@@ -1,11 +1,30 @@
+import 'dart:developer';
+
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
+
+  static const _tag = 'LoginScreen';
+
+  Future<void> _onKakaoLoginTap(BuildContext context) async {
+    log('카카오 로그인 버튼 탭', name: _tag);
+    try {
+      await KakaoAuthService().signIn();
+
+      // TODO: 백엔드 API 호출 - signIn()이 반환한 OAuthToken.accessToken을 서버로 전송
+      // final response = await authRepository.loginWithKakao(token.accessToken);
+      // TODO: 서버 응답 토큰 저장 후 홈 화면으로 이동
+    } catch (e, st) {
+      log('카카오 로그인 실패', name: _tag, error: e, stackTrace: st);
+      // TODO: 에러 처리 (스낵바, 다이얼로그 등)
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +36,7 @@ class LoginScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _KakaoLoginButton(
-                onTap: () {
-                  // TODO: 카카오 로그인 처리
-                },
-              ),
+              _KakaoLoginButton(onTap: () => _onKakaoLoginTap(context)),
               const SizedBox(height: ChaerokSpacing.md),
               _GoogleLoginButton(
                 onTap: () {
