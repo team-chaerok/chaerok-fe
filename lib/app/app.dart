@@ -1,5 +1,5 @@
 import 'package:chaerok/core/design_system/chaerok_theme.dart';
-
+import 'package:chaerok/features/auth/presentation/login_screen.dart';
 import 'package:flutter/material.dart';
 
 class ChaerokApp extends StatelessWidget {
@@ -11,7 +11,7 @@ class ChaerokApp extends StatelessWidget {
       title: 'Chaerok',
       debugShowCheckedModeBanner: false,
       theme: ChaerokTheme.light,
-      home: const Placeholder(),
+      home: const LoginScreen(),
     );
   }
 }
