@@ -25,6 +25,21 @@ jobs:
           flutter-version: "3.35.5"
           channel: "stable"
 
+      - name: Inject secrets (Android)
+        run: echo "kakao.nativeAppKey=${{ secrets.KAKAO_NATIVE_APP_KEY }}" >> android/local.properties
+
+      - name: Inject secrets (iOS)
+        run: echo "KAKAO_NATIVE_APP_KEY=${{ secrets.KAKAO_NATIVE_APP_KEY }}" > ios/Flutter/Secrets.xcconfig
+
+      - name: Inject secrets (Dart)
+        run: |
+          cat > lib/core/config/app_secrets.dart << 'EOF'
+          class AppSecrets {
+            const AppSecrets._();
+            static const String kakaoNativeAppKey = '${{ secrets.KAKAO_NATIVE_APP_KEY }}';
+          }
+          EOF
+
       - name: Install dependencies
         run: flutter pub get
 
