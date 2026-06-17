@@ -14,6 +14,13 @@ lib/
 └── data/
 ```
 
+## Git Hook 설정
+
+커밋 전 자동 포맷 및 정적 분석을 위해 최초 1회 아래 명령어를 실행합니다.
+
+````bash
+git config core.hooksPath .githooks
+
 ### 폴더 역할
 
 | 폴더        | 역할                                             |
@@ -58,7 +65,7 @@ lib/
         ├── chaerok_card.dart
         ├── loading_view.dart
         └── empty_view.dart
-```
+````
 
 ### 기본 원칙
 
