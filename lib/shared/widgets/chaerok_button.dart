@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+
+import 'package:flutter/material.dart';
 
 class ChaerokButton extends StatelessWidget {
   const ChaerokButton({
@@ -33,15 +33,13 @@ class ChaerokButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ChaerokRadius.md),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: ChaerokSpacing.lg,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.lg),
         ),
         child: Text(
           text,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: Colors.white),
         ),
       ),
     );

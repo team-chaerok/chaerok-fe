@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+echo "🔍 Checking staged Dart files..."
+
+DART_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.dart$' || true)
+
+if [ -n "$DART_FILES" ]; then
+  echo "🎨 Running dart format..."
+  dart format $DART_FILES
+
+  echo "➕ Re-adding formatted Dart files..."
+  git add $DART_FILES
+else
+  echo "No Dart files to format."
+fi
+
+echo "🧪 Running flutter analyze..."
+flutter analyze
+
+echo "✅ Pre-commit checks passed."
