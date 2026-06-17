@@ -4,8 +4,11 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
+import 'package:chaerok/features/home/presentation/home_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -17,12 +20,41 @@ class LoginScreen extends StatelessWidget {
     try {
       await KakaoAuthService().signIn();
 
-      // TODO: 백엔드 API 호출 - signIn()이 반환한 OAuthToken.accessToken을 서버로 전송
-      // final response = await authRepository.loginWithKakao(token.accessToken);
-      // TODO: 서버 응답 토큰 저장 후 홈 화면으로 이동
+      final user = await UserApi.instance.me();
+      if (!context.mounted) return;
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            provider: '카카오',
+            email: user.kakaoAccount?.email,
+            nickname: user.kakaoAccount?.profile?.nickname,
+          ),
+        ),
+      );
     } catch (e, st) {
       log('카카오 로그인 실패', name: _tag, error: e, stackTrace: st);
-      // TODO: 에러 처리 (스낵바, 다이얼로그 등)
+    }
+  }
+
+  Future<void> _onGoogleLoginTap(BuildContext context) async {
+    log('구글 로그인 버튼 탭', name: _tag);
+    try {
+      final account = await GoogleAuthService().signIn();
+
+      if (!context.mounted) return;
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            provider: '구글',
+            email: account.email,
+            nickname: account.displayName,
+          ),
+        ),
+      );
+    } catch (e, st) {
+      log('구글 로그인 실패', name: _tag, error: e, stackTrace: st);
     }
   }
 
@@ -38,11 +70,7 @@ class LoginScreen extends StatelessWidget {
             children: [
               _KakaoLoginButton(onTap: () => _onKakaoLoginTap(context)),
               const SizedBox(height: ChaerokSpacing.md),
-              _GoogleLoginButton(
-                onTap: () {
-                  // TODO: 구글 로그인 처리
-                },
-              ),
+              _GoogleLoginButton(onTap: () => _onGoogleLoginTap(context)),
             ],
           ),
         ),
