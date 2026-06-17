@@ -33,3 +33,39 @@ lib/
 - 화면에서는 API를 직접 호출하지 않고, `Controller → Repository → Datasource` 흐름을 따릅니다.
 
 자세한 프로젝트 구조 규칙은 [Project Structure Guide](docs/project-structure.md)를 참고합니다.
+
+## 디자인 시스템
+
+Chaerok은 화면 간 일관성을 유지하고, UI 수정 비용을 줄이기 위해 공통 디자인 시스템을 사용합니다.
+
+디자인 시스템은 크게 두 영역으로 관리합니다.
+
+```text
+lib/
+├── core/
+│   └── design_system/
+│       ├── chaerok_colors.dart
+│       ├── chaerok_typography.dart
+│       ├── chaerok_spacing.dart
+│       ├── chaerok_radius.dart
+│       ├── chaerok_shadows.dart
+│       └── chaerok_theme.dart
+│
+└── shared/
+    └── widgets/
+        ├── chaerok_button.dart
+        ├── chaerok_app_bar.dart
+        ├── chaerok_card.dart
+        ├── loading_view.dart
+        └── empty_view.dart
+```
+
+### 기본 원칙
+
+- 색상, 폰트, 간격, radius, shadow 같은 디자인 토큰은 `core/design_system/`에서 관리합니다.
+- 여러 화면에서 재사용되는 공통 UI 컴포넌트는 `shared/widgets/`에서 관리합니다.
+- 특정 기능에서만 사용하는 UI는 해당 `features/{기능명}/widgets/`에 둡니다.
+- 화면에서 직접 색상값, 폰트 크기, 여백값을 반복 작성하지 않고 디자인 토큰을 우선 사용합니다.
+- 앱 전체 테마는 `ChaerokTheme`을 통해 `MaterialApp`에 연결합니다.
+
+자세한 디자인 시스템 규칙은 [Design System Guide](docs/design-system.md)를 참고합니다.
