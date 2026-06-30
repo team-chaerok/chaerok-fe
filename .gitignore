@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets - 로컬에서만 유지, 절대 커밋 금지
+lib/core/config/app_secrets.dart
+ios/Flutter/Secrets.xcconfig
