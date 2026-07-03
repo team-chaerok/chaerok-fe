@@ -42,6 +42,7 @@ jobs:
             static const String googleServerClientId = '${{ secrets.GOOGLE_SERVER_CLIENT_ID }}';
           }
           EOF
+          dart format lib/core/config/app_secrets.dart
 
       - name: Install dependencies
         run: flutter pub get
