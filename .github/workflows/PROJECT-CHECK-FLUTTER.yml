@@ -36,7 +36,10 @@ jobs:
           cat > lib/core/config/app_secrets.dart << 'EOF'
           class AppSecrets {
             const AppSecrets._();
+            static const String baseUrl = '${{ secrets.BASE_URL }}';
             static const String kakaoNativeAppKey = '${{ secrets.KAKAO_NATIVE_APP_KEY }}';
+            static const String googleClientId = '${{ secrets.GOOGLE_CLIENT_ID }}';
+            static const String googleServerClientId = '${{ secrets.GOOGLE_SERVER_CLIENT_ID }}';
           }
           EOF
 
