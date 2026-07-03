@@ -6,7 +6,7 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 class KakaoAuthService {
   static const _tag = 'KakaoAuthService';
 
-  Future<OAuthToken> signIn() async {
+  Future<String> signIn() async {
     final kakaoTalkInstalled = await isKakaoTalkInstalled();
     log('카카오톡 설치 여부: $kakaoTalkInstalled', name: _tag);
 
@@ -14,8 +14,8 @@ class KakaoAuthService {
       try {
         log('카카오톡 앱으로 로그인 시도', name: _tag);
         final token = await UserApi.instance.loginWithKakaoTalk();
-        log('카카오톡으로 로그인 성공 - accessToken: ${token.accessToken}', name: _tag);
-        return token;
+        log('카카오톡으로 로그인 성공', name: _tag);
+        return _extractIdToken(token);
       } catch (e) {
         log('카카오톡으로 로그인 실패', name: _tag, error: e);
 
@@ -32,11 +32,22 @@ class KakaoAuthService {
     try {
       log('카카오 계정으로 로그인 시도', name: _tag);
       final token = await UserApi.instance.loginWithKakaoAccount();
-      log('카카오계정으로 로그인 성공 - accessToken: ${token.accessToken}', name: _tag);
-      return token;
+      log('카카오계정으로 로그인 성공', name: _tag);
+      return _extractIdToken(token);
     } catch (e) {
-      log('카카오계정으로 로그인 실패', name: _tag, error: e);
+      log('카카오계정으로 로그인 실패', name: _tag);
       rethrow;
     }
+  }
+
+  String _extractIdToken(OAuthToken token) {
+    final idToken = token.idToken;
+    log('카카오 idToken: $idToken', name: _tag);
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception(
+        '카카오 idToken이 없습니다. 카카오 개발자 콘솔에서 OpenID Connect를 활성화하세요.',
+      );
+    }
+    return idToken;
   }
 }

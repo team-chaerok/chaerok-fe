@@ -5,13 +5,17 @@ import 'package:google_sign_in/google_sign_in.dart';
 class GoogleAuthService {
   static const _tag = 'GoogleAuthService';
 
-  Future<GoogleSignInAccount> signIn() async {
+  Future<String> signIn() async {
     log('구글 로그인 시도', name: _tag);
 
     try {
       final account = await GoogleSignIn.instance.authenticate();
       log('구글 로그인 성공 - email: ${account.email}', name: _tag);
-      return account;
+
+      final auth = account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null) throw Exception('구글 idToken이 null입니다.');
+      return idToken;
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         log('사용자가 구글 로그인 취소', name: _tag);

@@ -3,8 +3,10 @@ import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class SignupScreen extends StatelessWidget {
+  const SignupScreen({super.key, required this.signupToken});
+
+  final String signupToken;
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +15,7 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: ChaerokColors.background,
         elevation: 0,
-        title: const Text('홈', style: ChaerokTypography.titleMedium),
+        title: const Text('회원가입', style: ChaerokTypography.titleMedium),
       ),
       body: const Center(
         child: Padding(
@@ -21,9 +23,9 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.check_circle, color: ChaerokColors.primary, size: 64),
+              Icon(Icons.person_add, color: ChaerokColors.primary, size: 64),
               SizedBox(height: ChaerokSpacing.lg),
-              Text('로그인 성공', style: ChaerokTypography.titleMedium),
+              Text('회원가입 화면', style: ChaerokTypography.titleMedium),
             ],
           ),
         ),
