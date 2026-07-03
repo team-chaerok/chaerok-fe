@@ -6,6 +6,7 @@ import '../../data/models/api_response.dart';
 import '../config/app_secrets.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
+import 'interceptors/logging_interceptor.dart';
 
 /// 앱 전체에서 공유되는 Dio HTTP 클라이언트 싱글톤.
 /// 로그아웃 처리가 필요하면 main.dart에서 [init]으로 초기화할 것.
@@ -14,6 +15,8 @@ class DioClient {
     _dio = Dio(
       BaseOptions(
         baseUrl: AppSecrets.baseUrl,
+
+        /// TODO : 백엔드랑 상의 후 수정
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
         headers: {'Content-Type': 'application/json'},
@@ -33,7 +36,7 @@ class DioClient {
         onUnauthorized: onUnauthorized,
       ),
       ErrorInterceptor(),
-      if (kDebugMode) LogInterceptor(requestBody: true, responseBody: true),
+      if (kDebugMode) LoggingInterceptor(),
     ]);
   }
 

@@ -15,8 +15,8 @@ class ApiResponse<T> {
     return ApiResponse<T>(
       success: json['success'] as bool? ?? true, // 백엔드 스펙 미확정 시 기본 성공으로 간주
       statusCode: statusCode,
-      data: fromJson != null && json['data'] != null
-          ? fromJson(json['data'])
+      data: fromJson != null
+          ? fromJson(json.containsKey('data') ? json['data'] : json)
           : null,
       message: json['message'] as String?,
     );
