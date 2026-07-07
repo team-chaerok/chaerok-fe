@@ -52,6 +52,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   /// 회원가입 버튼 클릭 시 호출되는 함수
   Future<void> _onSignupTap() async {
+    if (_isLoading) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
