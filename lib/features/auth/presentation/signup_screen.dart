@@ -67,13 +67,18 @@ class _SignupScreenState extends State<SignupScreen> {
           privacyAgreed: _privacyAgreed,
         ),
       );
-      log('회원가입 성공', name: _tag);
-      if (tokens.accessToken.isNotEmpty) {
-        await TokenStorage.instance.saveTokens(
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-        );
+      if (tokens.accessToken.isEmpty) {
+        log('회원가입 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
+        if (mounted) {
+          setState(() => _errorMessage = '회원가입에 실패했습니다. 다시 시도해주세요.');
+        }
+        return;
       }
+      log('회원가입 성공', name: _tag);
+      await TokenStorage.instance.saveTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      );
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,

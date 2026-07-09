@@ -44,6 +44,7 @@ class TokenStorage {
     await _storage.write(key: _keyAccessToken, value: accessToken);
   }
 
+  /// 저장된 토큰을 모두 삭제하고 isLoggedIn 상태를 false로 갱신한다.
   Future<void> clear() async {
     await _storage.delete(key: _keyAccessToken);
     await _storage.delete(key: _keyRefreshToken);
