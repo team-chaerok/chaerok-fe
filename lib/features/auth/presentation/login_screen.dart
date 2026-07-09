@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/o_auth_login_response.dart';
@@ -67,6 +68,11 @@ class LoginScreen extends StatelessWidget {
         ),
       );
     } else if (response.tokens != null) {
+      await TokenStorage.instance.saveTokens(
+        accessToken: response.tokens!.accessToken,
+        refreshToken: response.tokens!.refreshToken,
+      );
+      if (!context.mounted) return;
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),

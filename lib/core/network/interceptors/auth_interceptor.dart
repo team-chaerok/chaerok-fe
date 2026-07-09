@@ -1,24 +1,23 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../config/app_secrets.dart';
+import '../token_storage.dart';
 
-const _keyAccessToken = 'access_token';
-const _keyRefreshToken = 'refresh_token';
 // 재시도 요청임을 표시해 401 무한 루프 방지
 const _extraRetried = '_retried';
 
+/// 인증 토큰을 자동으로 갱신하고 요청을 재시도하는 Dio 인터셉터
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
-    required FlutterSecureStorage storage,
-    required Dio dio,
+    required TokenStorage tokenStorage, // 토큰 저장소
+    required Dio dio, // 토큰 갱신 요청을 보내기 위한 Dio 인스턴스
     this.onUnauthorized,
-  }) : _storage = storage,
+  }) : _tokenStorage = tokenStorage,
        _dio = dio;
 
-  final FlutterSecureStorage _storage;
+  final TokenStorage _tokenStorage;
   final Dio _dio;
   final void Function()? onUnauthorized;
 
@@ -27,11 +26,12 @@ class AuthInterceptor extends Interceptor {
   Completer<String?>? _refreshCompleter;
 
   @override
+  // 요청이 보내지기 전에 accessToken을 헤더에 추가
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await _storage.read(key: _keyAccessToken);
+    final token = await _tokenStorage.getAccessToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -39,6 +39,7 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
+  // 401 Unauthorized 에러 발생 시 토큰 갱신 후 요청 재시도
   Future<void> onError(
     DioException err,
     ErrorInterceptorHandler handler,
@@ -70,6 +71,7 @@ class AuthInterceptor extends Interceptor {
     }
   }
 
+  // 토큰 갱신(refresh) 요청을 보내고 새로운 accessToken을 반환
   Future<String?> _refreshAccessToken() async {
     if (_isRefreshing) {
       return _refreshCompleter!.future;
@@ -79,7 +81,7 @@ class AuthInterceptor extends Interceptor {
     _refreshCompleter = Completer<String?>();
 
     try {
-      final refreshToken = await _storage.read(key: _keyRefreshToken);
+      final refreshToken = await _tokenStorage.getRefreshToken();
       if (refreshToken == null) {
         _complete(null);
         return null;
@@ -93,14 +95,13 @@ class AuthInterceptor extends Interceptor {
 
       final newAccessToken = response.data['accessToken'] as String?;
       if (newAccessToken != null) {
-        await _storage.write(key: _keyAccessToken, value: newAccessToken);
+        await _tokenStorage.saveAccessToken(newAccessToken);
       }
 
       _complete(newAccessToken);
       return newAccessToken;
     } catch (_) {
-      await _storage.delete(key: _keyAccessToken);
-      await _storage.delete(key: _keyRefreshToken);
+      await _tokenStorage.clear();
       _complete(null);
       return null;
     }

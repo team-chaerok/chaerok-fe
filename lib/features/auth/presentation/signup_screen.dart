@@ -4,6 +4,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/signup_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
@@ -58,7 +59,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _errorMessage = null;
     });
     try {
-      await AuthApi.signUp(
+      final tokens = await AuthApi.signUp(
         SignupRequest(
           signupToken: widget.signupToken,
           nickname: _nicknameController.text.trim(),
@@ -67,6 +68,12 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       );
       log('회원가입 성공', name: _tag);
+      if (tokens.accessToken.isNotEmpty) {
+        await TokenStorage.instance.saveTokens(
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        );
+      }
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,
