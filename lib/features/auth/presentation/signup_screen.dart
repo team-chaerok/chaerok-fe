@@ -4,6 +4,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/signup_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
@@ -58,7 +59,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _errorMessage = null;
     });
     try {
-      await AuthApi.signUp(
+      final tokens = await AuthApi.signUp(
         SignupRequest(
           signupToken: widget.signupToken,
           nickname: _nicknameController.text.trim(),
@@ -66,7 +67,18 @@ class _SignupScreenState extends State<SignupScreen> {
           privacyAgreed: _privacyAgreed,
         ),
       );
+      if (tokens.accessToken.isEmpty || tokens.refreshToken.isEmpty) {
+        log('회원가입 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
+        if (mounted) {
+          setState(() => _errorMessage = '회원가입에 실패했습니다. 다시 시도해주세요.');
+        }
+        return;
+      }
       log('회원가입 성공', name: _tag);
+      await TokenStorage.instance.saveTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      );
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,

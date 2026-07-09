@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/o_auth_login_response.dart';
@@ -67,6 +68,16 @@ class LoginScreen extends StatelessWidget {
         ),
       );
     } else if (response.tokens != null) {
+      final tokens = response.tokens!;
+      if (tokens.accessToken.isEmpty || tokens.refreshToken.isEmpty) {
+        log('로그인 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
+        return;
+      }
+      await TokenStorage.instance.saveTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      );
+      if (!context.mounted) return;
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),

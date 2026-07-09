@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../data/models/api_response.dart';
 import '../config/app_secrets.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/logging_interceptor.dart';
+import 'token_storage.dart';
 
 /// 앱 전체에서 공유되는 Dio HTTP 클라이언트 싱글톤.
 /// 로그아웃 처리가 필요하면 main.dart에서 [init]으로 초기화할 것.
@@ -16,22 +16,16 @@ class DioClient {
       BaseOptions(
         baseUrl: AppSecrets.baseUrl,
 
-        /// TODO : 백엔드랑 상의 후 수정
+        /// TODO : TIMEOUT 시간 백엔드랑 상의 후 수정
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
         headers: {'Content-Type': 'application/json'},
       ),
     );
 
-    const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
-      // first_unlock: 기기 재시작 후 첫 잠금 해제 시점부터 접근 허용 (백그라운드 토큰 갱신 지원)
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-    );
-
     _dio.interceptors.addAll([
       AuthInterceptor(
-        storage: storage,
+        tokenStorage: TokenStorage.instance,
         dio: _dio,
         onUnauthorized: onUnauthorized,
       ),
