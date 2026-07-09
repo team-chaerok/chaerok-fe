@@ -94,8 +94,12 @@ class AuthInterceptor extends Interceptor {
       );
 
       final newAccessToken = response.data['accessToken'] as String?;
-      if (newAccessToken != null) {
-        await _tokenStorage.saveAccessToken(newAccessToken);
+      final newRefreshToken = response.data['refreshToken'] as String?;
+      if (newAccessToken != null && newRefreshToken != null) {
+        await _tokenStorage.saveTokens(
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+        );
       }
 
       _complete(newAccessToken);

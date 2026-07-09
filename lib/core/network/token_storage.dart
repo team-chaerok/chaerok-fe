@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const _keyAccessToken = 'access_token';
@@ -26,28 +27,46 @@ class TokenStorage {
   /// 로그인 여부를 구독 가능한 형태로 노출. saveTokens/clear 호출 시 자동 갱신됨.
   final ValueNotifier<bool> isLoggedIn = ValueNotifier(false);
 
-  Future<String?> getAccessToken() => _storage.read(key: _keyAccessToken);
+  Future<String?> getAccessToken() => _readSafely(_keyAccessToken);
 
-  Future<String?> getRefreshToken() => _storage.read(key: _keyRefreshToken);
+  Future<String?> getRefreshToken() => _readSafely(_keyRefreshToken);
 
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
   }) async {
-    await _storage.write(key: _keyAccessToken, value: accessToken);
-    await _storage.write(key: _keyRefreshToken, value: refreshToken);
-    isLoggedIn.value = true;
-  }
-
-  /// 토큰 재발급(refresh) 시 accessToken만 갱신한다.
-  Future<void> saveAccessToken(String accessToken) async {
-    await _storage.write(key: _keyAccessToken, value: accessToken);
+    try {
+      await _storage.write(key: _keyAccessToken, value: accessToken);
+      await _storage.write(key: _keyRefreshToken, value: refreshToken);
+      isLoggedIn.value = true;
+    } on PlatformException {
+      await _clearSilently();
+    }
   }
 
   /// 저장된 토큰을 모두 삭제하고 isLoggedIn 상태를 false로 갱신한다.
   Future<void> clear() async {
-    await _storage.delete(key: _keyAccessToken);
-    await _storage.delete(key: _keyRefreshToken);
+    await _clearSilently();
+  }
+
+  // 저장소 읽기 실패(예: Android 키스토어 손상으로 인한 BAD_DECRYPT) 시
+  // 저장소를 정리하고 null을 반환해 호출부가 재로그인 흐름으로 넘어가게 한다.
+  Future<String?> _readSafely(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } on PlatformException {
+      await _clearSilently();
+      return null;
+    }
+  }
+
+  Future<void> _clearSilently() async {
+    try {
+      await _storage.delete(key: _keyAccessToken);
+      await _storage.delete(key: _keyRefreshToken);
+    } on PlatformException {
+      // 삭제 자체가 실패해도 로그인 상태만은 확실히 false로 맞춘다.
+    }
     isLoggedIn.value = false;
   }
 }

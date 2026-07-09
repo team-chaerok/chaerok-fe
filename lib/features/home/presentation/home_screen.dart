@@ -19,9 +19,17 @@ class HomeScreen extends StatelessWidget {
     // 예: 토큰 삭제, 로그인 화면으로 이동 등
     log('로그아웃 버튼 탭', name: _tag);
     final refreshToken = await TokenStorage.instance.getRefreshToken();
-    log('현재 refreshToken: $refreshToken', name: _tag);
 
-    await AuthApi.logout(RefreshTokenRequest(refreshToken: refreshToken ?? ''));
+    try {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await AuthApi.logout(RefreshTokenRequest(refreshToken: refreshToken));
+      }
+    } catch (e, st) {
+      log('로그아웃 API 실패 - 로컬 토큰 삭제 진행', name: _tag, stackTrace: st);
+    } finally {
+      await TokenStorage.instance.clear();
+    }
+
     if (!context.mounted) return;
     await Navigator.of(
       context,

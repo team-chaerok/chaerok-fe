@@ -68,9 +68,14 @@ class LoginScreen extends StatelessWidget {
         ),
       );
     } else if (response.tokens != null) {
+      final tokens = response.tokens!;
+      if (tokens.accessToken.isEmpty || tokens.refreshToken.isEmpty) {
+        log('로그인 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
+        return;
+      }
       await TokenStorage.instance.saveTokens(
-        accessToken: response.tokens!.accessToken,
-        refreshToken: response.tokens!.refreshToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       );
       if (!context.mounted) return;
       await Navigator.pushReplacement(

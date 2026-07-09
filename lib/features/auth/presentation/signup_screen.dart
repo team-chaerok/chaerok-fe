@@ -67,7 +67,7 @@ class _SignupScreenState extends State<SignupScreen> {
           privacyAgreed: _privacyAgreed,
         ),
       );
-      if (tokens.accessToken.isEmpty) {
+      if (tokens.accessToken.isEmpty || tokens.refreshToken.isEmpty) {
         log('회원가입 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
         if (mounted) {
           setState(() => _errorMessage = '회원가입에 실패했습니다. 다시 시도해주세요.');
