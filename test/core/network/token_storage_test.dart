@@ -84,6 +84,63 @@ void main() {
     expect(await TokenStorage.instance.getRefreshToken(), isNull);
   });
 
+  test('accessToken이 없는 2xx 응답이면 unauthenticated를 반환하고 토큰을 삭제한다', () async {
+    final dio = _dioReturning(
+      (options) async => ResponseBody.fromString(
+        '{"refreshToken":"new-refresh"}',
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      ),
+    );
+
+    final status = await TokenStorage.instance.resolveSession(dio);
+
+    expect(status, SessionStatus.unauthenticated);
+    expect(await TokenStorage.instance.getRefreshToken(), isNull);
+  });
+
+  test('refreshToken이 없는 2xx 응답이면 unauthenticated를 반환하고 토큰을 삭제한다', () async {
+    final dio = _dioReturning(
+      (options) async => ResponseBody.fromString(
+        '{"accessToken":"new-access"}',
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      ),
+    );
+
+    final status = await TokenStorage.instance.resolveSession(dio);
+
+    expect(status, SessionStatus.unauthenticated);
+    expect(await TokenStorage.instance.getRefreshToken(), isNull);
+  });
+
+  test('서버가 500을 응답하면 networkError를 반환하고 refresh token을 유지한다', () async {
+    final dio = _dioReturning(
+      (options) async => ResponseBody.fromString('{"message":"error"}', 500),
+    );
+
+    final status = await TokenStorage.instance.resolveSession(dio);
+
+    expect(status, SessionStatus.networkError);
+    expect(await TokenStorage.instance.getRefreshToken(), 'old-refresh-token');
+  });
+
+  test('서버가 429를 응답하면 networkError를 반환하고 refresh token을 유지한다', () async {
+    final dio = _dioReturning(
+      (options) async =>
+          ResponseBody.fromString('{"message":"rate limited"}', 429),
+    );
+
+    final status = await TokenStorage.instance.resolveSession(dio);
+
+    expect(status, SessionStatus.networkError);
+    expect(await TokenStorage.instance.getRefreshToken(), 'old-refresh-token');
+  });
+
   test('연결에 실패하면 networkError를 반환하고 토큰을 유지한다', () async {
     final dio = _dioReturning(
       (options) async => throw DioException(

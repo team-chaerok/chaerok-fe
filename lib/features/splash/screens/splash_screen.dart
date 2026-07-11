@@ -40,7 +40,13 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     final status = await TokenStorage.instance.resolveSession(
-      Dio(BaseOptions(baseUrl: AppSecrets.baseUrl)),
+      Dio(
+        BaseOptions(
+          baseUrl: AppSecrets.baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      ),
     );
     log('세션 상태: $status', name: _tag);
 

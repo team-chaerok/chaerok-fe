@@ -28,7 +28,12 @@ class LoginScreen extends StatelessWidget {
       final response = await AuthApi.login(
         OAuthLoginRequest(provider: OAuthProvider.kakao, idToken: idToken),
       );
-      log('카카오 로그인 응답: $response', name: _tag);
+      log(
+        '카카오 로그인 응답 수신 (registered: ${response.registered}, '
+        'hasTokens: ${response.tokens != null}, '
+        'hasSignupToken: ${response.signupToken != null})',
+        name: _tag,
+      );
       if (!context.mounted) return;
       await _handleLoginResponse(context, response);
     } catch (e, st) {
@@ -43,7 +48,12 @@ class LoginScreen extends StatelessWidget {
       final response = await AuthApi.login(
         OAuthLoginRequest(provider: OAuthProvider.google, idToken: idToken),
       );
-      log('구글 로그인 응답: $response', name: _tag);
+      log(
+        '구글 로그인 응답 수신 (registered: ${response.registered}, '
+        'hasTokens: ${response.tokens != null}, '
+        'hasSignupToken: ${response.signupToken != null})',
+        name: _tag,
+      );
       if (!context.mounted) return;
       await _handleLoginResponse(context, response);
     } catch (e, st) {

@@ -37,7 +37,8 @@ class TokenStorage {
 
   Future<String?> getRefreshToken() => _readSafely(_keyRefreshToken);
 
-  Future<void> saveTokens({
+  /// 토큰 저장에 성공하면 true, 저장소 오류로 실패하면 false를 반환한다.
+  Future<bool> saveTokens({
     required String accessToken,
     required String refreshToken,
   }) async {
@@ -45,8 +46,10 @@ class TokenStorage {
       await _storage.write(key: _keyAccessToken, value: accessToken);
       await _storage.write(key: _keyRefreshToken, value: refreshToken);
       isLoggedIn.value = true;
+      return true;
     } on PlatformException {
       await _clearSilently();
+      return false;
     }
   }
 
@@ -74,15 +77,24 @@ class TokenStorage {
 
       final newAccessToken = response.data['accessToken'] as String?;
       final newRefreshToken = response.data['refreshToken'] as String?;
-      if (newAccessToken != null && newRefreshToken != null) {
-        await saveTokens(
-          accessToken: newAccessToken,
-          refreshToken: newRefreshToken,
-        );
+      if (newAccessToken == null ||
+          newAccessToken.isEmpty ||
+          newRefreshToken == null ||
+          newRefreshToken.isEmpty) {
+        await clear();
+        return SessionStatus.unauthenticated;
       }
-      return SessionStatus.authenticated;
+
+      final saved = await saveTokens(
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      );
+      return saved
+          ? SessionStatus.authenticated
+          : SessionStatus.unauthenticated;
     } on DioException catch (e) {
-      if (e.response != null) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 401 || statusCode == 403) {
         await clear();
         return SessionStatus.unauthenticated;
       }
