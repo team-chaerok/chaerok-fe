@@ -6,6 +6,7 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/api_error.dart';
+import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/settings/presentation/settings_screen.dart';
@@ -125,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: ChaerokSpacing.xxs),
           Text(
-            user.provider.toJson(),
+            _providerLabel(user.provider),
             style: ChaerokTypography.caption.copyWith(
               color: ChaerokColors.textSecondary,
             ),
@@ -133,6 +134,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  String _providerLabel(OAuthProvider provider) {
+    switch (provider) {
+      case OAuthProvider.kakao:
+        return '카카오';
+      case OAuthProvider.google:
+        return '구글';
+    }
   }
 
   Widget _buildCardContainer({required Widget child}) {

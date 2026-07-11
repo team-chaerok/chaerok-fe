@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 /// API 호출 중 발생한 예외에서 사용자에게 보여줄 에러 메시지를 추출합니다.
 String apiErrorMessage(Object error) {
   if (error is DioException && error.error is ApiError) {
-    return (error.error as ApiError).toString();
+    return (error.error as ApiError).message;
   }
   return error.toString();
 }
