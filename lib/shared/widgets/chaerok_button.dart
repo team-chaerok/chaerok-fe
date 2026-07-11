@@ -31,8 +31,12 @@ class ChaerokButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: ChaerokColors.primary,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: ChaerokColors.border,
-          disabledForegroundColor: ChaerokColors.textDisabled,
+          disabledBackgroundColor: isLoading
+              ? ChaerokColors.primary
+              : ChaerokColors.border,
+          disabledForegroundColor: isLoading
+              ? Colors.white
+              : ChaerokColors.textDisabled,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ChaerokRadius.md),
           ),

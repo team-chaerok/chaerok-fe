@@ -34,9 +34,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_loadingAction != null) return;
     log('로그아웃 버튼 탭', name: _tag);
     setState(() => _loadingAction = _SettingsAction.logout);
-    final refreshToken = await TokenStorage.instance.getRefreshToken();
 
     try {
+      final refreshToken = await TokenStorage.instance.getRefreshToken();
       if (refreshToken != null && refreshToken.isNotEmpty) {
         await AuthApi.logout(RefreshTokenRequest(refreshToken: refreshToken));
       }

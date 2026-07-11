@@ -13,6 +13,7 @@ class SocialLoginButton extends StatelessWidget {
     required this.foregroundColor,
     this.side,
     this.isLoading = false,
+    this.isEnabled = true,
   });
 
   final String label;
@@ -21,6 +22,7 @@ class SocialLoginButton extends StatelessWidget {
   final Color foregroundColor;
   final BorderSide? side;
   final bool isLoading;
+  final bool isEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,7 @@ class SocialLoginButton extends StatelessWidget {
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: isLoading ? null : onTap,
+        onPressed: isEnabled && !isLoading ? onTap : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,

@@ -130,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 backgroundColor: const Color(0xFFFEE500),
                 foregroundColor: const Color(0xFF191919),
                 isLoading: _loadingProvider == _LoginProvider.kakao,
+                isEnabled: _loadingProvider == null,
               ),
               const SizedBox(height: ChaerokSpacing.md),
               SocialLoginButton(
@@ -139,6 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 foregroundColor: ChaerokColors.textPrimary,
                 side: const BorderSide(color: ChaerokColors.border),
                 isLoading: _loadingProvider == _LoginProvider.google,
+                isEnabled: _loadingProvider == null,
               ),
             ],
           ),
