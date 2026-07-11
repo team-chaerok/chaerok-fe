@@ -11,16 +11,28 @@ import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
+import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-class SettingsScreen extends StatelessWidget {
+enum _SettingsAction { logout, withdraw }
+
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
   static const _tag = 'SettingsScreen';
 
+  _SettingsAction? _loadingAction;
+
   Future<void> _onLogoutTap(BuildContext context) async {
+    if (_loadingAction != null) return;
     log('로그아웃 버튼 탭', name: _tag);
+    setState(() => _loadingAction = _SettingsAction.logout);
     final refreshToken = await TokenStorage.instance.getRefreshToken();
 
     try {
@@ -40,16 +52,20 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _onWithdrawTap(BuildContext context) async {
+    if (_loadingAction != null) return;
     log('회원탈퇴 버튼 탭', name: _tag);
     final confirmed = await _showWithdrawConfirmDialog(context);
     if (confirmed != true) return;
     if (!context.mounted) return;
+
+    setState(() => _loadingAction = _SettingsAction.withdraw);
 
     try {
       await UsersApi.withdraw();
     } catch (e, st) {
       log('회원탈퇴 API 실패', name: _tag, error: e, stackTrace: st);
       if (!context.mounted) return;
+      setState(() => _loadingAction = null);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(_errorMessage(e))));
@@ -131,7 +147,12 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('로그아웃', style: ChaerokTypography.bodyLarge),
-              onTap: () => _onLogoutTap(context),
+              trailing: _loadingAction == _SettingsAction.logout
+                  ? const ChaerokLoadingIndicator(size: 20, strokeWidth: 2)
+                  : null,
+              onTap: _loadingAction == null
+                  ? () => _onLogoutTap(context)
+                  : null,
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -141,7 +162,16 @@ class SettingsScreen extends StatelessWidget {
                   color: ChaerokColors.error,
                 ),
               ),
-              onTap: () => _onWithdrawTap(context),
+              trailing: _loadingAction == _SettingsAction.withdraw
+                  ? const ChaerokLoadingIndicator(
+                      color: ChaerokColors.error,
+                      size: 20,
+                      strokeWidth: 2,
+                    )
+                  : null,
+              onTap: _loadingAction == null
+                  ? () => _onWithdrawTap(context)
+                  : null,
             ),
           ],
         ),

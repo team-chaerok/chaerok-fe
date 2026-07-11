@@ -16,13 +16,24 @@ import 'package:chaerok/shared/widgets/social_login_button.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-class LoginScreen extends StatelessWidget {
+enum _LoginProvider { kakao, google }
+
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
   static const _tag = 'LoginScreen';
 
+  _LoginProvider? _loadingProvider;
+
   Future<void> _onKakaoLoginTap(BuildContext context) async {
+    if (_loadingProvider != null) return;
     log('카카오 로그인 버튼 탭', name: _tag);
+    setState(() => _loadingProvider = _LoginProvider.kakao);
     try {
       final idToken = await KakaoAuthService().signIn();
       final response = await AuthApi.login(
@@ -38,11 +49,15 @@ class LoginScreen extends StatelessWidget {
       await _handleLoginResponse(context, response);
     } catch (e, st) {
       log('카카오 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _loadingProvider = null);
     }
   }
 
   Future<void> _onGoogleLoginTap(BuildContext context) async {
+    if (_loadingProvider != null) return;
     log('구글 로그인 버튼 탭', name: _tag);
+    setState(() => _loadingProvider = _LoginProvider.google);
     try {
       final idToken = await GoogleAuthService().signIn();
       final response = await AuthApi.login(
@@ -58,6 +73,8 @@ class LoginScreen extends StatelessWidget {
       await _handleLoginResponse(context, response);
     } catch (e, st) {
       log('구글 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _loadingProvider = null);
     }
   }
 
@@ -112,6 +129,7 @@ class LoginScreen extends StatelessWidget {
                 onTap: () => _onKakaoLoginTap(context),
                 backgroundColor: const Color(0xFFFEE500),
                 foregroundColor: const Color(0xFF191919),
+                isLoading: _loadingProvider == _LoginProvider.kakao,
               ),
               const SizedBox(height: ChaerokSpacing.md),
               SocialLoginButton(
@@ -120,6 +138,7 @@ class LoginScreen extends StatelessWidget {
                 backgroundColor: ChaerokColors.surface,
                 foregroundColor: ChaerokColors.textPrimary,
                 side: const BorderSide(color: ChaerokColors.border),
+                isLoading: _loadingProvider == _LoginProvider.google,
               ),
             ],
           ),
