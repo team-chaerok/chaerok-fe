@@ -1,6 +1,7 @@
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 
 import 'package:flutter/material.dart';
 
@@ -11,12 +12,14 @@ class ChaerokButton extends StatelessWidget {
     required this.onPressed,
     this.isFullWidth = true,
     this.isEnabled = true,
+    this.isLoading = false,
   });
 
   final String text;
   final VoidCallback? onPressed;
   final bool isFullWidth;
   final bool isEnabled;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +27,7 @@ class ChaerokButton extends StatelessWidget {
       height: 52,
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton(
-        onPressed: isEnabled ? onPressed : null,
+        onPressed: isEnabled && !isLoading ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: ChaerokColors.primary,
           foregroundColor: Colors.white,
@@ -35,12 +38,18 @@ class ChaerokButton extends StatelessWidget {
           ),
           padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.lg),
         ),
-        child: Text(
-          text,
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(color: Colors.white),
-        ),
+        child: isLoading
+            ? const ChaerokLoadingIndicator(
+                color: Colors.white,
+                size: 20,
+                strokeWidth: 2,
+              )
+            : Text(
+                text,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: Colors.white),
+              ),
       ),
     );
 
