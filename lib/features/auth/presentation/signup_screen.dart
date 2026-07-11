@@ -162,9 +162,10 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
             const Spacer(),
             ChaerokButton(
-              text: _isLoading ? '가입 중...' : '가입하기',
+              text: '가입하기',
               onPressed: _canSubmit ? _onSignupTap : null,
               isEnabled: _canSubmit,
+              isLoading: _isLoading,
             ),
           ],
         ),
