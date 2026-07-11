@@ -28,6 +28,12 @@ class LoginScreen extends StatelessWidget {
       final response = await AuthApi.login(
         OAuthLoginRequest(provider: OAuthProvider.kakao, idToken: idToken),
       );
+      log(
+        '카카오 로그인 응답 수신 (registered: ${response.registered}, '
+        'hasTokens: ${response.tokens != null}, '
+        'hasSignupToken: ${response.signupToken != null})',
+        name: _tag,
+      );
       if (!context.mounted) return;
       await _handleLoginResponse(context, response);
     } catch (e, st) {
@@ -41,6 +47,12 @@ class LoginScreen extends StatelessWidget {
       final idToken = await GoogleAuthService().signIn();
       final response = await AuthApi.login(
         OAuthLoginRequest(provider: OAuthProvider.google, idToken: idToken),
+      );
+      log(
+        '구글 로그인 응답 수신 (registered: ${response.registered}, '
+        'hasTokens: ${response.tokens != null}, '
+        'hasSignupToken: ${response.signupToken != null})',
+        name: _tag,
       );
       if (!context.mounted) return;
       await _handleLoginResponse(context, response);
@@ -73,11 +85,11 @@ class LoginScreen extends StatelessWidget {
         log('로그인 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
         return;
       }
-      await TokenStorage.instance.saveTokens(
+      final saved = await TokenStorage.instance.saveTokens(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
-      if (!context.mounted) return;
+      if (!saved || !context.mounted) return;
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),

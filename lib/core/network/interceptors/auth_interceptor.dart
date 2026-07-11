@@ -88,7 +88,7 @@ class AuthInterceptor extends Interceptor {
       }
 
       final response = await _dio.post(
-        '${AppSecrets.baseUrl}/auth/refresh',
+        '${AppSecrets.baseUrl}/api/auth/refresh',
         data: {'refreshToken': refreshToken},
         options: Options(extra: {_extraRetried: true}),
       );
