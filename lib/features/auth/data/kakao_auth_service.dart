@@ -40,6 +40,18 @@ class KakaoAuthService {
     }
   }
 
+  /// 카카오 계정 연동을 해제합니다. 회원탈퇴 시 호출되며,
+  /// 실패해도 이미 완료된 탈퇴를 되돌릴 수 없으므로 로그만 남기고 넘어갑니다.
+  Future<void> unlink() async {
+    log('카카오 계정 연동 해제 시도', name: _tag);
+    try {
+      await UserApi.instance.unlink();
+      log('카카오 계정 연동 해제 성공', name: _tag);
+    } catch (e) {
+      log('카카오 계정 연동 해제 실패', name: _tag, error: e);
+    }
+  }
+
   String _extractIdToken(OAuthToken token) {
     final idToken = token.idToken;
     log('카카오 idToken: $idToken', name: _tag);
