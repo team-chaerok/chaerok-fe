@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'dart:developer';
 
+import 'package:chaerok/core/config/app_secrets.dart';
+import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/remote/health_api.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
+import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -12,6 +17,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  static const _tag = 'SplashScreen';
+
   @override
   void initState() {
     super.initState();
@@ -31,10 +38,30 @@ class _SplashScreenState extends State<SplashScreen> {
       );
       await Future.delayed(const Duration(seconds: 1));
     }
+
+    final status = await TokenStorage.instance.resolveSession(
+      Dio(BaseOptions(baseUrl: AppSecrets.baseUrl)),
+    );
+    log('세션 상태: $status', name: _tag);
+
     if (!mounted) return;
+
+    if (status == SessionStatus.networkError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('네트워크 연결을 확인해주세요.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+
+    final destination = status == SessionStatus.authenticated
+        ? const HomeScreen()
+        : const LoginScreen();
+
     await Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => destination),
     );
   }
 
