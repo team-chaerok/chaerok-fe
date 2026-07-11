@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
@@ -11,7 +12,7 @@ import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
-import 'package:dio/dio.dart';
+import 'package:chaerok/features/settings/presentation/profile_edit_screen.dart';
 import 'package:flutter/material.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -52,7 +53,7 @@ class SettingsScreen extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(_errorMessage(e))));
+      ).showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
       return;
     }
 
@@ -105,11 +106,12 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  String _errorMessage(Object e) {
-    if (e is DioException && e.error is ApiError) {
-      return (e.error as ApiError).toString();
-    }
-    return e.toString();
+  void _onProfileEditTap(BuildContext context) {
+    unawaited(
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
+    );
   }
 
   @override
@@ -128,6 +130,11 @@ class SettingsScreen extends StatelessWidget {
         ),
         child: Column(
           children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('프로필 수정', style: ChaerokTypography.bodyLarge),
+              onTap: () => _onProfileEditTap(context),
+            ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('로그아웃', style: ChaerokTypography.bodyLarge),
