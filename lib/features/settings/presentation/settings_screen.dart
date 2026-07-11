@@ -69,7 +69,11 @@ class SettingsScreen extends StatelessWidget {
         onTimeout: () {},
       ),
     ]);
-    await TokenStorage.instance.clear();
+    try {
+      await TokenStorage.instance.clear();
+    } catch (e, st) {
+      log('토큰 삭제 실패', name: _tag, error: e, stackTrace: st);
+    }
 
     if (!context.mounted) return;
     await Navigator.of(
