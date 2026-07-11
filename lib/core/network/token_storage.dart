@@ -1,6 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../config/app_secrets.dart';
+import 'session_status.dart';
+
+export 'session_status.dart';
 
 const _keyAccessToken = 'access_token';
 const _keyRefreshToken = 'refresh_token';
@@ -47,6 +53,43 @@ class TokenStorage {
   /// 저장된 토큰을 모두 삭제하고 isLoggedIn 상태를 false로 갱신한다.
   Future<void> clear() async {
     await _clearSilently();
+  }
+
+  /// refresh token으로 실제 갱신을 시도해 세션 유효성을 검증한다.
+  ///
+  /// [dio]는 AuthInterceptor가 붙지 않은 순수 Dio 인스턴스여야 한다. 인터셉터가
+  /// 붙은 인스턴스를 넘기면 refresh 요청이 401을 받았을 때 AuthInterceptor가
+  /// 다시 자체적으로 refresh를 시도해 이중 처리가 된다.
+  Future<SessionStatus> resolveSession(Dio dio) async {
+    final refreshToken = await getRefreshToken();
+    if (refreshToken == null) {
+      return SessionStatus.unauthenticated;
+    }
+
+    try {
+      final response = await dio.post(
+        '${AppSecrets.baseUrl}/api/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+
+      final newAccessToken = response.data['accessToken'] as String?;
+      final newRefreshToken = response.data['refreshToken'] as String?;
+      if (newAccessToken != null && newRefreshToken != null) {
+        await saveTokens(
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+        );
+      }
+      return SessionStatus.authenticated;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        await clear();
+        return SessionStatus.unauthenticated;
+      }
+      return SessionStatus.networkError;
+    } catch (_) {
+      return SessionStatus.networkError;
+    }
   }
 
   // 저장소 읽기 실패(예: Android 키스토어 손상으로 인한 BAD_DECRYPT) 시
