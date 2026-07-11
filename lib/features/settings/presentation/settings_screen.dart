@@ -56,10 +56,19 @@ class SettingsScreen extends StatelessWidget {
       return;
     }
 
-    // 탈퇴 API가 이미 성공했으므로 소셜 연동 해제가 실패해도 탈퇴 흐름은 계속 진행한다.
+    // 탈퇴 API가 이미 성공했으므로 소셜 연동 해제가 실패하거나 응답이 없어도
+    // 탈퇴 흐름(토큰 삭제·화면 전환)은 계속 진행한다.
     log('회원탈퇴 성공 - 소셜 계정 연동 해제 진행', name: _tag);
-    await GoogleAuthService().disconnect();
-    await KakaoAuthService().unlink();
+    await Future.wait([
+      GoogleAuthService().disconnect().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {},
+      ),
+      KakaoAuthService().unlink().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {},
+      ),
+    ]);
     await TokenStorage.instance.clear();
 
     if (!context.mounted) return;
