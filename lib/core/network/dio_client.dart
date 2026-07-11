@@ -76,6 +76,15 @@ class DioClient {
     return _toApiResponse(response, fromJson);
   }
 
+  Future<ApiResponse<T>> patch<T>(
+    String path, {
+    dynamic data,
+    T Function(dynamic)? fromJson,
+  }) async {
+    final response = await _dio.patch(path, data: data);
+    return _toApiResponse(response, fromJson);
+  }
+
   Future<ApiResponse<T>> delete<T>(
     String path, {
     T Function(dynamic)? fromJson,
