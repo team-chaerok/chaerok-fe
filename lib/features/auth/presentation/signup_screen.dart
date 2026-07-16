@@ -9,6 +9,7 @@ import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/signup_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
 import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +80,8 @@ class _SignupScreenState extends State<SignupScreen> {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
+      if (!mounted) return;
+      await LocationPermissionService.requestPermission();
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,
