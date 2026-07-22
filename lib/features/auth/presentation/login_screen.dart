@@ -108,7 +108,11 @@ class _LoginScreenState extends State<LoginScreen> {
         refreshToken: tokens.refreshToken,
       );
       if (!saved || !context.mounted) return;
-      await LocationPermissionService.requestPermission();
+      try {
+        await LocationPermissionService.requestPermission();
+      } catch (e, st) {
+        log('위치 권한 요청 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+      }
       if (!context.mounted) return;
       await Navigator.pushReplacement(
         context,

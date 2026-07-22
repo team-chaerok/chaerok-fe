@@ -81,7 +81,11 @@ class _SignupScreenState extends State<SignupScreen> {
         refreshToken: tokens.refreshToken,
       );
       if (!mounted) return;
-      await LocationPermissionService.requestPermission();
+      try {
+        await LocationPermissionService.requestPermission();
+      } catch (e, st) {
+        log('위치 권한 요청 실패 - ${_toErrorMessage(e)}', name: _tag, stackTrace: st);
+      }
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,

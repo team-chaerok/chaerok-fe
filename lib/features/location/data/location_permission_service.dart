@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,7 +11,11 @@ class LocationPermissionService {
   static const _tag = 'LocationPermissionService';
 
   /// 다이얼로그 없이 현재 위치 권한 상태를 조회합니다.
+  /// macOS는 permission_handler 구현체가 없어 Geolocator의 자체 권한 API로 대체한다.
   static Future<PermissionStatus> checkStatus() {
+    if (Platform.isMacOS) {
+      return Geolocator.checkPermission().then(_toPermissionStatus);
+    }
     return Permission.locationWhenInUse.status;
   }
 
@@ -18,9 +23,24 @@ class LocationPermissionService {
   /// 이미 승인·영구거부된 상태라면 OS가 다이얼로그 없이 현재 상태를 그대로 반환한다.
   static Future<PermissionStatus> requestPermission() async {
     log('위치 권한 요청', name: _tag);
-    final status = await Permission.locationWhenInUse.request();
+    final status = Platform.isMacOS
+        ? _toPermissionStatus(await Geolocator.requestPermission())
+        : await Permission.locationWhenInUse.request();
     log('위치 권한 상태: $status', name: _tag);
     return status;
+  }
+
+  static PermissionStatus _toPermissionStatus(LocationPermission permission) {
+    switch (permission) {
+      case LocationPermission.whileInUse:
+      case LocationPermission.always:
+        return PermissionStatus.granted;
+      case LocationPermission.deniedForever:
+        return PermissionStatus.permanentlyDenied;
+      case LocationPermission.denied:
+      case LocationPermission.unableToDetermine:
+        return PermissionStatus.denied;
+    }
   }
 
   /// 기기의 위치 서비스(OS GPS 설정) 활성화 여부를 확인합니다.
