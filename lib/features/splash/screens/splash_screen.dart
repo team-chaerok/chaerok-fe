@@ -29,7 +29,8 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _init() async {
     try {
       await HealthApi.checkHealth();
-    } catch (_) {
+    } catch (e, st) {
+      log('헬스체크 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

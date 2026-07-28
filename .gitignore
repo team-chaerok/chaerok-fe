@@ -50,3 +50,6 @@ app.*.map.json
 # Secrets - 로컬에서만 유지, 절대 커밋 금지
 lib/core/config/app_secrets.dart
 ios/Flutter/Secrets.xcconfig
+
+# suh-template local context (issue/PAT metadata, not for commit)
+.suh-template/
