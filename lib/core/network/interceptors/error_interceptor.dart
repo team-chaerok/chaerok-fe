@@ -1,17 +1,32 @@
+import 'dart:developer';
+
 import 'package:dio/dio.dart';
 
 import '../../../data/models/api_error.dart';
 
 /// Dio 요청 중 발생한 오류를 ApiError로 변환하는 인터셉터
 class ErrorInterceptor extends Interceptor {
+  static const _tag = 'ErrorInterceptor';
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    log(
+      '[ERROR]\n'
+      '  Type   : ${err.type}\n'
+      '  Path   : ${err.requestOptions.path}\n'
+      '  Message: ${err.message}',
+      name: _tag,
+      error: err.error,
+      stackTrace: err.stackTrace,
+    );
+
     final apiError = _toApiError(err);
     handler.reject(
       DioException(
         requestOptions: err.requestOptions,
         error: apiError,
         type: err.type,
+        message: err.message,
         response: err.response,
       ),
     );
