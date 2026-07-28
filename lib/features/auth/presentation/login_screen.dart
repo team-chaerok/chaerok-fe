@@ -12,6 +12,7 @@ import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/signup_screen.dart';
 import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/social_login_button.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -107,6 +108,12 @@ class _LoginScreenState extends State<LoginScreen> {
         refreshToken: tokens.refreshToken,
       );
       if (!saved || !context.mounted) return;
+      try {
+        await LocationPermissionService.requestPermission();
+      } catch (e, st) {
+        log('위치 권한 요청 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+      }
+      if (!context.mounted) return;
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),

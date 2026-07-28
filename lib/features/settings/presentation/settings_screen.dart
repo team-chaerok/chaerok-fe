@@ -12,6 +12,7 @@ import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
+import 'package:chaerok/features/location/presentation/location_permission_mockup_screen.dart';
 import 'package:chaerok/features/settings/presentation/profile_edit_screen.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -130,6 +131,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // TODO : 실제 디자인 확정 후 정식 화면으로 교체되면 이 진입점은 제거할 것
+  void _onLocationPermissionMockupTap(BuildContext context) {
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const LocationPermissionMockupScreen(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,6 +162,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text('프로필 수정', style: ChaerokTypography.bodyLarge),
               onTap: () => _onProfileEditTap(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                '위치 권한 테스트 (Mockup)',
+                style: ChaerokTypography.bodyLarge,
+              ),
+              subtitle: const Text(
+                '디자인 확정 전 임시 QA 진입점',
+                style: ChaerokTypography.caption,
+              ),
+              onTap: () => _onLocationPermissionMockupTap(context),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
