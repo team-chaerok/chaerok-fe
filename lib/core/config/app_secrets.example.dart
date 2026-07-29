@@ -6,6 +6,7 @@ class AppSecrets {
   static const String baseUrl = '';
 
   static const String kakaoNativeAppKey = '';
+  static const String kakaoRestApiKey = '';
 
   static const String googleClientId = '';
   static const String googleServerClientId = '';
