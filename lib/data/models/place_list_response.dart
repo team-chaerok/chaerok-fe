@@ -16,7 +16,7 @@ class PlaceListResponse {
 
   factory PlaceListResponse.fromJson(Map<String, dynamic> json) {
     return PlaceListResponse(
-      id: json['id'] as int,
+      id: json['id'] as int?,
       tourContentId: json['tourContentId'] as String?,
       kakaoPlaceId: json['kakaoPlaceId'] as String?,
       title: json['title'] as String,
@@ -31,7 +31,7 @@ class PlaceListResponse {
     );
   }
 
-  final int id;
+  final int? id;
   final String? tourContentId;
   final String? kakaoPlaceId;
   final String title;
