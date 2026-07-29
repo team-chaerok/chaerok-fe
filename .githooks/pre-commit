@@ -2,13 +2,22 @@
 
 set -e
 
+# git이 훅을 실행할 때 주입하는 GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE이
+# flutter/dart 내부의 자체 git 버전 감지(SDK 저장소의 git describe)에 그대로
+# 상속되면, flutter가 이 프로젝트 저장소를 SDK 저장소로 착각해
+# "0.0.0-unknown" 버전으로 pub 의존성 해석에 실패한다.
+# 단, 이 훅 자체의 git diff/add는 partial commit(pathspec) 시 git이 구성한
+# 임시 인덱스(GIT_INDEX_FILE)를 그대로 써야 하므로 전역 unset은 하지 않고
+# flutter/dart 호출에만 범위를 한정한다.
+CLEAN_GIT_ENV="env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX"
+
 echo "🔍 Checking staged Dart files..."
 
 DART_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.dart$' || true)
 
 if [ -n "$DART_FILES" ]; then
   echo "🎨 Running dart format..."
-  dart format $DART_FILES
+  $CLEAN_GIT_ENV dart format $DART_FILES
 
   echo "➕ Re-adding formatted Dart files..."
   git add $DART_FILES
@@ -17,6 +26,6 @@ else
 fi
 
 echo "🧪 Running flutter analyze..."
-flutter analyze
+$CLEAN_GIT_ENV flutter analyze
 
 echo "✅ Pre-commit checks passed."

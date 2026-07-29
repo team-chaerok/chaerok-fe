@@ -9,6 +9,7 @@ class LocationPermissionService {
   const LocationPermissionService._();
 
   static const _tag = 'LocationPermissionService';
+  static const _positionTimeLimit = Duration(seconds: 30);
 
   /// 다이얼로그 없이 현재 위치 권한 상태를 조회합니다.
   /// macOS는 permission_handler 구현체가 없어 Geolocator의 자체 권한 API로 대체한다.
@@ -58,14 +59,31 @@ class LocationPermissionService {
 
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-        ),
+        locationSettings: _buildLocationSettings(),
       );
     } catch (e, st) {
-      log('현재 위치 조회 실패', name: _tag, error: e, stackTrace: st);
+      log('현재 위치 조회 실패 또는 시간 초과', name: _tag, error: e, stackTrace: st);
       return null;
     }
+  }
+
+  /// 위치 조회 설정을 생성합니다.
+  /// Android는 FusedLocationProviderClient(Play Services) 대신 LocationManager를
+  /// 강제 사용한다. 에뮬레이터의 Extended Controls로 주입한 mock 위치는
+  /// FusedLocationProviderClient로 갱신되지 않아 getCurrentPosition이
+  /// timeLimit까지 응답 없이 타임아웃되는 문제가 있었다.
+  static LocationSettings _buildLocationSettings() {
+    if (Platform.isAndroid) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.medium,
+        timeLimit: _positionTimeLimit,
+        forceLocationManager: true,
+      );
+    }
+    return const LocationSettings(
+      accuracy: LocationAccuracy.medium,
+      timeLimit: _positionTimeLimit,
+    );
   }
 
   /// 영구 거부 상태에서 사용자를 OS 앱 설정 화면으로 이동시킵니다.
