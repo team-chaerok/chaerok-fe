@@ -38,6 +38,7 @@ jobs:
             const AppSecrets._();
             static const String baseUrl = '${{ secrets.BASE_URL }}';
             static const String kakaoNativeAppKey = '${{ secrets.KAKAO_NATIVE_APP_KEY }}';
+            static const String kakaoRestApiKey = '${{ secrets.KAKAO_REST_API_KEY }}';
             static const String googleClientId = '${{ secrets.GOOGLE_CLIENT_ID }}';
             static const String googleServerClientId = '${{ secrets.GOOGLE_SERVER_CLIENT_ID }}';
           }
