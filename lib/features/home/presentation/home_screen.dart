@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     unawaited(_fetchUserInfo());
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       unawaited(_ensureLocationVerified());
     });
   }

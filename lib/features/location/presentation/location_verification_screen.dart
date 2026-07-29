@@ -5,6 +5,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
@@ -31,6 +32,7 @@ enum _Step {
   permissionPermanentlyDenied,
   locationFailed,
   outOfServiceArea,
+  regionVerificationFailed,
   placesFailed,
 }
 
@@ -126,8 +128,9 @@ class _LocationVerificationScreenState
       );
     }
 
+    final RegionResponse region;
     try {
-      final region = await RegionsApi.resolveRegion(
+      region = await RegionsApi.resolveRegion(
         ResolveRegionRequest(
           provinceName: useDebugFallbackRegion
               ? _debugFallbackProvinceName
@@ -137,13 +140,20 @@ class _LocationVerificationScreenState
               : administrativeRegion.cityCountyName,
         ),
       );
+    } catch (e, st) {
+      log('지역 검증 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
+      setState(() => _step = _Step.regionVerificationFailed);
+      return;
+    }
+    if (!mounted) return;
 
-      if (!region.serviceArea) {
-        setState(() => _step = _Step.outOfServiceArea);
-        return;
-      }
+    if (!region.serviceArea) {
+      setState(() => _step = _Step.outOfServiceArea);
+      return;
+    }
 
+    try {
       final places = await PlacesApi.getExternalPlaces(region.regionId);
       if (!mounted) return;
 
@@ -155,7 +165,7 @@ class _LocationVerificationScreenState
       LocationVerificationResult.sessionCache = result;
       Navigator.of(context).pop(result);
     } catch (e, st) {
-      log('지역 검증/관광지 조회 실패', name: _tag, error: e, stackTrace: st);
+      log('관광지 조회 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
       setState(() => _step = _Step.placesFailed);
     }
@@ -215,6 +225,12 @@ class _LocationVerificationScreenState
             '충청남도 전용 기능은 이용이 제한됩니다.',
         buttonText: '메인으로 돌아가기',
         onPressed: () => Navigator.of(context).pop(),
+      ),
+      _Step.regionVerificationFailed => _buildInfoCard(
+        title: '지역 정보를 확인하지 못했어요',
+        description: '일시적인 서버 또는 네트워크 오류예요. 잠시 후 다시 시도해주세요.',
+        buttonText: '다시 시도',
+        onPressed: _run,
       ),
       _Step.placesFailed => _buildInfoCard(
         title: '관광지 정보를 불러오지 못했어요',
