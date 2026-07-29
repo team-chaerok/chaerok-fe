@@ -21,7 +21,7 @@ class UserResponse {
       id: json['id'] as int,
       provider: OAuthProvider.fromJson(json['provider'] as String),
       nickname: json['nickname'] as String,
-      email: json['email'] as String,
+      email: json['email'] as String?,
       role: UserRole.fromJson(json['role'] as String),
     );
   }
@@ -29,6 +29,6 @@ class UserResponse {
   final int id;
   final OAuthProvider provider;
   final String nickname;
-  final String email;
+  final String? email;
   final UserRole role;
 }
