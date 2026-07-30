@@ -5,6 +5,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/core/location/location_provider_factory.dart';
 import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
@@ -86,7 +87,8 @@ class _LocationVerificationScreenState
       return;
     }
 
-    final position = await LocationPermissionService.getCurrentPosition();
+    final locationProvider = await LocationProviderFactory.create();
+    final position = await locationProvider.getCurrentPosition();
     if (!mounted) return;
     if (position == null) {
       final serviceEnabled =
