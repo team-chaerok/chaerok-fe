@@ -1,0 +1,52 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
+const _keyLastActiveFilmRollId = 'last_active_film_roll_id';
+const _keyMockLocationEnabled = 'mock_location_enabled';
+const _keyMockRegionCode = 'mock_region_code';
+
+/// 앱 재시작 복구/개발용 mock 설정 등 단순 값을 저장하는 SharedPreferences 래퍼.
+class AppPreferences {
+  AppPreferences._();
+
+  static AppPreferences? _instance;
+
+  static AppPreferences get instance => _instance ??= AppPreferences._();
+
+  /// 앱 재시작 시 진행중이던 필름롤로 복귀하기 위한 마지막 필름롤 ID.
+  Future<String?> getLastActiveFilmRollId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLastActiveFilmRollId);
+  }
+
+  Future<void> setLastActiveFilmRollId(String? filmRollId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (filmRollId == null) {
+      await prefs.remove(_keyLastActiveFilmRollId);
+    } else {
+      await prefs.setString(_keyLastActiveFilmRollId, filmRollId);
+    }
+  }
+
+  /// 개발용 mock 위치 사용 여부. release 빌드에서는 항상 비활성화로 취급된다
+  /// (`LocationProviderFactory` 참고).
+  Future<bool> isMockLocationEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyMockLocationEnabled) ?? false;
+  }
+
+  Future<void> setMockLocationEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyMockLocationEnabled, enabled);
+  }
+
+  /// 개발용 mock 위치가 표현할 지역(RegionCode.name 문자열).
+  Future<String?> getMockRegionCodeName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyMockRegionCode);
+  }
+
+  Future<void> setMockRegionCodeName(String regionCodeName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyMockRegionCode, regionCodeName);
+  }
+}
