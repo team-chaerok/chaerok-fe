@@ -20,10 +20,14 @@ abstract class FilmRollRepository {
   Stream<FilmRoll?> watchById(String filmRollId);
 
   /// 추천 코스 후보를 확정해 필름롤에 스냅샷으로 저장한다.
-  /// 이미 방문/사진 기록이 있는 상태에서 기존과 다른 코스로 변경하려 하면
-  /// [CourseChangeBlockedException]을 던진다(안전 기본값 정책).
+  /// [courseId]는 후보를 식별하는 안정적인 로컬 식별자([CourseResponse.courseId])로,
+  /// 서로 다른 후보가 우연히 같은 [courseTitle]을 가지더라도 다른 코스로
+  /// 인식되도록 한다. 이미 방문/사진 기록이 있는 상태에서 기존과 다른
+  /// [courseId]로 변경하려 하면 [CourseChangeBlockedException]을 던진다
+  /// (안전 기본값 정책).
   Future<void> selectCourse({
     required String filmRollId,
+    required String courseId,
     required String courseTitle,
     required List<CourseCandidatePlace> places,
   });

@@ -26,3 +26,16 @@ class UnsupportedRegionException implements Exception {
   String toString() =>
       'UnsupportedRegionException: 지원하지 않는 지역입니다($cityCountyName).';
 }
+
+/// 추천 코스 후보의 장소에 좌표(위도/경도)가 없는 상태로 코스를 확정하려 할 때
+/// 발생하는 예외. 좌표를 0으로 대체해 저장하면 실제 위치(기니만)로 오인될 수
+/// 있으므로, 확정 자체를 차단한다.
+class InvalidCoursePlaceException implements Exception {
+  const InvalidCoursePlaceException(this.placeName);
+
+  final String placeName;
+
+  @override
+  String toString() =>
+      'InvalidCoursePlaceException: "$placeName" 장소에 좌표 정보가 없어 코스를 확정할 수 없습니다.';
+}

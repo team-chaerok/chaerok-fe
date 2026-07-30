@@ -935,6 +935,10 @@ class $FilmRollPlacesTable extends FilmRollPlaces
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {filmRollId, id},
+  ];
+  @override
   FilmRollPlaceRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return FilmRollPlaceRow(
@@ -1467,9 +1471,6 @@ class $PhotosTable extends Photos with TableInfo<$PhotosTable, Photo> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES film_roll_places (id) ON DELETE CASCADE',
-    ),
   );
   static const VerificationMeta _originalPathMeta = const VerificationMeta(
     'originalPath',
@@ -2048,13 +2049,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [TableUpdate('photos', kind: UpdateKind.delete)],
     ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'film_roll_places',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('photos', kind: UpdateKind.delete)],
-    ),
   ]);
 }
 
@@ -2628,27 +2622,6 @@ final class $$FilmRollPlacesTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
-
-  static MultiTypedResultKey<$PhotosTable, List<Photo>> _photosRefsTable(
-    _$AppDatabase db,
-  ) => MultiTypedResultKey.fromTable(
-    db.photos,
-    aliasName: $_aliasNameGenerator(
-      db.filmRollPlaces.id,
-      db.photos.filmRollPlaceId,
-    ),
-  );
-
-  $$PhotosTableProcessedTableManager get photosRefs {
-    final manager = $$PhotosTableTableManager($_db, $_db.photos).filter(
-      (f) => f.filmRollPlaceId.id.sqlEquals($_itemColumn<String>('id')!),
-    );
-
-    final cache = $_typedResult.readTableOrNull(_photosRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
 }
 
 class $$FilmRollPlacesTableFilterComposer
@@ -2741,31 +2714,6 @@ class $$FilmRollPlacesTableFilterComposer
           ),
     );
     return composer;
-  }
-
-  Expression<bool> photosRefs(
-    Expression<bool> Function($$PhotosTableFilterComposer f) f,
-  ) {
-    final $$PhotosTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.photos,
-      getReferencedColumn: (t) => t.filmRollPlaceId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$PhotosTableFilterComposer(
-            $db: $db,
-            $table: $db.photos,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
   }
 }
 
@@ -2935,31 +2883,6 @@ class $$FilmRollPlacesTableAnnotationComposer
     );
     return composer;
   }
-
-  Expression<T> photosRefs<T extends Object>(
-    Expression<T> Function($$PhotosTableAnnotationComposer a) f,
-  ) {
-    final $$PhotosTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.photos,
-      getReferencedColumn: (t) => t.filmRollPlaceId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$PhotosTableAnnotationComposer(
-            $db: $db,
-            $table: $db.photos,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
 }
 
 class $$FilmRollPlacesTableTableManager
@@ -2975,7 +2898,7 @@ class $$FilmRollPlacesTableTableManager
           $$FilmRollPlacesTableUpdateCompanionBuilder,
           (FilmRollPlaceRow, $$FilmRollPlacesTableReferences),
           FilmRollPlaceRow,
-          PrefetchHooks Function({bool filmRollId, bool photosRefs})
+          PrefetchHooks Function({bool filmRollId})
         > {
   $$FilmRollPlacesTableTableManager(
     _$AppDatabase db,
@@ -3062,10 +2985,10 @@ class $$FilmRollPlacesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({filmRollId = false, photosRefs = false}) {
+          prefetchHooksCallback: ({filmRollId = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (photosRefs) db.photos],
+              explicitlyWatchedTables: [],
               addJoins:
                   <
                     T extends TableManagerState<
@@ -3100,29 +3023,7 @@ class $$FilmRollPlacesTableTableManager
                     return state;
                   },
               getPrefetchedDataCallback: (items) async {
-                return [
-                  if (photosRefs)
-                    await $_getPrefetchedData<
-                      FilmRollPlaceRow,
-                      $FilmRollPlacesTable,
-                      Photo
-                    >(
-                      currentTable: table,
-                      referencedTable: $$FilmRollPlacesTableReferences
-                          ._photosRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$FilmRollPlacesTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).photosRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where(
-                            (e) => e.filmRollPlaceId == item.id,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
+                return [];
               },
             );
           },
@@ -3142,7 +3043,7 @@ typedef $$FilmRollPlacesTableProcessedTableManager =
       $$FilmRollPlacesTableUpdateCompanionBuilder,
       (FilmRollPlaceRow, $$FilmRollPlacesTableReferences),
       FilmRollPlaceRow,
-      PrefetchHooks Function({bool filmRollId, bool photosRefs})
+      PrefetchHooks Function({bool filmRollId})
     >;
 typedef $$PhotosTableCreateCompanionBuilder =
     PhotosCompanion Function({
@@ -3191,25 +3092,6 @@ final class $$PhotosTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
-
-  static $FilmRollPlacesTable _filmRollPlaceIdTable(_$AppDatabase db) =>
-      db.filmRollPlaces.createAlias(
-        $_aliasNameGenerator(db.photos.filmRollPlaceId, db.filmRollPlaces.id),
-      );
-
-  $$FilmRollPlacesTableProcessedTableManager get filmRollPlaceId {
-    final $_column = $_itemColumn<String>('film_roll_place_id')!;
-
-    final manager = $$FilmRollPlacesTableTableManager(
-      $_db,
-      $_db.filmRollPlaces,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_filmRollPlaceIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
 }
 
 class $$PhotosTableFilterComposer
@@ -3223,6 +3105,11 @@ class $$PhotosTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filmRollPlaceId => $composableBuilder(
+    column: $table.filmRollPlaceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3278,29 +3165,6 @@ class $$PhotosTableFilterComposer
     );
     return composer;
   }
-
-  $$FilmRollPlacesTableFilterComposer get filmRollPlaceId {
-    final $$FilmRollPlacesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.filmRollPlaceId,
-      referencedTable: $db.filmRollPlaces,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$FilmRollPlacesTableFilterComposer(
-            $db: $db,
-            $table: $db.filmRollPlaces,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$PhotosTableOrderingComposer
@@ -3314,6 +3178,11 @@ class $$PhotosTableOrderingComposer
   });
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filmRollPlaceId => $composableBuilder(
+    column: $table.filmRollPlaceId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3369,29 +3238,6 @@ class $$PhotosTableOrderingComposer
     );
     return composer;
   }
-
-  $$FilmRollPlacesTableOrderingComposer get filmRollPlaceId {
-    final $$FilmRollPlacesTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.filmRollPlaceId,
-      referencedTable: $db.filmRollPlaces,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$FilmRollPlacesTableOrderingComposer(
-            $db: $db,
-            $table: $db.filmRollPlaces,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$PhotosTableAnnotationComposer
@@ -3405,6 +3251,11 @@ class $$PhotosTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get filmRollPlaceId => $composableBuilder(
+    column: $table.filmRollPlaceId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get originalPath => $composableBuilder(
     column: $table.originalPath,
@@ -3450,29 +3301,6 @@ class $$PhotosTableAnnotationComposer
     );
     return composer;
   }
-
-  $$FilmRollPlacesTableAnnotationComposer get filmRollPlaceId {
-    final $$FilmRollPlacesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.filmRollPlaceId,
-      referencedTable: $db.filmRollPlaces,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$FilmRollPlacesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.filmRollPlaces,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$PhotosTableTableManager
@@ -3488,7 +3316,7 @@ class $$PhotosTableTableManager
           $$PhotosTableUpdateCompanionBuilder,
           (Photo, $$PhotosTableReferences),
           Photo,
-          PrefetchHooks Function({bool filmRollId, bool filmRollPlaceId})
+          PrefetchHooks Function({bool filmRollId})
         > {
   $$PhotosTableTableManager(_$AppDatabase db, $PhotosTable table)
     : super(
@@ -3555,61 +3383,47 @@ class $$PhotosTableTableManager
                     (e.readTable(table), $$PhotosTableReferences(db, table, e)),
               )
               .toList(),
-          prefetchHooksCallback:
-              ({filmRollId = false, filmRollPlaceId = false}) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (filmRollId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.filmRollId,
-                                    referencedTable: $$PhotosTableReferences
-                                        ._filmRollIdTable(db),
-                                    referencedColumn: $$PhotosTableReferences
-                                        ._filmRollIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
-                        }
-                        if (filmRollPlaceId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.filmRollPlaceId,
-                                    referencedTable: $$PhotosTableReferences
-                                        ._filmRollPlaceIdTable(db),
-                                    referencedColumn: $$PhotosTableReferences
-                                        ._filmRollPlaceIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
-                        }
+          prefetchHooksCallback: ({filmRollId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (filmRollId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.filmRollId,
+                                referencedTable: $$PhotosTableReferences
+                                    ._filmRollIdTable(db),
+                                referencedColumn: $$PhotosTableReferences
+                                    ._filmRollIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
 
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [];
+                    return state;
                   },
-                );
+              getPrefetchedDataCallback: (items) async {
+                return [];
               },
+            );
+          },
         ),
       );
 }
@@ -3626,7 +3440,7 @@ typedef $$PhotosTableProcessedTableManager =
       $$PhotosTableUpdateCompanionBuilder,
       (Photo, $$PhotosTableReferences),
       Photo,
-      PrefetchHooks Function({bool filmRollId, bool filmRollPlaceId})
+      PrefetchHooks Function({bool filmRollId})
     >;
 
 class $AppDatabaseManager {

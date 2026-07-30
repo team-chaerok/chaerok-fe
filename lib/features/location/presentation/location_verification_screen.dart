@@ -6,6 +6,7 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/core/location/location_provider_factory.dart';
+import 'package:chaerok/core/location/mock_location_provider.dart';
 import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
@@ -72,22 +73,25 @@ class _LocationVerificationScreenState
       return;
     }
 
-    var status = await LocationPermissionService.checkStatus();
-    if (!status.isGranted) {
-      status = await LocationPermissionService.requestPermission();
-    }
-    if (!mounted) return;
-
-    if (status.isPermanentlyDenied) {
-      setState(() => _step = _Step.permissionPermanentlyDenied);
-      return;
-    }
-    if (!status.isGranted) {
-      setState(() => _step = _Step.permissionDenied);
-      return;
-    }
-
     final locationProvider = await LocationProviderFactory.create();
+
+    if (locationProvider is! MockLocationProvider) {
+      var status = await LocationPermissionService.checkStatus();
+      if (!status.isGranted) {
+        status = await LocationPermissionService.requestPermission();
+      }
+      if (!mounted) return;
+
+      if (status.isPermanentlyDenied) {
+        setState(() => _step = _Step.permissionPermanentlyDenied);
+        return;
+      }
+      if (!status.isGranted) {
+        setState(() => _step = _Step.permissionDenied);
+        return;
+      }
+    }
+
     final position = await locationProvider.getCurrentPosition();
     if (!mounted) return;
     if (position == null) {

@@ -1,4 +1,5 @@
 import 'package:chaerok/data/models/course_place_response.dart';
+import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 
 /// 추천 코스 후보에 포함된 장소 하나를 필름롤 스냅샷으로 저장하기 위한 입력 값.
 /// [CoursesApi.getRecommendedCourses]가 반환하는 [CoursePlaceResponse]를 그대로 저장하지 않고
@@ -16,18 +17,27 @@ class CourseCandidatePlace {
     this.imageUrl,
   });
 
+  /// 좌표(위도/경도)가 없는 장소는 [InvalidCoursePlaceException]을 던진다.
+  /// 0으로 대체해 저장하면 실제 좌표(기니만)로 오인될 수 있어 코스 확정
+  /// 자체를 막는다([SelectCourseUseCase]가 이 값을 저장하기 전에 호출됨).
   factory CourseCandidatePlace.fromCoursePlaceResponse(
     CoursePlaceResponse response, {
     required int visitOrder,
   }) {
+    final latitude = response.latitude;
+    final longitude = response.longitude;
+    if (latitude == null || longitude == null) {
+      throw InvalidCoursePlaceException(response.title);
+    }
+
     return CourseCandidatePlace(
       serverPlaceId: response.placeId,
       externalPlaceId: response.externalPlaceId,
       name: response.title,
       address: response.address,
       category: response.categoryDetail ?? response.categoryGroup,
-      latitude: response.latitude ?? 0,
-      longitude: response.longitude ?? 0,
+      latitude: latitude,
+      longitude: longitude,
       visitOrder: visitOrder,
     );
   }

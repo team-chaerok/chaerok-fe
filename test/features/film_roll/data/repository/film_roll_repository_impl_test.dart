@@ -85,6 +85,7 @@ void main() {
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
+      courseId: 'course-1',
       courseTitle: '테스트 코스',
       places: const [_testPlace],
     );
@@ -109,6 +110,18 @@ void main() {
       filmRollRepository.completeFilmRoll(filmRoll.id),
       throwsA(isA<FilmRollNotCompletableException>()),
     );
+
+    await filmRollRepository.selectCourse(
+      filmRollId: filmRoll.id,
+      courseId: 'course-1',
+      courseTitle: '테스트 코스',
+      places: const [_testPlace],
+    );
+
+    await expectLater(
+      filmRollRepository.completeFilmRoll(filmRoll.id),
+      throwsA(isA<FilmRollNotCompletableException>()),
+    );
   });
 
   test('완료 조건을 충족하면 필름롤이 completed 상태가 된다', () async {
@@ -118,6 +131,7 @@ void main() {
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
+      courseId: 'course-1',
       courseTitle: '테스트 코스',
       places: const [_testPlace],
     );
@@ -137,6 +151,7 @@ void main() {
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
+      courseId: 'course-a',
       courseTitle: '코스 A',
       places: const [_testPlace],
     );
@@ -146,7 +161,60 @@ void main() {
     await expectLater(
       filmRollRepository.selectCourse(
         filmRollId: filmRoll.id,
+        courseId: 'course-b',
         courseTitle: '코스 B',
+        places: const [_testPlace],
+      ),
+      throwsA(isA<CourseChangeBlockedException>()),
+    );
+  });
+
+  test('장소 구성이 같아도 courseId가 같으면 제목만 달라도 차단되지 않는다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+    );
+    await filmRollRepository.selectCourse(
+      filmRollId: filmRoll.id,
+      courseId: 'course-a',
+      courseTitle: '코스 A',
+      places: const [_testPlace],
+    );
+    final places = await placeRepository.findByFilmRoll(filmRoll.id);
+    await placeRepository.markVisited(places.first.id);
+
+    // title이 바뀌어도 courseId(같은 후보)가 같으면 재선택으로 취급해 차단하지 않는다.
+    await filmRollRepository.selectCourse(
+      filmRollId: filmRoll.id,
+      courseId: 'course-a',
+      courseTitle: '코스 A(수정된 제목)',
+      places: const [_testPlace],
+    );
+
+    final updated = await filmRollRepository.findById(filmRoll.id);
+    expect(updated!.selectedCourseTitle, '코스 A(수정된 제목)');
+  });
+
+  test('courseId가 다르면 title이 우연히 같아도 방문 기록이 있는 코스 변경이 차단된다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+    );
+    await filmRollRepository.selectCourse(
+      filmRollId: filmRoll.id,
+      courseId: 'course-a',
+      courseTitle: '중복 제목',
+      places: const [_testPlace],
+    );
+    final places = await placeRepository.findByFilmRoll(filmRoll.id);
+    await placeRepository.markVisited(places.first.id);
+
+    // title은 우연히 같지만 courseId가 다른, 실제로는 다른 후보 코스.
+    await expectLater(
+      filmRollRepository.selectCourse(
+        filmRollId: filmRoll.id,
+        courseId: 'course-b',
+        courseTitle: '중복 제목',
         places: const [_testPlace],
       ),
       throwsA(isA<CourseChangeBlockedException>()),
@@ -160,12 +228,14 @@ void main() {
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
+      courseId: 'course-a',
       courseTitle: '코스 A',
       places: const [_testPlace],
     );
 
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
+      courseId: 'course-b',
       courseTitle: '코스 B',
       places: const [_testPlace],
     );

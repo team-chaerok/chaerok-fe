@@ -20,19 +20,27 @@ class FilmRollPlaceLocalDataSource {
     )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  Future<int> countByFilmRoll(String filmRollId) async {
-    final rows = await findByFilmRoll(filmRollId);
-    return rows.length;
+  Future<int> countByFilmRoll(String filmRollId) {
+    final count = _db.filmRollPlaces.id.count();
+    final query = _db.selectOnly(_db.filmRollPlaces)
+      ..addColumns([count])
+      ..where(_db.filmRollPlaces.filmRollId.equals(filmRollId));
+    return query.map((row) => row.read(count)!).getSingle();
   }
 
-  Future<int> countVisitedByFilmRoll(String filmRollId) async {
-    final rows = await findByFilmRoll(filmRollId);
-    return rows.where((row) => row.isVisited).length;
+  Future<int> countVisitedByFilmRoll(String filmRollId) {
+    final count = _db.filmRollPlaces.id.count();
+    final query = _db.selectOnly(_db.filmRollPlaces)
+      ..addColumns([count])
+      ..where(
+        _db.filmRollPlaces.filmRollId.equals(filmRollId) &
+            _db.filmRollPlaces.isVisited.equals(true),
+      );
+    return query.map((row) => row.read(count)!).getSingle();
   }
 
   Future<bool> hasAnyVisited(String filmRollId) async {
-    final rows = await findByFilmRoll(filmRollId);
-    return rows.any((row) => row.isVisited);
+    return await countVisitedByFilmRoll(filmRollId) > 0;
   }
 
   Future<void> insertAll(List<FilmRollPlacesCompanion> rows) {

@@ -22,4 +22,11 @@ class FilmRollPlaces extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+
+  // Photos.filmRollId/filmRollPlaceId 복합 외래키가 이 컬럼 조합을 참조하므로,
+  // SQLite가 요구하는 대로 (filmRollId, id) 전용 UNIQUE 인덱스를 별도로 선언한다.
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {filmRollId, id},
+  ];
 }

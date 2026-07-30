@@ -38,18 +38,28 @@ class PhotoRepositoryImpl implements PhotoRepository {
     );
 
     final now = DateTime.now();
-    await _photoDs.insert(
-      PhotosCompanion.insert(
-        id: photoId,
-        filmRollId: filmRollId,
-        filmRollPlaceId: filmRollPlaceId,
+    try {
+      await _photoDs.insert(
+        PhotosCompanion.insert(
+          id: photoId,
+          filmRollId: filmRollId,
+          filmRollPlaceId: filmRollPlaceId,
+          originalPath: paths.originalPath,
+          thumbnailPath: paths.thumbnailPath,
+          takenAt: now,
+          latitude: Value(latitude),
+          longitude: Value(longitude),
+        ),
+      );
+    } catch (_) {
+      // DB insert 실패 시 이미 저장된 파일이 고아로 남지 않도록 정리한 뒤
+      // 원래 실패를 그대로 전파한다.
+      await _photoStorage.delete(
         originalPath: paths.originalPath,
         thumbnailPath: paths.thumbnailPath,
-        takenAt: now,
-        latitude: Value(latitude),
-        longitude: Value(longitude),
-      ),
-    );
+      );
+      rethrow;
+    }
 
     return FilmRollPhoto(
       id: photoId,

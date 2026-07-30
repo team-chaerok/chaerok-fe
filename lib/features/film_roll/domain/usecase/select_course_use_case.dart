@@ -27,6 +27,7 @@ class SelectCourseUseCase {
 
     return _filmRollRepository.selectCourse(
       filmRollId: filmRollId,
+      courseId: course.courseId,
       courseTitle: course.title,
       places: places,
     );

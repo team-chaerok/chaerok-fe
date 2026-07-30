@@ -74,6 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => FilmRollScreen(filmRollId: recovered.id),
       ),
     );
+    if (!mounted) return;
+    await _loadRecoveredFilmRoll();
   }
 
   Future<void> _loadMockLocationSettings() async {
@@ -158,6 +160,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       );
+      if (!mounted) return;
+      await _loadRecoveredFilmRoll();
     } on UnsupportedRegionException {
       if (!mounted) return;
       ScaffoldMessenger.of(

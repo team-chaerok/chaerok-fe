@@ -70,7 +70,10 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
         await controller.dispose();
         return;
       }
-      setState(() => _cameraController = controller);
+      setState(() {
+        _cameraController = controller;
+        _errorMessage = null;
+      });
     } catch (e, st) {
       log('카메라 초기화 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
@@ -81,13 +84,15 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final controller = _cameraController;
-    if (controller == null || !controller.value.isInitialized) return;
+    final isInitialized = controller != null && controller.value.isInitialized;
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
+      if (!isInitialized) return;
       setState(() => _cameraController = null);
       unawaited(controller.dispose());
     } else if (state == AppLifecycleState.resumed) {
+      if (isInitialized) return;
       unawaited(_initializeCamera());
     }
   }
