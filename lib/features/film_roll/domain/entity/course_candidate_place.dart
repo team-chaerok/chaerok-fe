@@ -17,9 +17,11 @@ class CourseCandidatePlace {
     this.imageUrl,
   });
 
-  /// 좌표(위도/경도)가 없는 장소는 [InvalidCoursePlaceException]을 던진다.
-  /// 0으로 대체해 저장하면 실제 좌표(기니만)로 오인될 수 있어 코스 확정
-  /// 자체를 막는다([SelectCourseUseCase]가 이 값을 저장하기 전에 호출됨).
+  /// 좌표(위도/경도)가 없거나 유효 범위를 벗어난 장소는
+  /// [InvalidCoursePlaceException]을 던진다. 0으로 대체해 저장하면 실제
+  /// 좌표(기니만)로 오인될 수 있고, NaN/Infinity나 범위를 벗어난 값도 지도
+  /// 표시·거리 계산을 깨뜨릴 수 있어 코스 확정 자체를 막는다
+  /// ([SelectCourseUseCase]가 이 값을 저장하기 전에 호출됨).
   factory CourseCandidatePlace.fromCoursePlaceResponse(
     CoursePlaceResponse response, {
     required int visitOrder,
@@ -27,7 +29,23 @@ class CourseCandidatePlace {
     final latitude = response.latitude;
     final longitude = response.longitude;
     if (latitude == null || longitude == null) {
-      throw InvalidCoursePlaceException(response.title);
+      throw InvalidCoursePlaceException(response.title, '좌표 정보 없음');
+    }
+    if (!latitude.isFinite || !longitude.isFinite) {
+      throw InvalidCoursePlaceException(
+        response.title,
+        'latitude=$latitude, longitude=$longitude (유한한 값이 아님)',
+      );
+    }
+    if (latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
+      throw InvalidCoursePlaceException(
+        response.title,
+        'latitude=$latitude, longitude=$longitude (허용 범위 밖: '
+        'latitude [-90, 90], longitude [-180, 180])',
+      );
     }
 
     return CourseCandidatePlace(

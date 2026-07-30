@@ -25,6 +25,12 @@ abstract class FilmRollRepository {
   /// 인식되도록 한다. 이미 방문/사진 기록이 있는 상태에서 기존과 다른
   /// [courseId]로 변경하려 하면 [CourseChangeBlockedException]을 던진다
   /// (안전 기본값 정책).
+  ///
+  /// 충돌 없는 식별자 계약: [courseId]는 서로 다른 장소 구성(장소 개수,
+  /// 순서, 각 장소의 ID 종류/출처/값 중 하나라도)에 대해 항상 서로 다른
+  /// 문자열이어야 한다. 이 계약이 깨지면 실제로는 다른 코스인데 같은
+  /// 코스로 오인되어 변경 차단이 누락될 수 있다. 구현은
+  /// [CourseResponse.courseId]/[CoursePlaceResponse.identityParts]를 참고.
   Future<void> selectCourse({
     required String filmRollId,
     required String courseId,

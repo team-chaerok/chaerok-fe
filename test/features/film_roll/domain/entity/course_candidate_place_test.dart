@@ -50,4 +50,89 @@ void main() {
       throwsA(isA<InvalidCoursePlaceException>()),
     );
   });
+
+  test('latitude가 NaN이면 예외가 발생한다', () {
+    expect(
+      () => CourseCandidatePlace.fromCoursePlaceResponse(
+        const CoursePlaceResponse(
+          source: 'kakao',
+          title: '테스트 장소',
+          categoryGroup: '카페',
+          address: '주소',
+          latitude: double.nan,
+          longitude: 127.1,
+        ),
+        visitOrder: 0,
+      ),
+      throwsA(isA<InvalidCoursePlaceException>()),
+    );
+  });
+
+  test('longitude가 Infinity이면 예외가 발생한다', () {
+    expect(
+      () => CourseCandidatePlace.fromCoursePlaceResponse(
+        const CoursePlaceResponse(
+          source: 'kakao',
+          title: '테스트 장소',
+          categoryGroup: '카페',
+          address: '주소',
+          latitude: 37.1,
+          longitude: double.infinity,
+        ),
+        visitOrder: 0,
+      ),
+      throwsA(isA<InvalidCoursePlaceException>()),
+    );
+  });
+
+  test('latitude가 90을 초과하면 예외가 발생한다', () {
+    expect(
+      () => CourseCandidatePlace.fromCoursePlaceResponse(
+        const CoursePlaceResponse(
+          source: 'kakao',
+          title: '테스트 장소',
+          categoryGroup: '카페',
+          address: '주소',
+          latitude: 90.1,
+          longitude: 127.1,
+        ),
+        visitOrder: 0,
+      ),
+      throwsA(isA<InvalidCoursePlaceException>()),
+    );
+  });
+
+  test('longitude가 -180 미만이면 예외가 발생한다', () {
+    expect(
+      () => CourseCandidatePlace.fromCoursePlaceResponse(
+        const CoursePlaceResponse(
+          source: 'kakao',
+          title: '테스트 장소',
+          categoryGroup: '카페',
+          address: '주소',
+          latitude: 37.1,
+          longitude: -180.1,
+        ),
+        visitOrder: 0,
+      ),
+      throwsA(isA<InvalidCoursePlaceException>()),
+    );
+  });
+
+  test('경계값(latitude 90, longitude 180)은 유효한 좌표로 보존된다', () {
+    final place = CourseCandidatePlace.fromCoursePlaceResponse(
+      const CoursePlaceResponse(
+        source: 'kakao',
+        title: '테스트 장소',
+        categoryGroup: '카페',
+        address: '주소',
+        latitude: 90,
+        longitude: 180,
+      ),
+      visitOrder: 0,
+    );
+
+    expect(place.latitude, 90);
+    expect(place.longitude, 180);
+  });
 }

@@ -83,16 +83,15 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = _cameraController;
-    final isInitialized = controller != null && controller.value.isInitialized;
-
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      if (!isInitialized) return;
+      final controller = _cameraController;
+      if (controller == null || !controller.value.isInitialized) return;
       setState(() => _cameraController = null);
       unawaited(controller.dispose());
     } else if (state == AppLifecycleState.resumed) {
-      if (isInitialized) return;
+      final controller = _cameraController;
+      if (controller != null && controller.value.isInitialized) return;
       unawaited(_initializeCamera());
     }
   }
