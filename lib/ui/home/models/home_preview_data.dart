@@ -56,7 +56,8 @@ class FilmRollPreviewData {
   final int totalCount;
   final String supportingText;
 
-  double get progress => capturedCount / totalCount;
+  double get progress =>
+      totalCount <= 0 ? 0.0 : (capturedCount / totalCount).clamp(0.0, 1.0);
 }
 
 class RecommendedPlacePreviewData {

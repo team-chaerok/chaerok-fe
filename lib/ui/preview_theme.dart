@@ -61,7 +61,7 @@ class UiPreviewTypography {
   // the system-font fallback so functional UI does not inherit display fonts.
   static const TextStyle displayLarge = TextStyle(
     fontSize: 26,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     height: 1.25,
     letterSpacing: -0.4,
     color: UiPreviewColors.textPrimary,
@@ -69,7 +69,7 @@ class UiPreviewTypography {
 
   static const TextStyle displayMedium = TextStyle(
     fontSize: 22,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     height: 1.3,
     letterSpacing: -0.2,
     color: UiPreviewColors.textPrimary,
@@ -152,8 +152,8 @@ class UiPreviewTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: UiPreviewColors.background,
-      splashColor: UiPreviewColors.surface.withValues(alpha: 0.12),
-      highlightColor: UiPreviewColors.surface.withValues(alpha: 0.08),
+      splashColor: UiPreviewColors.primaryDark.withValues(alpha: 0.10),
+      highlightColor: UiPreviewColors.primaryDark.withValues(alpha: 0.06),
       textTheme: const TextTheme(
         headlineLarge: UiPreviewTypography.headingLarge,
         headlineMedium: UiPreviewTypography.headingMedium,

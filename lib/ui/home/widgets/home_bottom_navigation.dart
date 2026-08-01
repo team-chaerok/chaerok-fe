@@ -52,7 +52,7 @@ class HomeBottomNavigation extends StatelessWidget {
                     '카메라',
                     style: UiPreviewTypography.labelSmall.copyWith(
                       color: UiPreviewColors.primaryDark,
-                      fontSize: 9,
+                      fontSize: 10,
                     ),
                   ),
                 ],
@@ -115,7 +115,7 @@ class _NavigationItem extends StatelessWidget {
                 label,
                 style: UiPreviewTypography.labelSmall.copyWith(
                   color: color,
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
