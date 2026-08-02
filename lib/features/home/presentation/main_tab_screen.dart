@@ -88,7 +88,15 @@ class _MainTabScreenState extends State<MainTabScreen> {
         ),
       );
       if (captured == true) {
-        await FilmRollModule.instance.completeVisit(nextPlace.id);
+        try {
+          await FilmRollModule.instance.completeVisit(nextPlace.id);
+        } catch (e, st) {
+          log('방문 완료 처리 실패', name: _tag, error: e, stackTrace: st);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('촬영은 완료됐지만 방문 처리에 실패했어요.')),
+          );
+        }
       }
     } catch (e, st) {
       log('카메라 진입 실패', name: _tag, error: e, stackTrace: st);

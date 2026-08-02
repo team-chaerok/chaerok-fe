@@ -75,9 +75,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   /// 앱 재시작 시 진행중이던 필름롤이 있다면 복구해 "이어하기"로 노출한다.
   Future<void> _loadRecoveredFilmRoll() async {
-    final recovered = await FilmRollModule.instance.recoverLastActiveFilmRoll();
-    if (!mounted) return;
-    setState(() => _recoveredFilmRoll = recovered);
+    try {
+      final recovered = await FilmRollModule.instance
+          .recoverLastActiveFilmRoll();
+      if (!mounted) return;
+      setState(() => _recoveredFilmRoll = recovered);
+    } catch (e, st) {
+      log('필름롤 복구 실패', name: _tag, error: e, stackTrace: st);
+    }
   }
 
   Future<void> _onResumeFilmRollTap() async {

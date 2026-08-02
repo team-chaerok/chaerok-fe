@@ -45,6 +45,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   int? _regionId;
   List<PlaceListResponse> _places = const [];
   Position? _currentPosition;
+  int _fetchRequestId = 0;
 
   @override
   void initState() {
@@ -54,9 +55,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Future<void> _loadCurrentPosition() async {
-    final position = await LocationPermissionService.getCurrentPosition();
-    if (!mounted || position == null) return;
-    setState(() => _currentPosition = position);
+    try {
+      final position = await LocationPermissionService.getCurrentPosition();
+      if (!mounted || position == null) return;
+      setState(() => _currentPosition = position);
+    } catch (e, st) {
+      log('현재 위치 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
   }
 
   Future<void> _onRegionSelected(RegionCode region) async {
@@ -66,28 +71,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Future<void> _fetchPlaces() async {
+    final requestId = ++_fetchRequestId;
+    final region = _selectedRegion;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final region = await RegionsApi.resolveRegion(
+      final resolvedRegion = await RegionsApi.resolveRegion(
         ResolveRegionRequest(
           provinceName: _serviceProvinceName,
-          cityCountyName: _selectedRegion.cityCountyName,
+          cityCountyName: region.cityCountyName,
         ),
       );
-      final places = await PlacesApi.getExternalPlaces(region.regionId);
-      if (!mounted) return;
+      final places = await PlacesApi.getExternalPlaces(resolvedRegion.regionId);
+      if (!mounted || requestId != _fetchRequestId) return;
       setState(() {
-        _regionId = region.regionId;
+        _regionId = resolvedRegion.regionId;
         _places = places;
         _isLoading = false;
       });
     } catch (e, st) {
       log('관광지 조회 실패', name: _tag, error: e, stackTrace: st);
-      if (!mounted) return;
+      if (!mounted || requestId != _fetchRequestId) return;
       setState(() {
         _errorMessage = apiErrorMessage(e);
         _isLoading = false;
@@ -279,6 +286,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         top: false,
         child: ChaerokButton(
           text: '${_selectedRegion.displayName}에서 필름롤 시작하기',
+          isEnabled: _regionId != null && !_isLoading,
           isLoading: _isEnteringFilmRoll,
           onPressed: _onEnterRegionTap,
         ),
