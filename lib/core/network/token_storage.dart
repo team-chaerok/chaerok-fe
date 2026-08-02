@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
@@ -106,9 +108,13 @@ class TokenStorage {
 
   // 저장소 읽기 실패(예: Android 키스토어 손상으로 인한 BAD_DECRYPT) 시
   // 저장소를 정리하고 null을 반환해 호출부가 재로그인 흐름으로 넘어가게 한다.
+  // 네이티브 플랫폼 채널 호출이 예외 없이 멈추는 기기 환경도 있어(알려진
+  // flutter_secure_storage 이슈), 그 경우까지 대비해 읽기에 타임아웃을 둔다.
   Future<String?> _readSafely(String key) async {
     try {
-      return await _storage.read(key: key);
+      return await _storage
+          .read(key: key)
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
     } on PlatformException {
       await _clearSilently();
       return null;
