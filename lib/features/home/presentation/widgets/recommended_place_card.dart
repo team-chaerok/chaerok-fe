@@ -1,5 +1,9 @@
-import 'package:chaerok/ui/home/models/home_preview_data.dart';
-import 'package:chaerok/ui/preview_theme.dart';
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_radius.dart';
+import 'package:chaerok/core/design_system/chaerok_shadows.dart';
+import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:flutter/material.dart';
 
 class RecommendedPlaceCard extends StatelessWidget {
@@ -10,27 +14,27 @@ class RecommendedPlaceCard extends StatelessWidget {
     this.isFeatured = false,
   });
 
-  final RecommendedPlacePreviewData data;
+  final RecommendedPlaceSummaryData data;
   final VoidCallback onTap;
   final bool isFeatured;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: UiPreviewColors.surface,
-      borderRadius: BorderRadius.circular(UiPreviewRadius.lg),
+      color: ChaerokColors.surface,
+      borderRadius: BorderRadius.circular(ChaerokRadius.lg),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(UiPreviewRadius.lg),
+        borderRadius: BorderRadius.circular(ChaerokRadius.lg),
         child: Ink(
           decoration: BoxDecoration(
-            color: UiPreviewColors.surface,
-            border: Border.all(color: UiPreviewColors.border),
-            borderRadius: BorderRadius.circular(UiPreviewRadius.lg),
-            boxShadow: isFeatured ? UiPreviewShadows.card : null,
+            color: ChaerokColors.surface,
+            border: Border.all(color: ChaerokColors.border),
+            borderRadius: BorderRadius.circular(ChaerokRadius.lg),
+            boxShadow: isFeatured ? ChaerokShadows.card : null,
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(UiPreviewRadius.lg),
+            borderRadius: BorderRadius.circular(ChaerokRadius.lg),
             child: isFeatured ? _buildFeatured() : _buildCompact(),
           ),
         ),
@@ -48,10 +52,10 @@ class RecommendedPlaceCard extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            UiPreviewSpacing.sm,
-            UiPreviewSpacing.xs,
-            UiPreviewSpacing.sm,
-            UiPreviewSpacing.sm,
+            ChaerokSpacing.sm,
+            ChaerokSpacing.xs,
+            ChaerokSpacing.sm,
+            ChaerokSpacing.sm,
           ),
           child: _PlaceInformation(data: data),
         ),
@@ -71,18 +75,18 @@ class RecommendedPlaceCard extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: UiPreviewSpacing.sm,
-                vertical: UiPreviewSpacing.xs,
+                horizontal: ChaerokSpacing.sm,
+                vertical: ChaerokSpacing.xs,
               ),
               child: _PlaceInformation(data: data),
             ),
           ),
           const Padding(
-            padding: EdgeInsets.only(right: UiPreviewSpacing.sm),
+            padding: EdgeInsets.only(right: ChaerokSpacing.sm),
             child: Icon(
               Icons.chevron_right_rounded,
-              color: UiPreviewColors.textSecondary,
-              size: UiPreviewSpacing.lg,
+              color: ChaerokColors.textSecondary,
+              size: ChaerokSpacing.lg,
             ),
           ),
         ],
@@ -94,10 +98,11 @@ class RecommendedPlaceCard extends StatelessWidget {
 class _PlaceInformation extends StatelessWidget {
   const _PlaceInformation({required this.data});
 
-  final RecommendedPlacePreviewData data;
+  final RecommendedPlaceSummaryData data;
 
   @override
   Widget build(BuildContext context) {
+    final distance = data.distance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -106,9 +111,9 @@ class _PlaceInformation extends StatelessWidget {
           data.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: UiPreviewTypography.headingMedium,
+          style: ChaerokTypography.headingMedium,
         ),
-        const SizedBox(height: UiPreviewSpacing.xxs),
+        const SizedBox(height: ChaerokSpacing.xxs),
         Row(
           children: [
             Flexible(
@@ -116,23 +121,32 @@ class _PlaceInformation extends StatelessWidget {
                 data.category,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: UiPreviewTypography.labelSmall,
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: UiPreviewSpacing.xs),
-              child: SizedBox(
-                width: 2,
-                height: 2,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: UiPreviewColors.textSecondary,
-                    shape: BoxShape.circle,
-                  ),
+                style: ChaerokTypography.labelSmall.copyWith(
+                  color: ChaerokColors.textSecondary,
                 ),
               ),
             ),
-            Text(data.distance, style: UiPreviewTypography.labelSmall),
+            if (distance != null) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
+                child: SizedBox(
+                  width: 2,
+                  height: 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: ChaerokColors.textSecondary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+              Text(
+                distance,
+                style: ChaerokTypography.labelSmall.copyWith(
+                  color: ChaerokColors.textSecondary,
+                ),
+              ),
+            ],
           ],
         ),
       ],
@@ -162,20 +176,20 @@ class _SummerTownPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final skyPaint = Paint()..color = UiPreviewColors.skyBlue;
+    final skyPaint = Paint()..color = ChaerokColors.skyBlue;
     final sunlightPaint = Paint()
-      ..color = UiPreviewColors.surface.withValues(alpha: 0.72);
+      ..color = ChaerokColors.surface.withValues(alpha: 0.72);
     final distantGreenPaint = Paint()
-      ..color = UiPreviewColors.sage.withValues(alpha: 0.78);
+      ..color = ChaerokColors.sage.withValues(alpha: 0.78);
     final deepGreenPaint = Paint()
-      ..color = UiPreviewColors.primary.withValues(alpha: 0.82);
-    final groundPaint = Paint()..color = UiPreviewColors.sageLight;
+      ..color = ChaerokColors.primary.withValues(alpha: 0.82);
+    final groundPaint = Paint()..color = ChaerokColors.sageLight;
     final pathPaint = Paint()
-      ..color = UiPreviewColors.surface.withValues(alpha: 0.82);
+      ..color = ChaerokColors.surface.withValues(alpha: 0.82);
     final waterPaint = Paint()
-      ..color = UiPreviewColors.skyBlue.withValues(alpha: 0.72);
+      ..color = ChaerokColors.skyBlue.withValues(alpha: 0.72);
     final wallPaint = Paint()
-      ..color = UiPreviewColors.surface.withValues(alpha: 0.92);
+      ..color = ChaerokColors.surface.withValues(alpha: 0.92);
 
     canvas.drawRect(Offset.zero & size, skyPaint);
     canvas.drawCircle(
@@ -237,7 +251,7 @@ class _SummerTownPainter extends CustomPainter {
               size.width * 0.64,
               size.height * 0.22,
             ),
-            const Radius.circular(UiPreviewRadius.sm),
+            const Radius.circular(ChaerokRadius.sm),
           ),
           wallPaint,
         );
@@ -275,7 +289,7 @@ class _SummerTownPainter extends CustomPainter {
     Paint foliagePaint,
   ) {
     final trunkPaint = Paint()
-      ..color = UiPreviewColors.primaryDark.withValues(alpha: 0.46);
+      ..color = ChaerokColors.primaryDark.withValues(alpha: 0.46);
     canvas.drawRect(
       Rect.fromLTWH(x - 2, size.height * baseHeight, 4, size.height * 0.24),
       trunkPaint,

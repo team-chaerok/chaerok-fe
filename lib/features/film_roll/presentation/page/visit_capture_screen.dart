@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:camera/camera.dart';
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
@@ -136,9 +137,9 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: ChaerokColors.cameraBlack,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: ChaerokColors.cameraBlack,
         elevation: 0,
         foregroundColor: Colors.white,
         title: Text(

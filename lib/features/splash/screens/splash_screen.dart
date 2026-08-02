@@ -5,7 +5,7 @@ import 'package:chaerok/core/config/app_secrets.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/remote/health_api.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
-import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +20,10 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   static const _tag = 'SplashScreen';
 
+  // 헬스체크/세션 검증 각 단계에 자체 타임아웃이 있지만, 알려지지 않은 원인으로
+  // 어느 한 단계가 예외 없이 멈추는 경우까지 대비한 전체 초기화 상한선.
+  static const _initTimeout = Duration(seconds: 20);
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +31,24 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _init() async {
+    try {
+      await _runInitFlow().timeout(_initTimeout);
+    } on TimeoutException catch (e, st) {
+      log(
+        '초기화가 시간 내에 끝나지 않음 - 로그인 화면으로 이동',
+        name: _tag,
+        error: e,
+        stackTrace: st,
+      );
+      if (!mounted) return;
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
+  }
+
+  Future<void> _runInitFlow() async {
     try {
       await HealthApi.checkHealth();
     } catch (e, st) {
@@ -64,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     final destination = status == SessionStatus.authenticated
-        ? const HomeScreen()
+        ? const MainTabScreen()
         : const LoginScreen();
 
     await Navigator.pushReplacement(

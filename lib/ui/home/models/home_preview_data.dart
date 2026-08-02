@@ -1,3 +1,5 @@
+import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
+
 class HomePreviewData {
   const HomePreviewData({
     required this.regionName,
@@ -9,26 +11,25 @@ class HomePreviewData {
   static const sample = HomePreviewData(
     regionName: '공주시',
     userNickname: '여행자',
-    filmRoll: FilmRollPreviewData(
+    filmRoll: FilmRollSummaryData(
       name: '공주 필름 롤',
       capturedCount: 12,
       totalCount: 36,
-      supportingText: '지금의 빛과 공기를 한 장씩 담아보세요.',
     ),
     recommendedPlaces: [
-      RecommendedPlacePreviewData(
+      RecommendedPlaceSummaryData(
         name: '제민천 산책길',
         category: '자연·산책',
         distance: '120m',
         placeholderMood: PlacePlaceholderMood.stream,
       ),
-      RecommendedPlacePreviewData(
+      RecommendedPlaceSummaryData(
         name: '공산성',
         category: '유적·역사',
         distance: '480m',
         placeholderMood: PlacePlaceholderMood.wall,
       ),
-      RecommendedPlacePreviewData(
+      RecommendedPlaceSummaryData(
         name: '연미산 자연미술공원',
         category: '문화·전시',
         distance: '1.8km',
@@ -39,39 +40,6 @@ class HomePreviewData {
 
   final String regionName;
   final String userNickname;
-  final FilmRollPreviewData filmRoll;
-  final List<RecommendedPlacePreviewData> recommendedPlaces;
+  final FilmRollSummaryData filmRoll;
+  final List<RecommendedPlaceSummaryData> recommendedPlaces;
 }
-
-class FilmRollPreviewData {
-  const FilmRollPreviewData({
-    required this.name,
-    required this.capturedCount,
-    required this.totalCount,
-    required this.supportingText,
-  });
-
-  final String name;
-  final int capturedCount;
-  final int totalCount;
-  final String supportingText;
-
-  double get progress =>
-      totalCount <= 0 ? 0.0 : (capturedCount / totalCount).clamp(0.0, 1.0);
-}
-
-class RecommendedPlacePreviewData {
-  const RecommendedPlacePreviewData({
-    required this.name,
-    required this.category,
-    required this.distance,
-    required this.placeholderMood,
-  });
-
-  final String name;
-  final String category;
-  final String distance;
-  final PlacePlaceholderMood placeholderMood;
-}
-
-enum PlacePlaceholderMood { stream, wall, forest }
