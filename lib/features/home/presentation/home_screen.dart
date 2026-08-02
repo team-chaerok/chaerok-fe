@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:chaerok/core/config/app_preferences.dart';
+import 'package:chaerok/core/database/local_database.dart';
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
@@ -10,9 +12,17 @@ import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
+import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_collection_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
 import 'package:chaerok/features/location/presentation/location_verification_screen.dart';
 import 'package:chaerok/features/settings/presentation/settings_screen.dart';
+import 'package:chaerok/shared/region/region_code.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
+import 'package:drift_db_viewer/drift_db_viewer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -30,6 +40,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   LocationVerificationResult? _locationResult;
+  bool _isEnteringFilmRoll = false;
+  bool _isMockLocationEnabled = false;
+  RegionCode _mockRegionCode = RegionCode.gongju;
+  FilmRoll? _recoveredFilmRoll;
 
   @override
   void initState() {
@@ -38,6 +52,43 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_ensureLocationVerified());
+    });
+    unawaited(_loadRecoveredFilmRoll());
+    if (kDebugMode) {
+      unawaited(_loadMockLocationSettings());
+    }
+  }
+
+  /// 앱 재시작 시 진행중이던 필름롤이 있다면 복구해 "이어하기"로 노출한다.
+  Future<void> _loadRecoveredFilmRoll() async {
+    final recovered = await FilmRollModule.instance.recoverLastActiveFilmRoll();
+    if (!mounted) return;
+    setState(() => _recoveredFilmRoll = recovered);
+  }
+
+  Future<void> _onResumeFilmRollTap() async {
+    final recovered = _recoveredFilmRoll;
+    if (recovered == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FilmRollScreen(filmRollId: recovered.id),
+      ),
+    );
+    if (!mounted) return;
+    await _loadRecoveredFilmRoll();
+  }
+
+  Future<void> _loadMockLocationSettings() async {
+    final preferences = AppPreferences.instance;
+    final isEnabled = await preferences.isMockLocationEnabled();
+    final regionCodeName = await preferences.getMockRegionCodeName();
+    if (!mounted) return;
+    setState(() {
+      _isMockLocationEnabled = isEnabled;
+      _mockRegionCode = RegionCode.values.firstWhere(
+        (region) => region.name == regionCodeName,
+        orElse: () => RegionCode.gongju,
+      );
     });
   }
 
@@ -90,6 +141,67 @@ class _HomeScreenState extends State<HomeScreen> {
     await _fetchUserInfo();
   }
 
+  /// 위치 인증으로 확인된 지역에 대한 로컬 필름롤을 찾거나 새로 생성해 진입한다.
+  Future<void> _onStartFilmRollTap() async {
+    final locationResult = _locationResult;
+    if (locationResult == null || _isEnteringFilmRoll) return;
+
+    setState(() => _isEnteringFilmRoll = true);
+    try {
+      final filmRoll = await FilmRollModule.instance.enterRegion(
+        locationResult.region.cityCountyName,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => FilmRollScreen(
+            filmRollId: filmRoll.id,
+            regionId: locationResult.region.regionId,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      await _loadRecoveredFilmRoll();
+    } on UnsupportedRegionException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('아직 필름롤을 지원하지 않는 지역이에요.')));
+    } catch (e, st) {
+      log('필름롤 진입 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('필름롤을 불러오지 못했어요.')));
+    } finally {
+      if (mounted) setState(() => _isEnteringFilmRoll = false);
+    }
+  }
+
+  Future<void> _onOpenCollectionTap() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const FilmRollCollectionScreen()));
+  }
+
+  Future<void> _onMockLocationEnabledChanged(bool enabled) async {
+    setState(() => _isMockLocationEnabled = enabled);
+    await AppPreferences.instance.setMockLocationEnabled(enabled);
+  }
+
+  Future<void> _onMockRegionCodeChanged(RegionCode? regionCode) async {
+    if (regionCode == null) return;
+    setState(() => _mockRegionCode = regionCode);
+    await AppPreferences.instance.setMockRegionCodeName(regionCode.name);
+  }
+
+  /// 로컬 DB(필름롤/장소/사진 테이블)를 표로 직접 조회할 수 있는 뷰어를 연다.
+  Future<void> _onOpenDbViewerTap() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => DriftDbViewer(AppDatabase.instance)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -111,12 +223,97 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildUserCard(),
+            const SizedBox(height: ChaerokSpacing.md),
+            _buildFilmRollEntryCard(),
+            if (kDebugMode) ...[
+              const SizedBox(height: ChaerokSpacing.md),
+              _buildMockLocationDebugCard(),
+            ],
             if (kDebugMode && _locationResult != null) ...[
               const SizedBox(height: ChaerokSpacing.md),
               _buildLocationDebugCard(_locationResult!),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFilmRollEntryCard() {
+    return _buildCardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('필름롤', style: ChaerokTypography.labelLarge),
+          const SizedBox(height: ChaerokSpacing.xs),
+          Text(
+            _locationResult != null
+                ? '${_locationResult!.region.cityCountyName}에서 필름롤을 시작해보세요.'
+                : '위치 인증이 완료되면 필름롤을 시작할 수 있어요.',
+            style: ChaerokTypography.bodyMedium.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+          if (_recoveredFilmRoll != null) ...[
+            const SizedBox(height: ChaerokSpacing.sm),
+            ChaerokButton(
+              text: '${_recoveredFilmRoll!.title} 이어하기',
+              onPressed: _onResumeFilmRollTap,
+            ),
+          ],
+          const SizedBox(height: ChaerokSpacing.sm),
+          ChaerokButton(
+            text: '필름롤 시작하기',
+            isEnabled: _locationResult != null,
+            isLoading: _isEnteringFilmRoll,
+            onPressed: _onStartFilmRollTap,
+          ),
+          const SizedBox(height: ChaerokSpacing.xs),
+          TextButton(
+            onPressed: _onOpenCollectionTap,
+            child: const Text('필름 컬렉션 보기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 개발용 mock 위치 설정 (QA 검증용, 릴리즈 빌드에서는 노출되지 않음).
+  Widget _buildMockLocationDebugCard() {
+    return _buildCardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Mock 위치 (디버그)', style: ChaerokTypography.labelLarge),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Mock 위치 사용',
+              style: ChaerokTypography.bodyMedium,
+            ),
+            value: _isMockLocationEnabled,
+            onChanged: _onMockLocationEnabledChanged,
+          ),
+          if (_isMockLocationEnabled)
+            DropdownButton<RegionCode>(
+              value: _mockRegionCode,
+              isExpanded: true,
+              items: RegionCode.values
+                  .map(
+                    (region) => DropdownMenuItem(
+                      value: region,
+                      child: Text(region.filmRollTitle),
+                    ),
+                  )
+                  .toList(),
+              onChanged: _onMockRegionCodeChanged,
+            ),
+          const SizedBox(height: ChaerokSpacing.sm),
+          TextButton(
+            onPressed: _onOpenDbViewerTap,
+            child: const Text('로컬 DB 확인하기'),
+          ),
+        ],
       ),
     );
   }
