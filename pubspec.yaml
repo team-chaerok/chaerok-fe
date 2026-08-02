@@ -66,6 +66,8 @@ dev_dependencies:
   flutter_secure_storage_platform_interface: ^1.1.2
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
+  camera_platform_interface: ^2.13.0
+  permission_handler_platform_interface: ^4.3.0
   drift_dev: ^2.20.3
   build_runner: ^2.4.13
 

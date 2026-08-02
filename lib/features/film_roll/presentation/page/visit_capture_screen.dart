@@ -36,6 +36,8 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   CameraController? _cameraController;
   String? _errorMessage;
   bool _isSaving = false;
+  bool _isInitializingCamera = false;
+  bool _isPermissionPermanentlyDenied = false;
 
   @override
   void initState() {
@@ -45,14 +47,29 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   }
 
   Future<void> _initializeCamera() async {
-    final status = await Permission.camera.request();
-    if (!status.isGranted) {
-      if (!mounted) return;
-      setState(() => _errorMessage = '카메라 권한이 필요해요.');
-      return;
-    }
-
+    // 권한 요청 다이얼로그가 뜨고 닫히는 과정 자체가 앱 라이프사이클을
+    // inactive/resumed로 흔들어 didChangeAppLifecycleState에서 이 메서드를
+    // 다시 호출할 수 있다. 이미 진행 중이면 무시해 카메라 컨트롤러가
+    // 중복 생성되어 서로 충돌하는 것을 막는다.
+    if (_isInitializingCamera) return;
+    _isInitializingCamera = true;
+    _isPermissionPermanentlyDenied = false;
     try {
+      // 이미 영구 거부된 상태라면 OS가 다이얼로그 없이 현재 상태를 그대로
+      // 반환한다(iOS는 최초 1회만 다이얼로그를 띄우고, 이후엔 설정 화면에서만
+      // 변경 가능). 이 경우 설정으로 안내해야 한다.
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (!mounted) return;
+        setState(() {
+          _isPermissionPermanentlyDenied = status.isPermanentlyDenied;
+          _errorMessage = status.isPermanentlyDenied
+              ? '설정 화면에서 카메라 권한을 직접 허용해주세요.'
+              : '카메라 권한이 필요해요.';
+        });
+        return;
+      }
+
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         if (!mounted) return;
@@ -78,6 +95,8 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       log('카메라 초기화 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
       setState(() => _errorMessage = '카메라를 시작하지 못했어요.');
+    } finally {
+      _isInitializingCamera = false;
     }
   }
 
@@ -94,6 +113,10 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       if (controller != null && controller.value.isInitialized) return;
       unawaited(_initializeCamera());
     }
+  }
+
+  Future<void> _onOpenSettingsTap() async {
+    await openAppSettings();
   }
 
   Future<void> _onCaptureTap() async {
@@ -155,10 +178,24 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(ChaerokSpacing.xxl),
-          child: Text(
-            _errorMessage!,
-            textAlign: TextAlign.center,
-            style: ChaerokTypography.bodyMedium.copyWith(color: Colors.white),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: ChaerokTypography.bodyMedium.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+              if (_isPermissionPermanentlyDenied) ...[
+                const SizedBox(height: ChaerokSpacing.lg),
+                ChaerokButton(
+                  text: '설정에서 권한 허용하기',
+                  onPressed: _onOpenSettingsTap,
+                ),
+              ],
+            ],
           ),
         ),
       );
