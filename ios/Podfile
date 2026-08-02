@@ -40,10 +40,11 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
-    # permission_handler: 실제 사용하는 권한 그룹만 활성화 (위치 - WhenInUse)
+    # permission_handler: 실제 사용하는 권한 그룹만 활성화 (위치 - WhenInUse, 카메라)
     target.build_configurations.each do |config|
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_LOCATION=1'
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_CAMERA=1'
     end
   end
 end
