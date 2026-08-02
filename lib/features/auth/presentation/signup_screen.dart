@@ -8,7 +8,7 @@ import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/signup_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
-import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:dio/dio.dart';
@@ -89,7 +89,7 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const MainTabScreen()),
       );
     } catch (e, st) {
       log('회원가입 실패 - ${_toErrorMessage(e)}', name: _tag, stackTrace: st);

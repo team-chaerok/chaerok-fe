@@ -1,4 +1,6 @@
-import 'package:chaerok/ui/preview_theme.dart';
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:flutter/material.dart';
 
 class PlaceCategoryMenu extends StatelessWidget {
@@ -61,7 +63,7 @@ class PlaceCategoryMenu extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: UiPreviewSpacing.xs),
+        separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
         itemBuilder: (context, index) {
           return _CategoryMenuItem(
             item: _items[index],
@@ -97,29 +99,29 @@ class _CategoryMenuItemState extends State<_CategoryMenuItem> {
     if (widget.isSelected) {
       if (_isPressed) {
         return Color.lerp(
-          UiPreviewColors.primary,
-          UiPreviewColors.primaryDark,
+          ChaerokColors.primary,
+          ChaerokColors.primaryDark,
           0.18,
         )!;
       }
-      return UiPreviewColors.primary;
+      return ChaerokColors.primary;
     }
 
     if (_isPressed) {
       return Color.alphaBlend(
-        UiPreviewColors.primaryDark.withValues(alpha: 0.06),
-        UiPreviewColors.sageLight,
+        ChaerokColors.primaryDark.withValues(alpha: 0.06),
+        ChaerokColors.sageLight,
       );
     }
-    if (_isHovered) return UiPreviewColors.categoryHover;
-    return UiPreviewColors.sageLight;
+    if (_isHovered) return ChaerokColors.categoryHover;
+    return ChaerokColors.sageLight;
   }
 
   @override
   Widget build(BuildContext context) {
     final foregroundColor = widget.isSelected
-        ? UiPreviewColors.surface
-        : UiPreviewColors.primaryDark;
+        ? ChaerokColors.surface
+        : ChaerokColors.primaryDark;
 
     return Semantics(
       label: widget.item.categoryName,
@@ -157,7 +159,7 @@ class _CategoryMenuItemState extends State<_CategoryMenuItem> {
                     size: 20,
                   ),
                 ),
-                const SizedBox(height: UiPreviewSpacing.xs),
+                const SizedBox(height: ChaerokSpacing.xs),
                 SizedBox(
                   width: 60,
                   height: 15,
@@ -166,10 +168,10 @@ class _CategoryMenuItemState extends State<_CategoryMenuItem> {
                     child: Text(
                       widget.item.displayLabel,
                       maxLines: 1,
-                      style: UiPreviewTypography.labelSmall.copyWith(
+                      style: ChaerokTypography.labelSmall.copyWith(
                         color: widget.isSelected
-                            ? UiPreviewColors.primaryDark
-                            : UiPreviewColors.textSecondary,
+                            ? ChaerokColors.primaryDark
+                            : ChaerokColors.textSecondary,
                         fontWeight: widget.isSelected
                             ? FontWeight.w600
                             : FontWeight.w500,

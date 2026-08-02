@@ -1,4 +1,5 @@
-import 'package:chaerok/ui/preview_theme.dart';
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:flutter/material.dart';
 
 /// Temporary artwork slot for the future film-roll PNG or SVG asset.
@@ -15,19 +16,19 @@ class FilmRollArtwork extends StatelessWidget {
           width: 58,
           height: 68,
           decoration: BoxDecoration(
-            color: UiPreviewColors.surface.withValues(alpha: 0.48),
+            color: ChaerokColors.surface.withValues(alpha: 0.48),
             border: Border.all(
-              color: UiPreviewColors.primary.withValues(alpha: 0.34),
+              color: ChaerokColors.primary.withValues(alpha: 0.34),
               width: 1.5,
             ),
-            borderRadius: BorderRadius.circular(UiPreviewRadius.md),
+            borderRadius: BorderRadius.circular(ChaerokRadius.md),
           ),
           child: Center(
             child: Container(
               width: 14,
               height: 14,
               decoration: BoxDecoration(
-                color: UiPreviewColors.primary.withValues(alpha: 0.68),
+                color: ChaerokColors.primary.withValues(alpha: 0.68),
                 shape: BoxShape.circle,
               ),
             ),

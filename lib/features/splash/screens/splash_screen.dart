@@ -5,7 +5,7 @@ import 'package:chaerok/core/config/app_secrets.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/remote/health_api.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
-import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     final destination = status == SessionStatus.authenticated
-        ? const HomeScreen()
+        ? const MainTabScreen()
         : const LoginScreen();
 
     await Navigator.pushReplacement(

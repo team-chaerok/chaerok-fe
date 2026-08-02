@@ -1,4 +1,6 @@
-import 'package:chaerok/ui/preview_theme.dart';
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_shadows.dart';
+import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:flutter/material.dart';
 
 class HomeCameraAction extends StatelessWidget {
@@ -13,18 +15,18 @@ class HomeCameraAction extends StatelessWidget {
       height: 48,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: UiPreviewShadows.floating,
+        boxShadow: ChaerokShadows.floating,
       ),
       child: Material(
-        color: UiPreviewColors.primary,
+        color: ChaerokColors.primary,
         shape: const CircleBorder(),
         child: InkWell(
           onTap: onPressed,
           customBorder: const CircleBorder(),
           child: const Icon(
             Icons.camera_alt_outlined,
-            color: UiPreviewColors.surface,
-            size: UiPreviewSpacing.lg,
+            color: ChaerokColors.surface,
+            size: ChaerokSpacing.lg,
           ),
         ),
       ),

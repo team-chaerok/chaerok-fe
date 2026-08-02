@@ -1,5 +1,8 @@
-import 'package:chaerok/ui/home/widgets/home_camera_action.dart';
-import 'package:chaerok/ui/preview_theme.dart';
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_shadows.dart';
+import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/features/home/presentation/widgets/home_camera_action.dart';
 import 'package:flutter/material.dart';
 
 class HomeBottomNavigation extends StatelessWidget {
@@ -7,24 +10,26 @@ class HomeBottomNavigation extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    required this.onCameraTap,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
+  final VoidCallback onCameraTap;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: const BoxDecoration(
-        color: UiPreviewColors.surface,
-        border: Border(top: BorderSide(color: UiPreviewColors.border)),
-        boxShadow: UiPreviewShadows.card,
+        color: ChaerokColors.surface,
+        border: Border(top: BorderSide(color: ChaerokColors.border)),
+        boxShadow: ChaerokShadows.card,
       ),
       child: SafeArea(
         top: false,
         minimum: const EdgeInsets.only(
-          top: UiPreviewSpacing.xs,
-          bottom: UiPreviewSpacing.xs,
+          top: ChaerokSpacing.xs,
+          bottom: ChaerokSpacing.xs,
         ),
         child: Row(
           children: [
@@ -36,9 +41,9 @@ class HomeBottomNavigation extends StatelessWidget {
               onTap: () => onItemSelected(0),
             ),
             _NavigationItem(
-              label: '지도',
-              icon: Icons.location_on_outlined,
-              selectedIcon: Icons.location_on_rounded,
+              label: '채록길',
+              icon: Icons.explore_outlined,
+              selectedIcon: Icons.explore,
               isSelected: selectedIndex == 1,
               onTap: () => onItemSelected(1),
             ),
@@ -46,12 +51,12 @@ class HomeBottomNavigation extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  HomeCameraAction(onPressed: () => onItemSelected(2)),
+                  HomeCameraAction(onPressed: onCameraTap),
                   const SizedBox(height: 2),
                   Text(
                     '카메라',
-                    style: UiPreviewTypography.labelSmall.copyWith(
-                      color: UiPreviewColors.primaryDark,
+                    style: ChaerokTypography.labelSmall.copyWith(
+                      color: ChaerokColors.primaryDark,
                       fontSize: 10,
                     ),
                   ),
@@ -59,18 +64,18 @@ class HomeBottomNavigation extends StatelessWidget {
               ),
             ),
             _NavigationItem(
-              label: '필름 롤',
+              label: '필름',
               icon: Icons.photo_library_outlined,
               selectedIcon: Icons.photo_library_rounded,
-              isSelected: selectedIndex == 3,
-              onTap: () => onItemSelected(3),
+              isSelected: selectedIndex == 2,
+              onTap: () => onItemSelected(2),
             ),
             _NavigationItem(
               label: '마이',
               icon: Icons.person_outline_rounded,
               selectedIcon: Icons.person_rounded,
-              isSelected: selectedIndex == 4,
-              onTap: () => onItemSelected(4),
+              isSelected: selectedIndex == 3,
+              onTap: () => onItemSelected(3),
             ),
           ],
         ),
@@ -97,15 +102,15 @@ class _NavigationItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isSelected
-        ? UiPreviewColors.primary
-        : UiPreviewColors.textSecondary;
+        ? ChaerokColors.primary
+        : ChaerokColors.textSecondary;
 
     return Expanded(
       child: InkResponse(
         onTap: onTap,
-        radius: UiPreviewSpacing.xl,
+        radius: ChaerokSpacing.xl,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: UiPreviewSpacing.xxs),
+          padding: const EdgeInsets.symmetric(vertical: ChaerokSpacing.xxs),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -113,7 +118,7 @@ class _NavigationItem extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 label,
-                style: UiPreviewTypography.labelSmall.copyWith(
+                style: ChaerokTypography.labelSmall.copyWith(
                   color: color,
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,

@@ -11,7 +11,7 @@ import 'package:chaerok/data/remote/auth_api.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/signup_screen.dart';
-import 'package:chaerok/features/home/presentation/home_screen.dart';
+import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/social_login_button.dart';
 import 'package:dio/dio.dart';
@@ -116,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!context.mounted) return;
       await Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const MainTabScreen()),
       );
     }
   }

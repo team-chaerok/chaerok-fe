@@ -1,8 +1,8 @@
+import 'package:chaerok/features/home/presentation/widgets/active_film_roll_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/home_bottom_navigation.dart';
+import 'package:chaerok/features/home/presentation/widgets/place_category_menu.dart';
+import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/ui/home/models/home_preview_data.dart';
-import 'package:chaerok/ui/home/widgets/active_film_roll_card.dart';
-import 'package:chaerok/ui/home/widgets/home_bottom_navigation.dart';
-import 'package:chaerok/ui/home/widgets/place_category_menu.dart';
-import 'package:chaerok/ui/home/widgets/recommended_place_card.dart';
 import 'package:chaerok/ui/preview_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -18,9 +18,8 @@ class HomePreviewScreen extends StatefulWidget {
 class _HomePreviewScreenState extends State<HomePreviewScreen> {
   static const _navigationFeedback = [
     '현재 홈 화면이에요.',
-    '지도 화면은 UI 확정 후 연결할 예정이에요.',
-    '카메라 화면은 다음 단계에서 새롭게 연결할 예정이에요.',
-    '필름 롤 화면은 UI 확정 후 연결할 예정이에요.',
+    '채록길 화면은 UI 확정 후 연결할 예정이에요.',
+    '필름 화면은 UI 확정 후 연결할 예정이에요.',
     '마이 화면은 UI 확정 후 연결할 예정이에요.',
   ];
 
@@ -56,6 +55,9 @@ class _HomePreviewScreenState extends State<HomePreviewScreen> {
         selectedIndex: 0,
         onItemSelected: (index) {
           _showPreviewMessage(_navigationFeedback[index]);
+        },
+        onCameraTap: () {
+          _showPreviewMessage('카메라 화면은 다음 단계에서 새롭게 연결할 예정이에요.');
         },
       ),
       body: SafeArea(
