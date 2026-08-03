@@ -9,6 +9,9 @@ import 'package:drift/drift.dart';
 @DataClassName('FilmRollRow')
 class FilmRolls extends Table {
   TextColumn get id => text()();
+  // 마이그레이션 이전(v1) 레거시 행은 계정을 알 수 없어 null로 남는다.
+  // 로그인/세션 재개 시점에 현재 계정으로 1회 귀속(claim)된 뒤에는 항상 값이 채워진다.
+  IntColumn get userId => integer().nullable()();
   TextColumn get regionCode => textEnum<RegionCode>()();
   TextColumn get regionName => text()();
   TextColumn get title => text()();

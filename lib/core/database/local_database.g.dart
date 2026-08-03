@@ -18,6 +18,15 @@ class $FilmRollsTable extends FilmRolls
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+    'user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   late final GeneratedColumnWithTypeConverter<RegionCode, String> regionCode =
       GeneratedColumn<String>(
@@ -114,6 +123,7 @@ class $FilmRollsTable extends FilmRolls
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    userId,
     regionCode,
     regionName,
     title,
@@ -140,6 +150,12 @@ class $FilmRollsTable extends FilmRolls
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
     }
     if (data.containsKey('region_name')) {
       context.handle(
@@ -213,6 +229,10 @@ class $FilmRollsTable extends FilmRolls
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}user_id'],
+      ),
       regionCode: $FilmRollsTable.$converterregionCode.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -269,6 +289,7 @@ class $FilmRollsTable extends FilmRolls
 
 class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   final String id;
+  final int? userId;
   final RegionCode regionCode;
   final String regionName;
   final String title;
@@ -280,6 +301,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   final DateTime? completedAt;
   const FilmRollRow({
     required this.id,
+    this.userId,
     required this.regionCode,
     required this.regionName,
     required this.title,
@@ -294,6 +316,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<int>(userId);
+    }
     {
       map['region_code'] = Variable<String>(
         $FilmRollsTable.$converterregionCode.toSql(regionCode),
@@ -323,6 +348,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   FilmRollsCompanion toCompanion(bool nullToAbsent) {
     return FilmRollsCompanion(
       id: Value(id),
+      userId: userId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(userId),
       regionCode: Value(regionCode),
       regionName: Value(regionName),
       title: Value(title),
@@ -348,6 +376,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return FilmRollRow(
       id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<int?>(json['userId']),
       regionCode: $FilmRollsTable.$converterregionCode.fromJson(
         serializer.fromJson<String>(json['regionCode']),
       ),
@@ -370,6 +399,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<int?>(userId),
       'regionCode': serializer.toJson<String>(
         $FilmRollsTable.$converterregionCode.toJson(regionCode),
       ),
@@ -388,6 +418,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
 
   FilmRollRow copyWith({
     String? id,
+    Value<int?> userId = const Value.absent(),
     RegionCode? regionCode,
     String? regionName,
     String? title,
@@ -399,6 +430,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     Value<DateTime?> completedAt = const Value.absent(),
   }) => FilmRollRow(
     id: id ?? this.id,
+    userId: userId.present ? userId.value : this.userId,
     regionCode: regionCode ?? this.regionCode,
     regionName: regionName ?? this.regionName,
     title: title ?? this.title,
@@ -416,6 +448,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   FilmRollRow copyWithCompanion(FilmRollsCompanion data) {
     return FilmRollRow(
       id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
       regionCode: data.regionCode.present
           ? data.regionCode.value
           : this.regionCode,
@@ -442,6 +475,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   String toString() {
     return (StringBuffer('FilmRollRow(')
           ..write('id: $id, ')
+          ..write('userId: $userId, ')
           ..write('regionCode: $regionCode, ')
           ..write('regionName: $regionName, ')
           ..write('title: $title, ')
@@ -458,6 +492,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   @override
   int get hashCode => Object.hash(
     id,
+    userId,
     regionCode,
     regionName,
     title,
@@ -473,6 +508,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       identical(this, other) ||
       (other is FilmRollRow &&
           other.id == this.id &&
+          other.userId == this.userId &&
           other.regionCode == this.regionCode &&
           other.regionName == this.regionName &&
           other.title == this.title &&
@@ -486,6 +522,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
 
 class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   final Value<String> id;
+  final Value<int?> userId;
   final Value<RegionCode> regionCode;
   final Value<String> regionName;
   final Value<String> title;
@@ -498,6 +535,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   final Value<int> rowid;
   const FilmRollsCompanion({
     this.id = const Value.absent(),
+    this.userId = const Value.absent(),
     this.regionCode = const Value.absent(),
     this.regionName = const Value.absent(),
     this.title = const Value.absent(),
@@ -511,6 +549,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   });
   FilmRollsCompanion.insert({
     required String id,
+    this.userId = const Value.absent(),
     required RegionCode regionCode,
     required String regionName,
     required String title,
@@ -530,6 +569,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
        updatedAt = Value(updatedAt);
   static Insertable<FilmRollRow> custom({
     Expression<String>? id,
+    Expression<int>? userId,
     Expression<String>? regionCode,
     Expression<String>? regionName,
     Expression<String>? title,
@@ -543,6 +583,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
       if (regionCode != null) 'region_code': regionCode,
       if (regionName != null) 'region_name': regionName,
       if (title != null) 'title': title,
@@ -559,6 +600,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
 
   FilmRollsCompanion copyWith({
     Value<String>? id,
+    Value<int?>? userId,
     Value<RegionCode>? regionCode,
     Value<String>? regionName,
     Value<String>? title,
@@ -572,6 +614,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   }) {
     return FilmRollsCompanion(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       regionCode: regionCode ?? this.regionCode,
       regionName: regionName ?? this.regionName,
       title: title ?? this.title,
@@ -590,6 +633,9 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
     }
     if (regionCode.present) {
       map['region_code'] = Variable<String>(
@@ -634,6 +680,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   String toString() {
     return (StringBuffer('FilmRollsCompanion(')
           ..write('id: $id, ')
+          ..write('userId: $userId, ')
           ..write('regionCode: $regionCode, ')
           ..write('regionName: $regionName, ')
           ..write('title: $title, ')
@@ -2055,6 +2102,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$FilmRollsTableCreateCompanionBuilder =
     FilmRollsCompanion Function({
       required String id,
+      Value<int?> userId,
       required RegionCode regionCode,
       required String regionName,
       required String title,
@@ -2069,6 +2117,7 @@ typedef $$FilmRollsTableCreateCompanionBuilder =
 typedef $$FilmRollsTableUpdateCompanionBuilder =
     FilmRollsCompanion Function({
       Value<String> id,
+      Value<int?> userId,
       Value<RegionCode> regionCode,
       Value<String> regionName,
       Value<String> title,
@@ -2137,6 +2186,11 @@ class $$FilmRollsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get userId => $composableBuilder(
+    column: $table.userId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2252,6 +2306,11 @@ class $$FilmRollsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get regionCode => $composableBuilder(
     column: $table.regionCode,
     builder: (column) => ColumnOrderings(column),
@@ -2309,6 +2368,9 @@ class $$FilmRollsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<RegionCode, String> get regionCode =>
       $composableBuilder(
@@ -2428,6 +2490,7 @@ class $$FilmRollsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<int?> userId = const Value.absent(),
                 Value<RegionCode> regionCode = const Value.absent(),
                 Value<String> regionName = const Value.absent(),
                 Value<String> title = const Value.absent(),
@@ -2440,6 +2503,7 @@ class $$FilmRollsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => FilmRollsCompanion(
                 id: id,
+                userId: userId,
                 regionCode: regionCode,
                 regionName: regionName,
                 title: title,
@@ -2454,6 +2518,7 @@ class $$FilmRollsTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<int?> userId = const Value.absent(),
                 required RegionCode regionCode,
                 required String regionName,
                 required String title,
@@ -2466,6 +2531,7 @@ class $$FilmRollsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => FilmRollsCompanion.insert(
                 id: id,
+                userId: userId,
                 regionCode: regionCode,
                 regionName: regionName,
                 title: title,

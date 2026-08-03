@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/database/local_database.dart';
 import 'package:chaerok/core/file/local_photo_storage.dart';
 import 'package:chaerok/features/film_roll/data/local/film_roll_local_data_source.dart';
@@ -11,6 +14,9 @@ import 'package:chaerok/features/film_roll/domain/repository/film_roll_exception
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _testPlace = CourseCandidatePlace(
   name: '장소1',
@@ -21,12 +27,29 @@ const _testPlace = CourseCandidatePlace(
   visitOrder: 0,
 );
 
+class _FakePathProviderPlatform extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakePathProviderPlatform(this.dir);
+  final Directory dir;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => dir.path;
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory tempDir;
   late AppDatabase database;
   late FilmRollRepositoryImpl filmRollRepository;
   late FilmRollPlaceRepositoryImpl placeRepository;
 
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({'current_user_id': 1});
+    tempDir = await Directory.systemTemp.createTemp(
+      'film_roll_repository_impl_test',
+    );
+    PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir);
     database = AppDatabase.forTesting(NativeDatabase.memory());
     filmRollRepository = FilmRollRepositoryImpl(
       database: database,
@@ -43,6 +66,7 @@ void main() {
 
   tearDown(() async {
     await database.close();
+    await tempDir.delete(recursive: true);
   });
 
   test('같은 지역에 여러 번 진입해도 진행중 필름롤은 1개만 생성된다', () async {
@@ -56,6 +80,28 @@ void main() {
     );
 
     expect(second.id, first.id);
+  });
+
+  test('서로 다른 계정은 같은 지역에 각자 진행중 필름롤을 가질 수 있다', () async {
+    final userAFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+    );
+
+    await AppPreferences.instance.setCurrentUserId(2);
+    final userBFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+    );
+
+    expect(userBFilmRoll.id, isNot(userAFilmRoll.id));
+
+    await AppPreferences.instance.setCurrentUserId(1);
+    final userAAgain = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+    );
+    expect(userAAgain.id, userAFilmRoll.id);
   });
 
   test('동시에 findOrCreate를 호출해도 진행중 필름롤은 1개만 생성된다', () async {
@@ -242,5 +288,29 @@ void main() {
 
     final updated = await filmRollRepository.findById(filmRoll.id);
     expect(updated!.selectedCourseTitle, '코스 B');
+  });
+
+  test('deleteFilmRoll은 다른 계정 소유의 필름롤을 삭제하지 않는다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+    );
+
+    await AppPreferences.instance.setCurrentUserId(2);
+    await filmRollRepository.deleteFilmRoll(filmRoll.id);
+
+    await AppPreferences.instance.setCurrentUserId(1);
+    expect(await filmRollRepository.findById(filmRoll.id), isNotNull);
+  });
+
+  test('deleteFilmRoll은 본인 소유의 필름롤을 정상적으로 삭제한다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+    );
+
+    await filmRollRepository.deleteFilmRoll(filmRoll.id);
+
+    expect(await filmRollRepository.findById(filmRoll.id), isNull);
   });
 }

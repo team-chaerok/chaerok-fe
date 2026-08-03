@@ -8,6 +8,7 @@ import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/o_auth_login_response.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
+import 'package:chaerok/features/auth/data/current_account_sync.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/signup_screen.dart';
@@ -108,6 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
         refreshToken: tokens.refreshToken,
       );
       if (!saved || !context.mounted) return;
+      await CurrentAccountSync.sync();
       try {
         await LocationPermissionService.requestPermission();
       } catch (e, st) {

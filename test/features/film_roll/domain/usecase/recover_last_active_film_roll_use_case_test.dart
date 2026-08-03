@@ -10,6 +10,7 @@ import 'package:chaerok/features/film_roll/data/repository/film_roll_repository_
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
 import 'package:chaerok/shared/region/region_code.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -32,6 +33,7 @@ void main() {
       '앱 시작 시 복구 유스케이스가 이를 감지해 null로 정리한다', () async {
     SharedPreferences.setMockInitialValues({
       'last_active_film_roll_id': 'roll-1',
+      'current_user_id': 1,
     });
     final tempDir = await Directory.systemTemp.createTemp(
       'recover_use_case_test',
@@ -45,6 +47,7 @@ void main() {
         .insert(
           FilmRollsCompanion.insert(
             id: 'roll-1',
+            userId: const Value(1),
             regionCode: RegionCode.gongju,
             regionName: '공주시',
             title: '공주',

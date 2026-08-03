@@ -44,4 +44,8 @@ abstract class FilmRollRepository {
 
   /// 필름롤과 연관된 장소/사진 레코드(DB) 및 사진 원본 파일을 함께 삭제한다.
   Future<void> deleteFilmRoll(String filmRollId);
+
+  /// 계정 스코프 도입 이전에 생성돼 계정이 비어있는 레거시 필름롤을
+  /// [userId] 소유로 1회 확정한다. 이미 계정이 확정된 행은 건드리지 않는다.
+  Future<void> claimLegacyData(int userId);
 }
