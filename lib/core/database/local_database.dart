@@ -24,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   static AppDatabase get instance => _instance ??= AppDatabase._();
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -33,12 +33,23 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
         await _createActiveFilmRollUniqueIndex();
       },
-      // v2: 계정 전환 시 이전 계정의 로컬 필름롤이 노출되던 버그 수정을 위해
-      // film_rolls.user_id 컬럼 추가. 기존 행은 null로 남았다가 로그인/세션
-      // 재개 시점에 CurrentAccountSync가 현재 계정으로 1회 귀속시킨다.
       onUpgrade: (m, from, to) async {
+        // v2: 계정 전환 시 이전 계정의 로컬 필름롤이 노출되던 버그 수정을 위해
+        // film_rolls.user_id 컬럼 추가. 기존 행은 null로 남았다가 로그인/세션
+        // 재개 시점에 CurrentAccountSync가 현재 계정으로 1회 귀속시킨다.
         if (from < 2) {
           await m.addColumn(filmRolls, filmRolls.userId);
+        }
+        // v3: v2에서 만든 부분 유니크 인덱스가 region_code만 보고 있어서
+        // "지역당 진행중 필름롤 1개" 제약이 계정 구분 없이 전체 기기에
+        // 걸려버렸다. 서로 다른 계정이 같은 지역에 각자 진행중 필름롤을
+        // 갖는 정상적인 상황도 UNIQUE constraint failed로 막던 버그라,
+        // user_id를 포함하도록 인덱스를 다시 만든다.
+        if (from < 3) {
+          await customStatement(
+            'DROP INDEX IF EXISTS idx_unique_active_film_roll_per_region',
+          );
+          await _createActiveFilmRollUniqueIndex();
         }
       },
       // FilmRolls 삭제 시 FilmRollPlaces/Photos가 cascade로 함께 삭제되도록
@@ -49,12 +60,14 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// 지역당 진행중(inProgress) 필름롤이 1개만 존재하도록 강제하는 부분 유니크 인덱스.
-  /// 완료(completed) 필름롤은 지역당 여러 개 허용되므로 status 조건을 둔다.
+  /// 계정별로 지역당 진행중(inProgress) 필름롤이 1개만 존재하도록 강제하는
+  /// 부분 유니크 인덱스. user_id를 포함하지 않으면 서로 다른 계정끼리도
+  /// 같은 지역을 동시에 진행할 수 없게 되어버린다. 완료(completed) 필름롤은
+  /// 지역당 여러 개 허용되므로 status 조건을 둔다.
   Future<void> _createActiveFilmRollUniqueIndex() async {
     await customStatement(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_film_roll_per_region '
-      "ON film_rolls(region_code) WHERE status = 'inProgress';",
+      "ON film_rolls(user_id, region_code) WHERE status = 'inProgress';",
     );
   }
 }

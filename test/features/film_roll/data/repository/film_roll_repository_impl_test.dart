@@ -82,6 +82,28 @@ void main() {
     expect(second.id, first.id);
   });
 
+  test('서로 다른 계정은 같은 지역에 각자 진행중 필름롤을 가질 수 있다', () async {
+    final userAFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+    );
+
+    await AppPreferences.instance.setCurrentUserId(2);
+    final userBFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+    );
+
+    expect(userBFilmRoll.id, isNot(userAFilmRoll.id));
+
+    await AppPreferences.instance.setCurrentUserId(1);
+    final userAAgain = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+    );
+    expect(userAAgain.id, userAFilmRoll.id);
+  });
+
   test('동시에 findOrCreate를 호출해도 진행중 필름롤은 1개만 생성된다', () async {
     final results = await Future.wait([
       filmRollRepository.findOrCreateActiveByRegion(

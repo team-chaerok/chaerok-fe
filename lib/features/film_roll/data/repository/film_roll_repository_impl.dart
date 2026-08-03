@@ -11,7 +11,6 @@ import 'package:chaerok/features/film_roll/domain/repository/film_roll_exception
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart' show SqliteException;
 import 'package:uuid/uuid.dart';
 
 /// [FilmRollRepository]의 Drift 기반 구현체.
@@ -78,11 +77,18 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
 
       try {
         await _filmRollDs.insert(row);
-      } on SqliteException catch (e) {
+      } catch (e) {
         // 동시 호출로 부분 유니크 인덱스(지역당 진행중 1개, idx_unique_active_
         // film_roll_per_region) 위반 시에만 다른 호출이 먼저 생성한 레코드를
         // 재조회해 반환한다. 그 외 UNIQUE 위반(예: PK 충돌)이나 다른 DB 오류는
         // 이 레이스와 무관하므로 그대로 전파한다.
+        //
+        // 실제 기기에서는 AppDatabase가 NativeDatabase.createInBackground로
+        // 별도 isolate에서 열리기 때문에, 원본 SqliteException이 isolate
+        // 경계를 넘으며 DriftRemoteException으로 감싸져 도착한다(타입 자체가
+        // SqliteException이 아니게 됨). 그래서 타입으로 잡지 않고 메시지
+        // 문자열로 판별한다 — 감싸져 있든 아니든 toString()에 원본 메시지가
+        // 그대로 포함된다.
         if (!_isActiveRegionUniqueViolation(e)) rethrow;
       }
 
@@ -230,11 +236,14 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
     return row.toEntity(totalPlaceCount: total, visitedPlaceCount: visited);
   }
 
-  /// [idx_unique_active_film_roll_per_region] 부분 유니크 인덱스(지역당
+  /// [idx_unique_active_film_roll_per_region] 부분 유니크 인덱스(계정+지역당
   /// 진행중 필름롤 1개) 위반인지 확인한다. SQLite는 이 인덱스 위반 시 메시지에
-  /// 인덱스가 걸린 컬럼명(`film_rolls.region_code`)을 포함시키므로, 이를 통해
-  /// id PK 충돌 등 다른 UNIQUE 위반과 구분한다.
-  bool _isActiveRegionUniqueViolation(SqliteException error) {
-    return error.message.contains('film_rolls.region_code');
+  /// 인덱스가 걸린 컬럼명(`film_rolls.user_id, film_rolls.region_code`)을
+  /// 포함시키므로, 이를 통해 id PK 충돌 등 다른 UNIQUE 위반과 구분한다.
+  /// `error`를 [SqliteException]으로 타입 좁히지 않고 [toString]으로 판별하는
+  /// 이유: 실제 기기에서는 백그라운드 isolate를 넘으며 [DriftRemoteException]
+  /// 으로 감싸져 도착해 타입 자체가 더 이상 [SqliteException]이 아니기 때문.
+  bool _isActiveRegionUniqueViolation(Object error) {
+    return error.toString().contains('film_rolls.region_code');
   }
 }
