@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/config/app_secrets.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/remote/health_api.dart';
@@ -88,6 +89,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (status == SessionStatus.authenticated) {
       await CurrentAccountSync.sync();
+      if (!mounted) return;
+    } else if (status == SessionStatus.unauthenticated) {
+      await AppPreferences.instance.setCurrentUserId(null);
       if (!mounted) return;
     }
 

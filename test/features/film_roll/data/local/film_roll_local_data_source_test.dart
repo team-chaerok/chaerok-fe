@@ -115,6 +115,20 @@ void main() {
     expect(events.last, isNull);
   });
 
+  test('watchById는 계정이 비어있는 레거시 행도 현재 계정을 알 수 없으면 null을 방출한다', () async {
+    await _insertFilmRoll(database, id: 'legacy-roll'); // userId: null
+
+    expect(await AppPreferences.instance.getCurrentUserId(), isNull);
+
+    final events = <FilmRollRow?>[];
+    final subscription = dataSource.watchById('legacy-roll').listen(events.add);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    await subscription.cancel();
+    expect(events, [isNull]);
+  });
+
   test('claimLegacyData은 계정이 비어있는 레거시 행만 지정한 계정으로 확정한다', () async {
     await _insertFilmRoll(database, id: 'legacy-roll'); // userId: null
     await _insertFilmRoll(

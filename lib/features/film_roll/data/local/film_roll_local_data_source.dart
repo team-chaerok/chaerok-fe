@@ -69,6 +69,7 @@ class FilmRollLocalDataSource {
     )..where((t) => t.id.equals(id))).watchSingleOrNull().asyncMap((row) async {
       if (row == null) return null;
       final userId = await currentUserId();
+      if (userId == null) return null;
       return row.userId == userId ? row : null;
     });
   }
