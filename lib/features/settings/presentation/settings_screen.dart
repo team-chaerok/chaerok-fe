@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
@@ -44,6 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       log('로그아웃 API 실패 - 로컬 토큰 삭제 진행', name: _tag, stackTrace: st);
     } finally {
       await TokenStorage.instance.clear();
+      await AppPreferences.instance.setCurrentUserId(null);
     }
 
     if (!context.mounted) return;
@@ -88,6 +90,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ]);
     try {
       await TokenStorage.instance.clear();
+      await AppPreferences.instance.setCurrentUserId(null);
     } catch (e, st) {
       log('토큰 삭제 실패', name: _tag, error: e, stackTrace: st);
     }

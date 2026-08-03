@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'package:chaerok/core/config/app_secrets.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/remote/health_api.dart';
+import 'package:chaerok/features/auth/data/current_account_sync.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
 import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
@@ -83,6 +84,11 @@ class _SplashScreenState extends State<SplashScreen> {
           duration: Duration(seconds: 3),
         ),
       );
+    }
+
+    if (status == SessionStatus.authenticated) {
+      await CurrentAccountSync.sync();
+      if (!mounted) return;
     }
 
     final destination = status == SessionStatus.authenticated

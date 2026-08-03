@@ -24,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   static AppDatabase get instance => _instance ??= AppDatabase._();
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -32,6 +32,14 @@ class AppDatabase extends _$AppDatabase {
       onCreate: (m) async {
         await m.createAll();
         await _createActiveFilmRollUniqueIndex();
+      },
+      // v2: 계정 전환 시 이전 계정의 로컬 필름롤이 노출되던 버그 수정을 위해
+      // film_rolls.user_id 컬럼 추가. 기존 행은 null로 남았다가 로그인/세션
+      // 재개 시점에 CurrentAccountSync가 현재 계정으로 1회 귀속시킨다.
+      onUpgrade: (m, from, to) async {
+        if (from < 2) {
+          await m.addColumn(filmRolls, filmRolls.userId);
+        }
       },
       // FilmRolls 삭제 시 FilmRollPlaces/Photos가 cascade로 함께 삭제되도록
       // SQLite의 외래 키 제약을 명시적으로 활성화한다(기본값 OFF).

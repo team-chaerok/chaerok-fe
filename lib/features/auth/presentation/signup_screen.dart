@@ -8,6 +8,7 @@ import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/signup_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
+import 'package:chaerok/features/auth/data/current_account_sync.dart';
 import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
@@ -81,6 +82,7 @@ class _SignupScreenState extends State<SignupScreen> {
         refreshToken: tokens.refreshToken,
       );
       if (!mounted) return;
+      await CurrentAccountSync.sync();
       try {
         await LocationPermissionService.requestPermission();
       } catch (e, st) {

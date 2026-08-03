@@ -43,7 +43,23 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
     required String regionName,
   }) {
     return _db.transaction(() async {
-      final existing = await _filmRollDs.findActiveByRegion(regionCode);
+      final userId = await _filmRollDs.currentUserId();
+      if (userId == null) {
+        // 이 경로는 이미 인증된 화면(MainTabScreen 등)에서만 호출되므로
+        // 현재 계정을 알 수 없는 상태는 로그인 동기화가 아직 안 끝난
+        // 예외적 레이스뿐이다. 계정 없이 생성하면 다음 로그인 계정에
+        // 잘못 노출될 수 있어, 여기서는 생성하지 않고 예외로 알린다.
+        throw StateError('현재 로그인 계정을 확인할 수 없어 필름롤을 생성할 수 없습니다.');
+      }
+
+      // 이 트랜잭션 안에서는 위에서 확정한 [userId] 하나만 계속 사용한다.
+      // 매번 AppPreferences를 다시 읽으면, 트랜잭션 도중 계정이 바뀌는
+      // 극단적인 레이스에서 "조회는 이전 계정 기준, 생성은 새 계정 기준"으로
+      // 어긋날 수 있기 때문이다.
+      final existing = await _filmRollDs.findActiveByRegion(
+        regionCode,
+        userId: userId,
+      );
       if (existing != null) {
         return _toEntity(existing);
       }
@@ -51,6 +67,7 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
       final now = DateTime.now();
       final row = FilmRollsCompanion.insert(
         id: _uuid.v4(),
+        userId: Value(userId),
         regionCode: regionCode,
         regionName: regionName,
         title: regionCode.filmRollTitle,
@@ -69,7 +86,10 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
         if (!_isActiveRegionUniqueViolation(e)) rethrow;
       }
 
-      final created = await _filmRollDs.findActiveByRegion(regionCode);
+      final created = await _filmRollDs.findActiveByRegion(
+        regionCode,
+        userId: userId,
+      );
       return _toEntity(created!);
     });
   }
@@ -182,6 +202,14 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
 
   @override
   Future<void> deleteFilmRoll(String filmRollId) async {
+    // _filmRollDs.deleteById도 계정으로 스코핑돼 다른 계정 소유 행은 지우지
+    // 않지만, 사진 원본 파일 삭제는 Drift를 거치지 않는 별도의 파일 시스템
+    // 작업이라 그 보호를 받지 못한다. 그래서 파일을 지우기 전에 먼저
+    // findById(현재 계정 스코핑됨)로 소유권을 확인해, 다른 계정 소유이거나
+    // 이미 없는 필름롤이면 아무 것도 건드리지 않고 조용히 반환한다.
+    final row = await _filmRollDs.findById(filmRollId);
+    if (row == null) return;
+
     // FilmRollPlaces/Photos 행은 FK cascade로 함께 삭제되지만, 실제 사진 파일은
     // DB cascade가 미치지 못하므로 파일 시스템 정리를 별도로 수행한다. 파일
     // 삭제를 DB 삭제보다 먼저 수행해, 파일 삭제가 실패해도 DB 레코드가 남아있어
@@ -189,6 +217,11 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
     // 레코드가 사라진다).
     await _photoStorage.deleteFilmRollDirectory(filmRollId);
     await _filmRollDs.deleteById(filmRollId);
+  }
+
+  @override
+  Future<void> claimLegacyData(int userId) {
+    return _filmRollDs.claimLegacyData(userId);
   }
 
   Future<FilmRoll> _toEntity(FilmRollRow row) async {

@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyLastActiveFilmRollId = 'last_active_film_roll_id';
+const _keyCurrentUserId = 'current_user_id';
 const _keyMockLocationEnabled = 'mock_location_enabled';
 const _keyMockRegionCode = 'mock_region_code';
 
@@ -24,6 +25,22 @@ class AppPreferences {
       await prefs.remove(_keyLastActiveFilmRollId);
     } else {
       await prefs.setString(_keyLastActiveFilmRollId, filmRollId);
+    }
+  }
+
+  /// 로컬 DB에 남은 필름롤을 현재 로그인 계정 기준으로 필터링하기 위한
+  /// 계정 식별자. 로그인/세션 재개 시 갱신되고, 로그아웃/탈퇴 시 null로 지워진다.
+  Future<int?> getCurrentUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyCurrentUserId);
+  }
+
+  Future<void> setCurrentUserId(int? userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (userId == null) {
+      await prefs.remove(_keyCurrentUserId);
+    } else {
+      await prefs.setInt(_keyCurrentUserId, userId);
     }
   }
 
