@@ -180,9 +180,9 @@ class _SummerTownPainter extends CustomPainter {
     final sunlightPaint = Paint()
       ..color = ChaerokColors.surface.withValues(alpha: 0.72);
     final distantGreenPaint = Paint()
-      ..color = ChaerokColors.sage.withValues(alpha: 0.78);
+      ..color = ChaerokColors.primary.withValues(alpha: 0.78);
     final deepGreenPaint = Paint()
-      ..color = ChaerokColors.primary.withValues(alpha: 0.82);
+      ..color = ChaerokColors.primaryDark.withValues(alpha: 0.82);
     final groundPaint = Paint()..color = ChaerokColors.sageLight;
     final pathPaint = Paint()
       ..color = ChaerokColors.surface.withValues(alpha: 0.82);
