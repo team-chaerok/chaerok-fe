@@ -82,6 +82,16 @@ flutter:
   uses-material-design: true
 
   fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.ttf
+          weight: 700
     - family: Jeongnimsaji
       fonts:
         - asset: assets/fonts/Jeongnimsaji-M.ttf

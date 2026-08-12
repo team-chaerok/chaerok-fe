@@ -233,7 +233,6 @@ class _HomeHeader extends StatelessWidget {
         Text(
           regionName ?? '확인 중...',
           style: ChaerokTypography.displayMedium.copyWith(
-            fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
             color: ChaerokColors.primaryDark,
           ),
         ),
