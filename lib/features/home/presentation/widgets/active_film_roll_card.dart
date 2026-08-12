@@ -24,7 +24,9 @@ class ActiveFilmRollCard extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: ChaerokColors.sageLight,
-        border: Border.all(color: ChaerokColors.sage.withValues(alpha: 0.26)),
+        border: Border.all(
+          color: ChaerokColors.primary.withValues(alpha: 0.26),
+        ),
         borderRadius: BorderRadius.circular(ChaerokRadius.lg),
         boxShadow: ChaerokShadows.card,
       ),

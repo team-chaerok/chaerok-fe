@@ -99,9 +99,14 @@ class _SplashScreenState extends State<SplashScreen> {
         ? const MainTabScreen()
         : const LoginScreen();
 
-    await Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => destination),
+    // pushReplacement가 반환하는 Future는 push된 새 라우트가 나중에 pop될 때
+    // 완료되므로(전환 완료 시점이 아님) await하면 이 함수가 사실상 끝나지 않아
+    // 위의 _initTimeout이 항상 뒤늦게 오작동한다.
+    unawaited(
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+      ),
     );
   }
 

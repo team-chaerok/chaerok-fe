@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'chaerok_colors.dart';
+import 'chaerok_typography.dart';
 
 class ChaerokTheme {
   const ChaerokTheme._();
@@ -23,30 +24,20 @@ class ChaerokTheme {
         foregroundColor: ChaerokColors.textPrimary,
         elevation: 0,
       ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
+      textTheme: TextTheme(
+        titleLarge: ChaerokTypography.titleLarge.copyWith(
           color: ChaerokColors.textPrimary,
         ),
-        titleMedium: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleMedium: ChaerokTypography.titleMedium.copyWith(
           color: ChaerokColors.textPrimary,
         ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
+        bodyLarge: ChaerokTypography.bodyLarge.copyWith(
           color: ChaerokColors.textPrimary,
         ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
+        bodyMedium: ChaerokTypography.bodyMedium.copyWith(
           color: ChaerokColors.textSecondary,
         ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+        labelLarge: ChaerokTypography.labelLarge.copyWith(
           color: ChaerokColors.textPrimary,
         ),
       ),
