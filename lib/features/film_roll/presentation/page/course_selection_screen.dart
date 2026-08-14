@@ -9,6 +9,7 @@ import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/course_response.dart';
 import 'package:chaerok/data/remote/courses_api.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
+import 'package:chaerok/shared/widgets/course_map_view.dart';
 import 'package:flutter/material.dart';
 
 /// 지역의 추천 코스 후보를 조회해 사용자가 하나를 선택하도록 하는 화면.
@@ -61,6 +62,16 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
   void _onCourseSelected(CourseResponse course) {
     Navigator.of(context).pop(course);
+  }
+
+  void _onShowCourseMap(CourseResponse course) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => _CourseMapPreviewSheet(course: course),
+      ),
+    );
   }
 
   @override
@@ -134,7 +145,20 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(course.title, style: ChaerokTypography.titleMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    course.title,
+                    style: ChaerokTypography.titleMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _onShowCourseMap(course),
+                  child: const Text('지도로 보기'),
+                ),
+              ],
+            ),
             const SizedBox(height: ChaerokSpacing.xxs),
             Text(
               '장소 ${course.places.length}곳',
@@ -152,6 +176,37 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                     color: ChaerokColors.textSecondary,
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// [CourseResponse]에 포함된 장소들을 지도로 미리 보여주는 바텀시트.
+class _CourseMapPreviewSheet extends StatelessWidget {
+  const _CourseMapPreviewSheet({required this.course});
+
+  final CourseResponse course;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(ChaerokSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(course.title, style: ChaerokTypography.titleMedium),
+            const SizedBox(height: ChaerokSpacing.sm),
+            SizedBox(
+              height: 320,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(ChaerokRadius.md),
+                child: CourseMapView(places: course.places),
               ),
             ),
           ],
