@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 카카오맵 등 네트워크 통신을 위한 인터넷 권한(release 빌드는 debug와 달리 명시가 필요) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- 위치 기반 서비스(장소 추천 등)를 위한 위치 권한 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>

@@ -39,6 +39,7 @@ dependencies:
   geolocator: ^14.0.2
   google_sign_in: ^7.2.0
   kakao_flutter_sdk_user: ^1.10.0
+  kakao_map_sdk: ^1.2.6
   permission_handler: ^12.0.3
 
   # 로컬 필름롤/코스/방문/사진 관리 (로컬 DB + 파일 저장)
