@@ -91,4 +91,13 @@ class PhotoRepositoryImpl implements PhotoRepository {
     final rows = await _photoDs.findByPlace(filmRollPlaceId);
     return rows.map((row) => row.toEntity()).toList();
   }
+
+  @override
+  Future<List<FilmRollPhoto>> findByFilmRoll(
+    String filmRollId, {
+    int? limit,
+  }) async {
+    final rows = await _photoDs.findByFilmRoll(filmRollId, limit: limit);
+    return rows.map((row) => row.toEntity()).toList();
+  }
 }
