@@ -6,11 +6,15 @@ class FilmRollSummaryData {
     required this.name,
     required this.capturedCount,
     required this.totalCount,
+    this.photoThumbnailPaths = const [],
   });
 
   final String name;
   final int capturedCount;
   final int totalCount;
+
+  /// 최근 촬영 사진 미리보기 캐러셀에 노출할 썸네일 경로(최신순).
+  final List<String> photoThumbnailPaths;
 
   double get progress =>
       totalCount <= 0 ? 0.0 : (capturedCount / totalCount).clamp(0.0, 1.0);
@@ -22,6 +26,7 @@ class RecommendedPlaceSummaryData {
     required this.category,
     required this.placeholderMood,
     this.distance,
+    this.isRecorded = false,
   });
 
   final String name;
@@ -30,6 +35,22 @@ class RecommendedPlaceSummaryData {
   /// 현재 위치를 확인할 수 없으면(예: 위치 권한 미허용) null.
   final String? distance;
   final PlacePlaceholderMood placeholderMood;
+
+  /// 현재 진행중 필름롤에서 이미 채록(방문)을 완료한 장소인지 여부.
+  final bool isRecorded;
 }
 
 enum PlacePlaceholderMood { stream, wall, forest }
+
+/// 홈 대시보드의 날씨 카드가 소비하는 표시 전용 뷰 데이터.
+class WeatherSummaryData {
+  const WeatherSummaryData({
+    required this.regionName,
+    required this.temperature,
+    required this.weatherLabel,
+  });
+
+  final String regionName;
+  final double temperature;
+  final String weatherLabel;
+}

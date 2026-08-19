@@ -5,18 +5,25 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
+import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
+import 'package:chaerok/features/home/presentation/nearby_place_recorder.dart';
 import 'package:chaerok/features/home/presentation/widgets/active_film_roll_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/weather_card.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
 import 'package:chaerok/features/location/presentation/location_verification_screen.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 /// 홈 탭: 현재 지역, 진행중 필름롤 진행률을 요약해 다음 행동(재개/시작)으로
 /// 이끄는 상태 요약 대시보드. `home_screen.dart`(구 홈 화면)의 사용자 조회 ·
@@ -31,10 +38,16 @@ class HomeDashboardScreen extends StatefulWidget {
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   static const _tag = 'HomeDashboardScreen';
 
+  /// 홈 화면 캐러셀에 노출할 최근 촬영 사진 수(전체가 아닌 미리보기).
+  static const _recentPhotoPreviewLimit = 10;
+
   UserResponse? _user;
   LocationVerificationResult? _locationResult;
   FilmRoll? _recoveredFilmRoll;
   bool _isEnteringFilmRoll = false;
+  WeatherSummaryData? _weather;
+  List<String> _recentPhotoThumbnailPaths = const [];
+  List<RecommendedPlaceSummaryData> _nearbyPlaces = const [];
 
   @override
   void initState() {
@@ -63,25 +76,130 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final cached = LocationVerificationResult.sessionCache;
     if (cached != null) {
       setState(() => _locationResult = cached);
+      unawaited(_onLocationVerified(cached));
       return;
     }
 
     final result = await Navigator.of(context).push<LocationVerificationResult>(
       MaterialPageRoute(builder: (_) => const LocationVerificationScreen()),
     );
-    if (!mounted) return;
+    if (!mounted || result == null) return;
     setState(() => _locationResult = result);
+    unawaited(_onLocationVerified(result));
+  }
+
+  /// 위치 인증 결과가 확정된 뒤, 이 결과에 의존하는 날씨/근처 채록 장소
+  /// 섹션을 채운다.
+  Future<void> _onLocationVerified(LocationVerificationResult result) async {
+    await Future.wait([_fetchWeather(result), _loadNearbyPlaces(result)]);
+  }
+
+  Future<void> _fetchWeather(LocationVerificationResult result) async {
+    try {
+      final weather = await WeatherApiService.getCurrentWeather(
+        latitude: result.position.latitude,
+        longitude: result.position.longitude,
+      );
+      if (!mounted || weather == null) return;
+      setState(() {
+        _weather = WeatherSummaryData(
+          regionName: result.region.cityCountyName,
+          temperature: weather.temperature,
+          weatherLabel: weather.weatherLabel,
+        );
+      });
+    } catch (e, st) {
+      log('날씨 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
+  }
+
+  /// 위치 인증 흐름에서 이미 조회된 근처 장소([LocationVerificationResult.places])를
+  /// 재사용해 채록길 탭의 별도 API 호출 없이 "가까운 채록 장소" 섹션을 채운다.
+  /// 각 장소가 현재 진행중 필름롤에서 이미 채록되었는지 여부도 함께 계산한다.
+  Future<void> _loadNearbyPlaces(LocationVerificationResult result) async {
+    List<FilmRollPlace> filmRollPlaces = const [];
+    final filmRollId = _recoveredFilmRoll?.id;
+    if (filmRollId != null) {
+      try {
+        filmRollPlaces = await FilmRollModule.instance.filmRollPlaceRepository
+            .findByFilmRoll(filmRollId);
+      } catch (e, st) {
+        log('필름롤 장소 조회 실패', name: _tag, error: e, stackTrace: st);
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _nearbyPlaces = [
+        for (final (index, place) in result.places.indexed)
+          _toNearbySummary(place, index, result.position, filmRollPlaces),
+      ];
+    });
+  }
+
+  RecommendedPlaceSummaryData _toNearbySummary(
+    PlaceListResponse place,
+    int index,
+    Position currentPosition,
+    List<FilmRollPlace> filmRollPlaces,
+  ) {
+    const moods = PlacePlaceholderMood.values;
+    final meters = Geolocator.distanceBetween(
+      currentPosition.latitude,
+      currentPosition.longitude,
+      place.latitude,
+      place.longitude,
+    );
+    final distance = meters < 1000
+        ? '${meters.round()}m'
+        : '${(meters / 1000).toStringAsFixed(1)}km';
+
+    return RecommendedPlaceSummaryData(
+      name: place.title,
+      category: place.categoryDetail,
+      distance: distance,
+      placeholderMood: moods[index % moods.length],
+      isRecorded: NearbyPlaceRecorder.isRecorded(place, filmRollPlaces),
+    );
   }
 
   /// 앱 재시작 시 진행중이던 필름롤이 있다면 복구해 "이어하기"로 노출한다.
+  /// 복구 결과에 따라 사진 캐러셀과(위치 인증이 끝났다면) 근처 채록 장소의
+  /// 채록 여부 뱃지도 함께 갱신한다.
   Future<void> _loadRecoveredFilmRoll() async {
     try {
       final recovered = await FilmRollModule.instance
           .recoverLastActiveFilmRoll();
       if (!mounted) return;
-      setState(() => _recoveredFilmRoll = recovered);
+      setState(() {
+        _recoveredFilmRoll = recovered;
+        if (recovered == null) _recentPhotoThumbnailPaths = const [];
+      });
+
+      if (recovered != null) {
+        unawaited(_loadRecentPhotos(recovered.id));
+      }
+      final locationResult = _locationResult;
+      if (locationResult != null) {
+        unawaited(_loadNearbyPlaces(locationResult));
+      }
     } catch (e, st) {
       log('필름롤 복구 실패', name: _tag, error: e, stackTrace: st);
+    }
+  }
+
+  Future<void> _loadRecentPhotos(String filmRollId) async {
+    try {
+      final photos = await FilmRollModule.instance.photoRepository
+          .findByFilmRoll(filmRollId, limit: _recentPhotoPreviewLimit);
+      if (!mounted) return;
+      setState(() {
+        _recentPhotoThumbnailPaths = photos
+            .map((photo) => photo.thumbnailPath)
+            .toList();
+      });
+    } catch (e, st) {
+      log('최근 촬영 사진 조회 실패', name: _tag, error: e, stackTrace: st);
     }
   }
 
@@ -150,6 +268,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 regionName: _locationResult?.region.cityCountyName,
               ),
               const SizedBox(height: ChaerokSpacing.lg),
+              if (_weather != null) ...[
+                WeatherCard(data: _weather!),
+                const SizedBox(height: ChaerokSpacing.lg),
+              ],
               if (_recoveredFilmRoll != null)
                 GestureDetector(
                   onTap: _onResumeFilmRollTap,
@@ -158,15 +280,34 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       name: _recoveredFilmRoll!.title,
                       capturedCount: _recoveredFilmRoll!.visitedPlaceCount,
                       totalCount: _recoveredFilmRoll!.totalPlaceCount,
+                      photoThumbnailPaths: _recentPhotoThumbnailPaths,
                     ),
                   ),
                 )
               else
                 _buildStartFilmRollCard(),
+              if (_nearbyPlaces.isNotEmpty) ...[
+                const SizedBox(height: ChaerokSpacing.lg),
+                _buildNearbyPlacesSection(),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNearbyPlacesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('가까운 채록 장소', style: ChaerokTypography.headingLarge),
+        const SizedBox(height: ChaerokSpacing.sm),
+        for (final place in _nearbyPlaces) ...[
+          RecommendedPlaceCard(data: place, onTap: () {}),
+          const SizedBox(height: ChaerokSpacing.sm),
+        ],
+      ],
     );
   }
 

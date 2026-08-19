@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_shadows.dart';
@@ -15,7 +17,6 @@ class ActiveFilmRollCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 120,
       padding: const EdgeInsets.fromLTRB(
         ChaerokSpacing.md,
         ChaerokSpacing.sm,
@@ -30,72 +31,115 @@ class ActiveFilmRollCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(ChaerokRadius.lg),
         boxShadow: ChaerokShadows.card,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+          SizedBox(
+            height: 96,
+            child: Row(
               children: [
-                Text(
-                  data.name,
-                  style: ChaerokTypography.labelLarge.copyWith(
-                    color: ChaerokColors.primaryDark,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: ChaerokSpacing.xs),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${data.capturedCount}',
-                      style: ChaerokTypography.progress.copyWith(
-                        color: ChaerokColors.primaryDark,
-                        fontSize: 22,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        data.name,
+                        style: ChaerokTypography.labelLarge.copyWith(
+                          color: ChaerokColors.primaryDark,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        left: ChaerokSpacing.xs,
-                        bottom: 2,
+                      const SizedBox(height: ChaerokSpacing.xs),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${data.capturedCount}',
+                            style: ChaerokTypography.progress.copyWith(
+                              color: ChaerokColors.primaryDark,
+                              fontSize: 22,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: ChaerokSpacing.xs,
+                              bottom: 2,
+                            ),
+                            child: Text(
+                              '/ ${data.totalCount}',
+                              style: ChaerokTypography.labelSmall.copyWith(
+                                color: ChaerokColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        '/ ${data.totalCount}',
+                      const SizedBox(height: ChaerokSpacing.xs),
+                      SizedBox(
+                        width: 126,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            ChaerokRadius.full,
+                          ),
+                          child: LinearProgressIndicator(
+                            value: data.progress,
+                            minHeight: 4,
+                            backgroundColor: ChaerokColors.surface,
+                            valueColor: const AlwaysStoppedAnimation(
+                              ChaerokColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: ChaerokSpacing.xxs),
+                      Text(
+                        '촬영 진행 중',
                         style: ChaerokTypography.labelSmall.copyWith(
                           color: ChaerokColors.textSecondary,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: ChaerokSpacing.xs),
-                SizedBox(
-                  width: 126,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(ChaerokRadius.full),
-                    child: LinearProgressIndicator(
-                      value: data.progress,
-                      minHeight: 4,
-                      backgroundColor: ChaerokColors.surface,
-                      valueColor: const AlwaysStoppedAnimation(
-                        ChaerokColors.primary,
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: ChaerokSpacing.xxs),
-                Text(
-                  '촬영 진행 중',
-                  style: ChaerokTypography.labelSmall.copyWith(
-                    color: ChaerokColors.textSecondary,
-                  ),
-                ),
+                const FilmRollArtwork(),
               ],
             ),
           ),
-          const FilmRollArtwork(),
+          if (data.photoThumbnailPaths.isNotEmpty) ...[
+            const SizedBox(height: ChaerokSpacing.sm),
+            _PhotoCarousel(thumbnailPaths: data.photoThumbnailPaths),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoCarousel extends StatelessWidget {
+  const _PhotoCarousel({required this.thumbnailPaths});
+
+  final List<String> thumbnailPaths;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 56,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: thumbnailPaths.length,
+        separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
+        itemBuilder: (context, index) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(ChaerokRadius.sm),
+            child: Image.file(
+              File(thumbnailPaths[index]),
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+            ),
+          );
+        },
       ),
     );
   }
