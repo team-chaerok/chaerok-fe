@@ -17,4 +17,8 @@ abstract class PhotoRepository {
   Future<void> deletePhoto(String photoId);
 
   Future<List<FilmRollPhoto>> findByPlace(String filmRollPlaceId);
+
+  /// 필름롤 전체에서 촬영된 사진을 최신순으로 조회한다. [limit]을 지정하면
+  /// 최근 [limit]장만 반환한다(홈 화면 캐러셀처럼 전체가 아닌 미리보기용).
+  Future<List<FilmRollPhoto>> findByFilmRoll(String filmRollId, {int? limit});
 }

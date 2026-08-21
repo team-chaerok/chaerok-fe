@@ -8,6 +8,8 @@ class AppSecrets {
   static const String kakaoNativeAppKey = '';
   static const String kakaoRestApiKey = '';
 
+  static const String kmaServiceKey = '';
+
   static const String googleClientId = '';
   static const String googleServerClientId = '';
 }

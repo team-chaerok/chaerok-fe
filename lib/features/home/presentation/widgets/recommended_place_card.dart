@@ -46,9 +46,14 @@ class RecommendedPlaceCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AspectRatio(
-          aspectRatio: 2,
-          child: _PlaceImagePlaceholder(mood: data.placeholderMood),
+        Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: 2,
+              child: _PlaceImagePlaceholder(mood: data.placeholderMood),
+            ),
+            if (data.isRecorded) const _RecordedBadge(),
+          ],
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -68,9 +73,15 @@ class RecommendedPlaceCard extends StatelessWidget {
       height: 76,
       child: Row(
         children: [
-          SizedBox(
-            width: 100,
-            child: _PlaceImagePlaceholder(mood: data.placeholderMood),
+          Stack(
+            children: [
+              SizedBox(
+                width: 100,
+                height: 76,
+                child: _PlaceImagePlaceholder(mood: data.placeholderMood),
+              ),
+              if (data.isRecorded) const _RecordedBadge(),
+            ],
           ),
           Expanded(
             child: Padding(
@@ -90,6 +101,31 @@ class RecommendedPlaceCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 현재 진행중 필름롤에서 이미 채록(방문)을 완료한 장소임을 알리는 뱃지.
+class _RecordedBadge extends StatelessWidget {
+  const _RecordedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: ChaerokSpacing.xxs,
+      left: ChaerokSpacing.xxs,
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: const BoxDecoration(
+          color: ChaerokColors.primaryDark,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.check_rounded,
+          color: ChaerokColors.surface,
+          size: ChaerokSpacing.sm,
+        ),
       ),
     );
   }

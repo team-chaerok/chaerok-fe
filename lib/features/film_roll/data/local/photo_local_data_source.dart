@@ -20,6 +20,15 @@ class PhotoLocalDataSource {
     )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// 필름롤 전체에서 촬영된 사진을 최신순으로 조회합니다.
+  Future<List<Photo>> findByFilmRoll(String filmRollId, {int? limit}) {
+    final query = _db.select(_db.photos)
+      ..where((t) => t.filmRollId.equals(filmRollId))
+      ..orderBy([(t) => OrderingTerm.desc(t.takenAt)]);
+    if (limit != null) query.limit(limit);
+    return query.get();
+  }
+
   Future<int> countByPlace(String filmRollPlaceId) async {
     final rows = await findByPlace(filmRollPlaceId);
     return rows.length;
