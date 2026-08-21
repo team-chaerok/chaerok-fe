@@ -49,6 +49,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   List<String> _recentPhotoThumbnailPaths = const [];
   List<RecommendedPlaceSummaryData> _nearbyPlaces = const [];
 
+  // 재개/시작 버튼이 연타되는 등 _loadNearbyPlaces/_loadRecentPhotos가 겹쳐
+  // 호출될 때, 먼저 시작한 요청이 나중에 끝나며 최신 상태를 stale 데이터로
+  // 덮어쓰지 않도록 각각 요청 토큰으로 최신 호출만 반영한다.
+  int _nearbyPlacesRequestToken = 0;
+  int _recentPhotosRequestToken = 0;
+
   @override
   void initState() {
     super.initState();
@@ -117,6 +123,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// 재사용해 채록길 탭의 별도 API 호출 없이 "가까운 채록 장소" 섹션을 채운다.
   /// 각 장소가 현재 진행중 필름롤에서 이미 채록되었는지 여부도 함께 계산한다.
   Future<void> _loadNearbyPlaces(LocationVerificationResult result) async {
+    final requestToken = ++_nearbyPlacesRequestToken;
     List<FilmRollPlace> filmRollPlaces = const [];
     final filmRollId = _recoveredFilmRoll?.id;
     if (filmRollId != null) {
@@ -128,7 +135,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       }
     }
 
-    if (!mounted) return;
+    if (!mounted || requestToken != _nearbyPlacesRequestToken) return;
     setState(() {
       _nearbyPlaces = [
         for (final (index, place) in result.places.indexed)
@@ -173,7 +180,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       if (!mounted) return;
       setState(() {
         _recoveredFilmRoll = recovered;
-        if (recovered == null) _recentPhotoThumbnailPaths = const [];
+        if (recovered == null) {
+          _recentPhotoThumbnailPaths = const [];
+          // 이전에 시작된 사진 조회가 아직 끝나지 않았다면, 그 결과가 뒤늦게
+          // 도착해 방금 비운 상태를 다시 덮어쓰지 않도록 토큰을 무효화한다.
+          _recentPhotosRequestToken++;
+        }
       });
 
       if (recovered != null) {
@@ -189,10 +201,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   Future<void> _loadRecentPhotos(String filmRollId) async {
+    final requestToken = ++_recentPhotosRequestToken;
     try {
       final photos = await FilmRollModule.instance.photoRepository
           .findByFilmRoll(filmRollId, limit: _recentPhotoPreviewLimit);
-      if (!mounted) return;
+      if (!mounted || requestToken != _recentPhotosRequestToken) return;
       setState(() {
         _recentPhotoThumbnailPaths = photos
             .map((photo) => photo.thumbnailPath)

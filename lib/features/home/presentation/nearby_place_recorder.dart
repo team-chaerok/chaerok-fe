@@ -18,15 +18,18 @@ class NearbyPlaceRecorder {
     PlaceListResponse place,
     List<FilmRollPlace> filmRollPlaces,
   ) {
+    final placeId = place.id;
     final externalId = _externalIdOf(place);
+
     for (final filmRollPlace in filmRollPlaces) {
       if (!filmRollPlace.isVisited) continue;
-      if (place.id != null && filmRollPlace.serverPlaceId == place.id) {
-        return true;
-      }
-      if (externalId != null && filmRollPlace.externalPlaceId == externalId) {
-        return true;
-      }
+      // 서버 ID가 있으면 그것만으로 판정한다 — externalId가 우연히 같더라도
+      // 서버 ID가 다르면 다른 장소이므로 무시해야 한다(identityParts와 동일한
+      // 우선순위: 서버 ID 있으면 서버 ID만 사용, 없을 때만 external ID로 대체).
+      final matches = placeId != null
+          ? filmRollPlace.serverPlaceId == placeId
+          : externalId != null && filmRollPlace.externalPlaceId == externalId;
+      if (matches) return true;
     }
     return false;
   }

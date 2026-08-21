@@ -83,5 +83,14 @@ void main() {
 
       expect(NearbyPlaceRecorder.isRecorded(place, filmRollPlaces), isFalse);
     });
+
+    test('place.id가 있으면 서버 ID로만 판정하고, externalId가 우연히 같아도 무시한다', () {
+      final place = _place(id: 1, kakaoPlaceId: 'shared-ext', source: 'KAKAO');
+      final filmRollPlaces = [
+        _filmRollPlace(serverPlaceId: 2, externalPlaceId: 'shared-ext'),
+      ];
+
+      expect(NearbyPlaceRecorder.isRecorded(place, filmRollPlaces), isFalse);
+    });
   });
 }
