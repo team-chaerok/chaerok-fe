@@ -23,7 +23,7 @@ import 'package:permission_handler/permission_handler.dart';
 /// 값이 아니라 촬영 화면의 정적인 UI 카피다.
 const _filmTypeLabel = '공주:공주의 잔(殘)';
 const _cameraName = 'Chaerok';
-const _cameraSubtitle = 'Flim Camera';
+const _cameraSubtitle = 'Film Camera';
 
 /// 촬영 화면 우측 줌 셀렉터에 노출할 배율 후보(위→아래 순서).
 /// 실제로는 [_VisitCaptureScreenState._availableZoomLevels]에서 기기가
@@ -54,6 +54,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   String? _errorMessage;
   bool _isSaving = false;
   bool _isInitializingCamera = false;
+  bool _isSwitchingCamera = false;
   bool _isPermissionPermanentlyDenied = false;
 
   CameraLensDirection _lensDirection = CameraLensDirection.back;
@@ -141,7 +142,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
         await controller.dispose();
         return;
       }
-      final clampedZoom = _zoomLevel.clamp(minZoom, maxZoom);
+      final clampedZoom = _zoomLevel.clamp(minZoom, maxZoom).toDouble();
       await controller.setZoomLevel(clampedZoom);
       await controller.setFlashMode(_flashMode);
       setState(() {
@@ -183,7 +184,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     final controller = _cameraController;
     if (controller == null) return;
 
-    final clampedZoom = zoom.clamp(_minZoom, _maxZoom);
+    final clampedZoom = zoom.clamp(_minZoom, _maxZoom).toDouble();
     await controller.setZoomLevel(clampedZoom);
     if (!mounted) return;
     setState(() => _zoomLevel = clampedZoom);
@@ -202,17 +203,22 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   }
 
   Future<void> _onCameraSwitch() async {
-    if (_isInitializingCamera) return;
+    if (_isInitializingCamera || _isSaving || _isSwitchingCamera) return;
+    _isSwitchingCamera = true;
 
-    final controller = _cameraController;
-    if (controller != null) {
-      setState(() => _cameraController = null);
-      await controller.dispose();
+    try {
+      final controller = _cameraController;
+      if (controller != null) {
+        setState(() => _cameraController = null);
+        await controller.dispose();
+      }
+      _lensDirection = _lensDirection == CameraLensDirection.back
+          ? CameraLensDirection.front
+          : CameraLensDirection.back;
+      await _initializeCamera();
+    } finally {
+      _isSwitchingCamera = false;
     }
-    _lensDirection = _lensDirection == CameraLensDirection.back
-        ? CameraLensDirection.front
-        : CameraLensDirection.back;
-    await _initializeCamera();
   }
 
   Future<void> _onCaptureTap() async {
