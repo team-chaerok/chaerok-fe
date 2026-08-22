@@ -147,4 +147,39 @@ void main() {
 
     expect(result, isEmpty);
   });
+
+  test('countByFilmRoll은 다른 필름롤의 사진을 섞지 않고 개수를 센다', () async {
+    final now = DateTime.now();
+    await _insertPhoto(
+      database,
+      id: 'photo-1',
+      filmRollId: 'roll-1',
+      filmRollPlaceId: 'place-1',
+      takenAt: now,
+    );
+    await _insertPhoto(
+      database,
+      id: 'photo-2',
+      filmRollId: 'roll-1',
+      filmRollPlaceId: 'place-1',
+      takenAt: now,
+    );
+    await _insertPhoto(
+      database,
+      id: 'photo-other-roll',
+      filmRollId: 'roll-2',
+      filmRollPlaceId: 'place-2',
+      takenAt: now,
+    );
+
+    final result = await dataSource.countByFilmRoll('roll-1');
+
+    expect(result, 2);
+  });
+
+  test('사진이 없는 필름롤의 countByFilmRoll은 0을 반환한다', () async {
+    final result = await dataSource.countByFilmRoll('roll-1');
+
+    expect(result, 0);
+  });
 }

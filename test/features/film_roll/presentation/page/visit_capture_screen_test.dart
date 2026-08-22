@@ -124,6 +124,18 @@ class _FakeCameraPlatform extends CameraPlatform {
 
   @override
   Future<void> dispose(int cameraId) async {}
+
+  @override
+  Future<double> getMinZoomLevel(int cameraId) async => 1.0;
+
+  @override
+  Future<double> getMaxZoomLevel(int cameraId) async => 4.0;
+
+  @override
+  Future<void> setZoomLevel(int cameraId, double zoom) async {}
+
+  @override
+  Future<void> setFlashMode(int cameraId, FlashMode mode) async {}
 }
 
 void main() {
@@ -138,7 +150,6 @@ void main() {
         home: VisitCaptureScreen(
           filmRollId: 'roll-1',
           filmRollPlaceId: 'place-1',
-          placeName: '테스트 장소',
         ),
       ),
     );
@@ -173,7 +184,6 @@ void main() {
         home: VisitCaptureScreen(
           filmRollId: 'roll-1',
           filmRollPlaceId: 'place-1',
-          placeName: '테스트 장소',
         ),
       ),
     );
