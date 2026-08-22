@@ -83,7 +83,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
           builder: (_) => VisitCaptureScreen(
             filmRollId: recovered.id,
             filmRollPlaceId: nextPlace!.id,
-            placeName: nextPlace.name,
           ),
         ),
       );

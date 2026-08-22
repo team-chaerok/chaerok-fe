@@ -109,7 +109,6 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
         builder: (_) => VisitCaptureScreen(
           filmRollId: filmRoll.id,
           filmRollPlaceId: place.id,
-          placeName: place.name,
         ),
       ),
     );

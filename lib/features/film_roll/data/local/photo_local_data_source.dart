@@ -34,6 +34,14 @@ class PhotoLocalDataSource {
     return rows.length;
   }
 
+  Future<int> countByFilmRoll(String filmRollId) {
+    final count = _db.photos.id.count();
+    final query = _db.selectOnly(_db.photos)
+      ..addColumns([count])
+      ..where(_db.photos.filmRollId.equals(filmRollId));
+    return query.map((row) => row.read(count)!).getSingle();
+  }
+
   Future<bool> hasAnyByFilmRoll(String filmRollId) async {
     final row =
         await (_db.select(_db.photos)

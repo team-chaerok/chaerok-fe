@@ -100,4 +100,9 @@ class PhotoRepositoryImpl implements PhotoRepository {
     final rows = await _photoDs.findByFilmRoll(filmRollId, limit: limit);
     return rows.map((row) => row.toEntity()).toList();
   }
+
+  @override
+  Future<int> countByFilmRoll(String filmRollId) {
+    return _photoDs.countByFilmRoll(filmRollId);
+  }
 }
