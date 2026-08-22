@@ -61,9 +61,18 @@ class DioClient {
   Future<ApiResponse<T>> post<T>(
     String path, {
     dynamic data,
+    Map<String, dynamic>? queryParameters,
+    ResponseType? responseType,
     T Function(dynamic)? fromJson,
   }) async {
-    final response = await _dio.post(path, data: data);
+    final response = await _dio.post(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: responseType != null
+          ? Options(responseType: responseType)
+          : null,
+    );
     return _toApiResponse(response, fromJson);
   }
 
