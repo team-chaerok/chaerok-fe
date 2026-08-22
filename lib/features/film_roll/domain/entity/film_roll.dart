@@ -20,6 +20,9 @@ class FilmRoll {
     this.completedAt,
   });
 
+  /// 필름롤당 촬영 가능한 고정 노출수(실제 필름 카메라의 24매 필름 컨셉).
+  static const int maxExposureCount = 24;
+
   final String id;
   final RegionCode regionCode;
   final String regionName;
