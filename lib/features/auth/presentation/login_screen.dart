@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/o_auth_login_request.dart';
@@ -133,7 +134,39 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Stack(
+                children: [
+                  Image.asset('assets/images/chaerok-logo.png', width: 213),
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Text(
+                      '채록',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
+                        fontSize: 48,
+                        color: ChaerokColors.primaryDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              Text(
+                '필름처럼 남기는\n나의 여행 기록',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
+                  fontSize: 14,
+                  color: ChaerokColors.primaryDark.withValues(alpha: 0.5),
+                ),
+              ),
+
+              const SizedBox(height: ChaerokSpacing.xxl * 5),
               SocialLoginButton(
+                logo: 'assets/images/kakao-logo.svg',
                 label: '카카오로 계속하기',
                 onTap: () => _onKakaoLoginTap(context),
                 backgroundColor: const Color(0xFFFEE500),
@@ -141,8 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 isLoading: _loadingProvider == _LoginProvider.kakao,
                 isEnabled: _loadingProvider == null,
               ),
-              const SizedBox(height: ChaerokSpacing.md),
+              const SizedBox(height: ChaerokSpacing.sm),
               SocialLoginButton(
+                logo: 'assets/images/google-logo.svg',
                 label: '구글로 계속하기',
                 onTap: () => _onGoogleLoginTap(context),
                 backgroundColor: ChaerokColors.surface,
@@ -150,6 +184,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 side: const BorderSide(color: ChaerokColors.border),
                 isLoading: _loadingProvider == _LoginProvider.google,
                 isEnabled: _loadingProvider == null,
+              ),
+              const SizedBox(height: ChaerokSpacing.md),
+              const Text(
+                '로그인 시 약관 동의가 필요합니다.',
+                style: TextStyle(
+                  color: ChaerokColors.textPrimary,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
