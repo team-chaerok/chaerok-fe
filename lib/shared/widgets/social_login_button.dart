@@ -51,7 +51,7 @@ class SocialLoginButton extends StatelessWidget {
                     size: 20,
                     strokeWidth: 2,
                   )
-                : Text(label, style: ChaerokTypography.labelLarge),
+                : Text(label, style: ChaerokTypography.bodyMedium),
           ),
         ),
         Positioned(

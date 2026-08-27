@@ -115,7 +115,7 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('닉네임', style: ChaerokTypography.labelLarge),
+            const Text('닉네임', style: ChaerokTypography.bodyMedium),
             const SizedBox(height: ChaerokSpacing.xs),
             TextField(
               controller: _nicknameController,
@@ -147,7 +147,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
             const SizedBox(height: ChaerokSpacing.xl),
-            const Text('약관 동의', style: ChaerokTypography.labelLarge),
+            const Text('약관 동의', style: ChaerokTypography.bodyMedium),
             const SizedBox(height: ChaerokSpacing.xs),
             _AgreementCheckbox(
               label: '이용약관에 동의합니다 (필수)',

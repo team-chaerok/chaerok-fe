@@ -213,7 +213,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             onSelected: (_) => _onRegionSelected(region),
             selectedColor: ChaerokColors.primary,
             backgroundColor: ChaerokColors.sageLight,
-            labelStyle: ChaerokTypography.labelLarge.copyWith(
+            labelStyle: ChaerokTypography.bodyMedium.copyWith(
               color: isSelected
                   ? ChaerokColors.surface
                   : ChaerokColors.primaryDark,

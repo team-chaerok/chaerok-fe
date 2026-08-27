@@ -147,7 +147,7 @@ class _PlaceInformation extends StatelessWidget {
           data.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: ChaerokTypography.headingMedium,
+          style: ChaerokTypography.bodyLarge,
         ),
         const SizedBox(height: ChaerokSpacing.xxs),
         Row(
@@ -157,7 +157,7 @@ class _PlaceInformation extends StatelessWidget {
                 data.category,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ChaerokTypography.labelSmall.copyWith(
+                style: ChaerokTypography.caption.copyWith(
                   color: ChaerokColors.textSecondary,
                 ),
               ),
@@ -178,7 +178,7 @@ class _PlaceInformation extends StatelessWidget {
               ),
               Text(
                 distance,
-                style: ChaerokTypography.labelSmall.copyWith(
+                style: ChaerokTypography.caption.copyWith(
                   color: ChaerokColors.textSecondary,
                 ),
               ),

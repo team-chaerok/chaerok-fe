@@ -168,7 +168,7 @@ class _CategoryMenuItemState extends State<_CategoryMenuItem> {
                     child: Text(
                       widget.item.displayLabel,
                       maxLines: 1,
-                      style: ChaerokTypography.labelSmall.copyWith(
+                      style: ChaerokTypography.caption.copyWith(
                         color: widget.isSelected
                             ? ChaerokColors.primaryDark
                             : ChaerokColors.textSecondary,

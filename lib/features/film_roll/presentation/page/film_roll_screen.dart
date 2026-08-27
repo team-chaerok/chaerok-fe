@@ -210,7 +210,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('방문 진행률', style: ChaerokTypography.labelLarge),
+          const Text('방문 진행률', style: ChaerokTypography.bodyMedium),
           const SizedBox(height: ChaerokSpacing.xs),
           ClipRRect(
             borderRadius: BorderRadius.circular(ChaerokRadius.full),

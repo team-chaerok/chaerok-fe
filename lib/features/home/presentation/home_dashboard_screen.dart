@@ -314,7 +314,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('가까운 채록 장소', style: ChaerokTypography.headingLarge),
+        const Text('가까운 채록 장소', style: ChaerokTypography.titleMedium),
         const SizedBox(height: ChaerokSpacing.sm),
         for (final place in _nearbyPlaces) ...[
           RecommendedPlaceCard(data: place, onTap: () {}),
@@ -336,7 +336,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('필름롤', style: ChaerokTypography.labelLarge),
+          const Text('필름롤', style: ChaerokTypography.bodyMedium),
           const SizedBox(height: ChaerokSpacing.xs),
           Text(
             _locationResult != null
@@ -379,7 +379,7 @@ class _HomeHeader extends StatelessWidget {
         const SizedBox(height: ChaerokSpacing.xs),
         Text(
           '현재 지역',
-          style: ChaerokTypography.labelSmall.copyWith(
+          style: ChaerokTypography.caption.copyWith(
             color: ChaerokColors.textSecondary,
           ),
         ),

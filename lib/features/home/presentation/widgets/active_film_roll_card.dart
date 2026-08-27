@@ -45,7 +45,7 @@ class ActiveFilmRollCard extends StatelessWidget {
                     children: [
                       Text(
                         data.name,
-                        style: ChaerokTypography.labelLarge.copyWith(
+                        style: ChaerokTypography.bodyMedium.copyWith(
                           color: ChaerokColors.primaryDark,
                           fontWeight: FontWeight.w600,
                         ),
@@ -68,7 +68,7 @@ class ActiveFilmRollCard extends StatelessWidget {
                             ),
                             child: Text(
                               '/ ${data.totalCount}',
-                              style: ChaerokTypography.labelSmall.copyWith(
+                              style: ChaerokTypography.caption.copyWith(
                                 color: ChaerokColors.textSecondary,
                               ),
                             ),
@@ -95,7 +95,7 @@ class ActiveFilmRollCard extends StatelessWidget {
                       const SizedBox(height: ChaerokSpacing.xxs),
                       Text(
                         '촬영 진행 중',
-                        style: ChaerokTypography.labelSmall.copyWith(
+                        style: ChaerokTypography.caption.copyWith(
                           color: ChaerokColors.textSecondary,
                         ),
                       ),
