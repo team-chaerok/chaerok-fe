@@ -20,9 +20,9 @@ class HomeBottomNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: ChaerokColors.surface,
-        border: Border(top: BorderSide(color: ChaerokColors.border)),
+        border: const Border(top: BorderSide(color: ChaerokColors.border)),
         boxShadow: ChaerokShadows.card,
       ),
       child: SafeArea(

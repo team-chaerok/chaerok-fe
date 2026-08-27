@@ -35,7 +35,7 @@ class ChaerokTheme {
           color: ChaerokColors.textPrimary,
         ),
         bodyMedium: ChaerokTypography.bodyMedium.copyWith(
-          color: ChaerokColors.textSecondary,
+          color: ChaerokColors.textPrimary,
         ),
         labelLarge: ChaerokTypography.bodyMedium.copyWith(
           color: ChaerokColors.textPrimary,

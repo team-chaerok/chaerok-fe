@@ -18,36 +18,64 @@ class WeatherCard extends StatelessWidget {
       padding: const EdgeInsets.all(ChaerokSpacing.md),
       decoration: BoxDecoration(
         color: ChaerokColors.surface,
-        border: Border.all(color: ChaerokColors.border),
         borderRadius: BorderRadius.circular(ChaerokRadius.lg),
         boxShadow: ChaerokShadows.card,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data.regionName,
-                  style: ChaerokTypography.labelLarge.copyWith(
-                    color: ChaerokColors.textSecondary,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        data.regionName,
+                        style: ChaerokTypography.displayLarge.copyWith(
+                          fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
+                          color: const Color(0xFF565F4A),
+                        ),
+                      ),
+
+                      Text(
+                        '에서 기록 중',
+                        style: ChaerokTypography.bodyMedium.copyWith(
+                          color: ChaerokColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: ChaerokSpacing.xxs),
-                Text(
-                  data.weatherLabel,
-                  style: ChaerokTypography.headingMedium.copyWith(
-                    color: ChaerokColors.primaryDark,
+                ],
+              ),
+
+              Row(
+                children: [
+                  Text(data.weatherLabel, style: ChaerokTypography.bodyMedium),
+                  Container(
+                    color: ChaerokColors.border,
+                    width: 1,
+                    height: 16,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: ChaerokSpacing.xxs,
+                    ),
                   ),
-                ),
-              ],
-            ),
+
+                  Text(
+                    '${data.temperature.round()}°',
+                    style: ChaerokTypography.bodyMedium,
+                  ),
+                ],
+              ),
+            ],
           ),
           Text(
-            '${data.temperature.round()}°',
-            style: ChaerokTypography.titleLarge.copyWith(
-              color: ChaerokColors.primaryDark,
+            '오늘도 천천히 기록해보세요.',
+            style: ChaerokTypography.caption.copyWith(
+              color: const Color(0xFF7F8775),
             ),
           ),
         ],
