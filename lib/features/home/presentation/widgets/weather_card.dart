@@ -72,6 +72,7 @@ class WeatherCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: ChaerokSpacing.md),
           Text(
             '오늘도 천천히 기록해보세요.',
             style: ChaerokTypography.caption.copyWith(

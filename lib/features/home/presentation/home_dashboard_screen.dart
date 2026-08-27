@@ -44,7 +44,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// 홈 콘텐츠 공통 좌우 패딩. ActiveFilmRollCard만 이 패딩을 적용하지 않아
   /// 화면 가장자리까지 노출된다.
   static const _contentPadding = EdgeInsets.symmetric(
-    horizontal: ChaerokSpacing.md,
+    horizontal: ChaerokSpacing.xl,
   );
 
   UserResponse? _user;
@@ -310,7 +310,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     regionName: _locationResult?.region.cityCountyName,
                   ),
                 ),
-                const SizedBox(height: ChaerokSpacing.lg),
+                const SizedBox(height: ChaerokSpacing.md),
                 if (_weather != null) ...[
                   Padding(
                     padding: _contentPadding,
@@ -336,7 +336,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     child: _buildStartFilmRollCard(),
                   ),
                 if (_nearbyPlaces.isNotEmpty) ...[
-                  const SizedBox(height: ChaerokSpacing.lg),
+                  const SizedBox(height: ChaerokSpacing.xxl),
                   Padding(
                     padding: _contentPadding,
                     child: _buildNearbyPlacesSection(),

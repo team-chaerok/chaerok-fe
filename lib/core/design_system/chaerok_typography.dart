@@ -19,6 +19,7 @@ class ChaerokTypography {
   static const TextStyle titleLarge = TextStyle(
     fontFamily: nanumSquareRoundFontFamily,
     fontSize: 22,
+    fontWeight: FontWeight.w700,
     height: 30 / 22,
   );
 
@@ -26,6 +27,7 @@ class ChaerokTypography {
   /// 섹션 제목.
   static const TextStyle titleMedium = TextStyle(
     fontFamily: nanumSquareRoundFontFamily,
+    fontWeight: FontWeight.w700,
     fontSize: 18,
     height: 26 / 18,
   );
@@ -59,7 +61,7 @@ class ChaerokTypography {
   static const TextStyle displayMedium = TextStyle(
     fontFamily: jeongnimsajiFontFamily,
     fontSize: 22,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w700,
     height: 1.3,
     letterSpacing: -0.2,
   );

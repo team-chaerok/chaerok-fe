@@ -99,7 +99,9 @@ flutter:
         - asset: assets/fonts/Jeongnimsaji-M.ttf
           weight: 500
         - asset: assets/fonts/Jeongnimsaji-L.ttf
-          weight: 500
+          weight: 600
+        - asset: assets/fonts/Jeongnimsaji-B.ttf
+          weight: 700
     - family: NanumSquareRound
       fonts:
         - asset: assets/fonts/NanumSquareRoundR.ttf
