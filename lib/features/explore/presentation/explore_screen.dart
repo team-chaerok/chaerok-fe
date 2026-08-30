@@ -156,6 +156,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return RecommendedPlaceSummaryData(
       name: place.title,
       category: place.categoryDetail,
+      imageUrl: place.firstImageUrl,
       distance: _distanceLabel(place),
       placeholderMood: moods[index % moods.length],
     );

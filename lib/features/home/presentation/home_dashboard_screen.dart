@@ -170,6 +170,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return RecommendedPlaceSummaryData(
       name: place.title,
       category: place.categoryDetail,
+      imageUrl: place.firstImageUrl,
       distance: distance,
       placeholderMood: moods[index % moods.length],
       isRecorded: NearbyPlaceRecorder.isRecorded(place, filmRollPlaces),
