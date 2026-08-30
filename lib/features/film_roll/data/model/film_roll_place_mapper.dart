@@ -19,6 +19,7 @@ extension FilmRollPlaceMapper on FilmRollPlaceRow {
       visitOrder: visitOrder,
       isVisited: isVisited,
       visitedAt: visitedAt,
+      visitSyncedAt: visitSyncedAt,
       photoCount: photoCount,
     );
   }

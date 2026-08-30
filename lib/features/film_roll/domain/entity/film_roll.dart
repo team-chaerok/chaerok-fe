@@ -18,6 +18,9 @@ class FilmRoll {
     this.selectedCourseId,
     this.selectedCourseTitle,
     this.completedAt,
+    this.regionId,
+    this.serverFilmRollId,
+    this.serverStatus,
   });
 
   /// 필름롤당 촬영 가능한 고정 노출수(실제 필름 카메라의 24매 필름 컨셉).
@@ -35,6 +38,15 @@ class FilmRoll {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
+
+  /// 백엔드 지역 ID(`RegionsApi.resolveRegion`이 반환). 서버 필름롤 생성에 필요.
+  final int? regionId;
+
+  /// 연결된 서버 필름롤 PK. null이면 아직 서버에 생성되지 않은 상태.
+  final int? serverFilmRollId;
+
+  /// 마지막으로 미러링한 서버 필름롤 status 원문(CAPTURING 등).
+  final String? serverStatus;
 
   /// 0.0 ~ 1.0 범위의 방문 진행률. 코스를 아직 선택하지 않았으면 0.
   double get progress =>
@@ -54,6 +66,9 @@ class FilmRoll {
     int? visitedPlaceCount,
     DateTime? updatedAt,
     DateTime? completedAt,
+    int? regionId,
+    int? serverFilmRollId,
+    String? serverStatus,
   }) {
     return FilmRoll(
       id: id,
@@ -68,6 +83,9 @@ class FilmRoll {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
+      regionId: regionId ?? this.regionId,
+      serverFilmRollId: serverFilmRollId ?? this.serverFilmRollId,
+      serverStatus: serverStatus ?? this.serverStatus,
     );
   }
 }
