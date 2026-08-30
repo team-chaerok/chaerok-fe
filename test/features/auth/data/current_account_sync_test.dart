@@ -36,6 +36,22 @@ class _FakeFilmRollRepository implements FilmRollRepository {
   Future<FilmRoll> findOrCreateActiveByRegion({
     required RegionCode regionCode,
     required String regionName,
+    required int regionId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> linkServerFilmRoll({
+    required String clientFilmRollId,
+    required int serverFilmRollId,
+    String? serverStatus,
+    String? filterId,
+    double? filterStrength,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> updateServerStatus({
+    required String clientFilmRollId,
+    required String serverStatus,
   }) => throw UnimplementedError();
 
   @override

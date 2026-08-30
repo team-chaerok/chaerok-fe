@@ -105,17 +105,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// 선택한 지역의 로컬 필름롤을 찾거나 새로 생성해 진입한다.
   Future<void> _onEnterRegionTap() async {
     if (_isEnteringFilmRoll) return;
+    // 진입 버튼은 _regionId가 확인된 뒤에만 활성화되지만(build의 isEnabled),
+    // 방어적으로 한 번 더 확인한다.
+    final regionId = _regionId;
+    if (regionId == null) return;
 
     setState(() => _isEnteringFilmRoll = true);
     try {
       final filmRoll = await FilmRollModule.instance.enterRegion(
         _selectedRegion.cityCountyName,
+        regionId: regionId,
       );
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) =>
-              FilmRollScreen(filmRollId: filmRoll.id, regionId: _regionId),
+              FilmRollScreen(filmRollId: filmRoll.id, regionId: regionId),
         ),
       );
     } on UnsupportedRegionException {

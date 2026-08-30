@@ -60,4 +60,26 @@ class FilmRollPlaceRepositoryImpl implements FilmRollPlaceRepository {
     if (hasVisited) return true;
     return _photoDs.hasAnyByFilmRoll(filmRollId);
   }
+
+  @override
+  Future<List<FilmRollPlace>> findUnsyncedVisitedPlaces(
+    String filmRollId,
+  ) async {
+    final rows = await _placeDs.findByFilmRoll(filmRollId);
+    final result = <FilmRollPlace>[];
+    for (final row in rows) {
+      if (!row.isVisited || row.visitSyncedAt != null) continue;
+      final photoCount = await _photoDs.countByPlace(row.id);
+      result.add(row.toEntity(photoCount: photoCount));
+    }
+    return result;
+  }
+
+  @override
+  Future<void> markVisitSynced(String filmRollPlaceId, {required DateTime at}) {
+    return _placeDs.update(
+      filmRollPlaceId,
+      FilmRollPlacesCompanion(visitSyncedAt: Value(at)),
+    );
+  }
 }

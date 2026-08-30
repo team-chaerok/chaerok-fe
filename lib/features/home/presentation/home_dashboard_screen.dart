@@ -244,6 +244,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     try {
       final filmRoll = await FilmRollModule.instance.enterRegion(
         locationResult.region.cityCountyName,
+        regionId: locationResult.region.regionId,
       );
       if (!mounted) return;
       await Navigator.of(context).push(

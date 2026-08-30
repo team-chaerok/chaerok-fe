@@ -6,9 +6,28 @@ import 'package:chaerok/shared/region/region_code.dart';
 abstract class FilmRollRepository {
   /// 해당 지역의 진행중(inProgress) 필름롤을 찾아 반환하고, 없으면 새로 생성한다.
   /// 지역당 진행중 필름롤은 1개만 존재해야 하며, 이 연산은 원자적으로 처리된다.
+  /// [regionId]는 백엔드 지역 ID(`RegionsApi.resolveRegion`)로, 서버 필름롤
+  /// 생성에 필요하다. 재사용되는 기존 행에 [regionId]가 없으면 여기서 채운다.
   Future<FilmRoll> findOrCreateActiveByRegion({
     required RegionCode regionCode,
     required String regionName,
+    required int regionId,
+  });
+
+  /// 서버 필름롤을 생성/조회한 결과를 로컬 행에 연결한다.
+  /// [filterId]/[filterStrength]는 생성에 사용한 값(재현·디버깅용).
+  Future<void> linkServerFilmRoll({
+    required String clientFilmRollId,
+    required int serverFilmRollId,
+    String? serverStatus,
+    String? filterId,
+    double? filterStrength,
+  });
+
+  /// 서버에서 조회한 필름롤 status를 로컬에 미러링한다.
+  Future<void> updateServerStatus({
+    required String clientFilmRollId,
+    required String serverStatus,
   });
 
   Future<FilmRoll?> findById(String filmRollId);

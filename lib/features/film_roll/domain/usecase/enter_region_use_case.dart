@@ -16,7 +16,7 @@ class EnterRegionUseCase {
   final FilmRollRepository _filmRollRepository;
   final AppPreferences? _appPreferences;
 
-  Future<FilmRoll> call(String cityCountyName) async {
+  Future<FilmRoll> call(String cityCountyName, {required int regionId}) async {
     final regionCode = RegionNormalizer.fromCityCountyName(cityCountyName);
     if (regionCode == null) {
       throw UnsupportedRegionException(cityCountyName);
@@ -25,6 +25,7 @@ class EnterRegionUseCase {
     final filmRoll = await _filmRollRepository.findOrCreateActiveByRegion(
       regionCode: regionCode,
       regionName: cityCountyName,
+      regionId: regionId,
     );
 
     final preferences = _appPreferences ?? AppPreferences.instance;
