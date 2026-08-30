@@ -6,6 +6,7 @@ import 'package:chaerok/features/film_roll/data/local/photo_local_data_source.da
 import 'package:chaerok/features/film_roll/data/repository/film_roll_place_repository_impl.dart';
 import 'package:chaerok/features/film_roll/data/repository/film_roll_repository_impl.dart';
 import 'package:chaerok/features/film_roll/data/repository/photo_repository_impl.dart';
+import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
@@ -39,7 +40,14 @@ class FilmRollModule {
         photoDataSource: PhotoLocalDataSource(AppDatabase.instance),
         photoStorage: LocalPhotoStorage.instance,
       ) {
-    enterRegion = EnterRegionUseCase(filmRollRepository: filmRollRepository);
+    filmRollSyncService = FilmRollSyncService(
+      filmRollRepository: filmRollRepository,
+      filmRollPlaceRepository: filmRollPlaceRepository,
+    );
+    enterRegion = EnterRegionUseCase(
+      filmRollRepository: filmRollRepository,
+      syncService: filmRollSyncService,
+    );
     selectCourse = SelectCourseUseCase(filmRollRepository);
     completeVisit = CompleteVisitUseCase(filmRollPlaceRepository);
     savePhoto = SavePhotoUseCase(photoRepository);
@@ -61,6 +69,9 @@ class FilmRollModule {
   final FilmRollRepository filmRollRepository;
   final FilmRollPlaceRepository filmRollPlaceRepository;
   final PhotoRepository photoRepository;
+
+  /// 로컬 필름롤/방문을 백엔드에 반영하는 동기화 서비스.
+  late final FilmRollSyncService filmRollSyncService;
 
   late final EnterRegionUseCase enterRegion;
   late final SelectCourseUseCase selectCourse;

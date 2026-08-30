@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:chaerok/data/models/course_response.dart';
+import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart';
+import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
@@ -24,6 +27,7 @@ class FilmRollController {
     SelectCourseUseCase? selectCourseUseCase,
     CompleteVisitUseCase? completeVisitUseCase,
     CompleteFilmRollUseCase? completeFilmRollUseCase,
+    FilmRollSyncService? syncService,
   }) : _onStateChanged = onStateChanged,
        _filmRollRepository =
            filmRollRepository ?? FilmRollModule.instance.filmRollRepository,
@@ -35,7 +39,9 @@ class FilmRollController {
        _completeVisitUseCase =
            completeVisitUseCase ?? FilmRollModule.instance.completeVisit,
        _completeFilmRollUseCase =
-           completeFilmRollUseCase ?? FilmRollModule.instance.completeFilmRoll;
+           completeFilmRollUseCase ?? FilmRollModule.instance.completeFilmRoll,
+       _syncService =
+           syncService ?? FilmRollModule.instance.filmRollSyncService;
 
   final String filmRollId;
   final void Function(FilmRollState state) _onStateChanged;
@@ -44,6 +50,7 @@ class FilmRollController {
   final SelectCourseUseCase _selectCourseUseCase;
   final CompleteVisitUseCase _completeVisitUseCase;
   final CompleteFilmRollUseCase _completeFilmRollUseCase;
+  final FilmRollSyncService _syncService;
 
   FilmRollState _state = const FilmRollState.initial();
 
@@ -68,8 +75,10 @@ class FilmRollController {
           status: FilmRollLoadStatus.loaded,
           filmRoll: filmRoll,
           places: places,
+          lastSyncHadError: _state.lastSyncHadError,
         ),
       );
+      _triggerSync();
     } catch (e, st) {
       log('필름롤 조회 실패', name: _tag, error: e, stackTrace: st);
       _emit(
@@ -79,6 +88,29 @@ class FilmRollController {
         ),
       );
     }
+  }
+
+  /// 백엔드 동기화를 백그라운드로 시도하고, 완료되면 부분 실패 여부를 상태에
+  /// 반영한다. 화면 진입/방문 후 자동으로 호출된다(fire-and-forget).
+  void _triggerSync() {
+    unawaited(
+      _syncService
+          .syncFilmRoll(filmRollId)
+          .then((result) {
+            _emit(_state.copyWith(lastSyncHadError: result.hasError));
+          })
+          .catchError((_) {
+            // syncFilmRoll은 예외를 던지지 않지만, 방어적으로 무시한다.
+          }),
+    );
+  }
+
+  /// 사용자가 "동기화 재시도"를 눌렀을 때. 결과를 기다렸다가 상태를 갱신한다.
+  Future<FilmRollSyncResult> retrySync() async {
+    final result = await _syncService.syncFilmRoll(filmRollId);
+    await load();
+    _emit(_state.copyWith(lastSyncHadError: result.hasError));
+    return result;
   }
 
   /// 코스를 확정한다. 코스 변경 차단 정책 등으로 실패하면 false를 반환하고
