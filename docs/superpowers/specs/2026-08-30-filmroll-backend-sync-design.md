@@ -68,12 +68,17 @@ class FilmRollSyncResult {
 1. 로컬 행 조회. 없거나 `userId`가 현재 계정과 다르면 즉시 반환.
 2. **생성**: `serverFilmRollId == null`이면
    - 필터 결정 (§5.3). 결정 불가 시 이번 호출 중단(다음 재시도).
-   - 행에 `filterId` / `filterStrength` 저장 (재현 가능하게).
-   - `FilmRollsApi.createFilmRoll(FilmRollCreateRequest(regionId, filterId, filterStrength))`.
-   - 성공 → `serverFilmRollId`, `serverStatus` 저장.
-   - **생성 충돌** (서버에 이미 미완료 롤 존재, §6.1) → `getCurrentFilmRoll()`
-     1회 호출. `regionId`가 로컬 행과 일치하면 그 `filmRollId`를 채택. 불일치면
-     연동하지 않고 로그만 남긴다 (이 롤은 서버 롤이 종료될 때까지 미동기화).
+   - `FilmRollsApi.createFilmRoll(FilmRollCreateRequest(clientFilmRollId,
+     regionId, filterId, filterStrength))`. **`clientFilmRollId`는 로컬 UUID**.
+     서버는 이를 멱등키로 취급 — 같은 사용자 + 같은 `clientFilmRollId` 재요청은
+     **기존 FilmRoll을 그대로 반환**한다 (응답 유실 후 재시도 안전).
+   - 성공(신규 생성이든 기존 반환이든) → 응답 `filmRollId`를 `serverFilmRollId`,
+     `status`를 `serverStatus`, 사용한 `filterId`/`filterStrength`를 함께 저장.
+   - **생성 제한** (§6.1): 서버는 "이탈하지 않은 CAPTURING FilmRoll이 이미 있을
+     때만" 새 생성을 막는다. 이 거절을 받으면 — 우리 `clientFilmRollId`로는
+     멱등 반환이 안 됐다는 뜻이므로 **다른 진행 롤이 서버에 있는 상태** —
+     연동하지 않고 로그만 남긴다 (이 롤은 서버의 진행 롤이 끝날 때까지 미동기화).
+     `/current` 는 호출하지 않는다.
 3. **방문 전송**: `serverFilmRollId != null`이면, 다음 조건의 로컬 장소마다
    `VisitsApi.createVisit(serverFilmRollId, VisitCreateRequest(placeId: serverPlaceId))`:
    - `isVisited == true`
@@ -83,6 +88,9 @@ class FilmRollSyncResult {
    - 그 외 오류 → 해당 장소는 미동기화 유지, 다음 장소 계속
 4. **상태 미러링**: `serverFilmRollId != null`이면 `getFilmRoll(serverFilmRollId)`
    호출, `serverStatus` 문자열 저장. 실패는 무시.
+
+> 참고: create 응답이 이미 `status`를 주므로, 생성 직후에는 4단계 없이도
+> `serverStatus`가 채워진다. 4단계는 이후 재동기화에서 상태를 갱신하는 용도.
 
 모든 서버 호출은 `ApiError`(DioException 래핑)로 실패할 수 있고, 서비스는 이를
 잡아 결과에 요약한다. 화면은 실패해도 로컬 데이터로 계속 동작한다.
@@ -129,6 +137,9 @@ class FilmRollSyncResult {
 - `FilmRollPlace` 엔티티: `visitSyncedAt`(DateTime?) 필드 추가.
 - `FilmRollPlaceMapper`: 새 필드 매핑.
 
+참고: create 요청에 `clientFilmRollId`(로컬 UUID)가 포함되므로,
+`FilmRollCreateRequest` 모델에 해당 필드를 추가해야 한다 (`toJson`에도).
+
 ### 5.3 필터 기본값
 
 로컬 생성 시점에는 필터를 모른다. `syncFilmRoll`이 생성 직전 JIT로 결정:
@@ -143,17 +154,21 @@ class FilmRollSyncResult {
 
 ## 6. 오류 / 멱등성
 
-### 6.1 생성 충돌
+### 6.1 생성 멱등 / 제한
 
-`createFilmRoll`은 idempotency key를 받지 않는다 (`{regionId, filterId,
-filterStrength}`만). 응답 유실 후 재시도하면 서버가 중복을 구분할 수 없다.
-서버는 "미완료 롤이 이미 있으면 생성 불가"로 거절한다.
+`createFilmRoll`은 `clientFilmRollId`를 멱등키로 받는다 (`film_rolls_api.dart`
+주석 기준: "같은 사용자 + 같은 clientFilmRollId 재요청은 기존 FilmRoll을
+반환한다. 이탈하지 않은 CAPTURING FilmRoll이 이미 있을 때만 새 생성을 제한한다").
 
-- **구현 기본값**: 생성이 4xx로 거절되면 `getCurrentFilmRoll()`을 1회 호출해
-  `regionId` 일치 시 `serverFilmRollId`를 채택한다. 불일치 시 미연동.
-- 이는 "현재 롤 판단"이 아니라 "생성 충돌 복구" 용도의 제한적 사용이다.
-- 거절을 정확히 식별하려면 `ApiError.errorCode` 값이 필요하다 → **오픈 질문**.
-  값을 모르면 "생성 호출이 4xx면 복구 시도"로 넓게 잡는다.
+- **응답 유실 후 재시도**: 같은 `clientFilmRollId`로 재-POST → 기존 FilmRoll이
+  그대로 돌아온다. 별도 복구 로직 불필요.
+- **생성 제한 거절**: 다른(우리 것이 아닌) 진행 CAPTURING 롤이 서버에 있을 때만
+  발생. 이 경우 이 로컬 롤은 연동하지 않고(`serverFilmRollId` null 유지) 로그만
+  남긴다. 서버의 진행 롤이 종료되면(다음 재시도) 우리 `clientFilmRollId`로
+  정상 생성된다. `/current` 는 호출하지 않는다.
+- 이 거절의 정확한 HTTP status / `errorCode` 는 미확정 → **오픈 질문 2**. 모르면
+  "생성이 4xx면 제한으로 간주, 미연동 후 재시도"로 넓게 잡는다.
+  (멱등 반환이 정상 동작하면 4xx 자체가 거의 안 나온다.)
 
 ### 6.2 방문 중복
 
@@ -169,9 +184,10 @@ filterStrength}`만). 응답 유실 후 재시도하면 서버가 중복을 구�
 
 ## 7. 오픈 질문 (백엔드 협의 필요)
 
-1. **생성 멱등성**: `createFilmRoll`에 clientFilmRollId(멱등키)를 받게 할 수
-   있나? 안 되면 §6.1의 `/current` 복구 방식으로 확정.
-2. **생성 충돌 식별**: 미완료 롤 존재 거절 시 HTTP status / `errorCode` 값?
+1. ~~**생성 멱등성**~~ — **해결.** `createFilmRoll`이 `clientFilmRollId`를 멱등키로
+   받는다 (`film_rolls_api.dart` 주석). 요청 body에 `clientFilmRollId` 추가 필요.
+2. **생성 제한 식별**: "이탈하지 않은 CAPTURING 롤이 이미 있음" 거절 시 HTTP
+   status / `errorCode` 값? (멱등 반환이 정상이면 드물게 발생)
 3. **방문 중복 식별**: 중복 방문 인증 시 HTTP status / `errorCode` 값?
 4. **완료 status 토큰**: 서버 `status`가 "현상 완료"를 나타내는 정확한 문자열?
    (미완료 집합은 CAPTURING/READY/QUEUED/PROCESSING/FAILED로 문서에 있음)
@@ -183,8 +199,8 @@ filterStrength}`만). 응답 유실 후 재시도하면 서버가 중복을 구�
    응답(`photoId` 등). 명세 확보 시 별도 pass에서 `syncFilmRoll`에 사진 전송
    단계를 추가하고 `Photos.isSynced`(기예약 컬럼)를 실제로 사용한다.
 
-이번 pass는 1~3에 대해 위 "기본값" 동작으로 구현하고, 값이 확정되면 좁힌다.
-4는 미러링만 하므로 당장 불필요, 5는 화면 전달값을 그대로 저장, 6은 TODO.
+이번 pass는 2~3에 대해 위 "기본값"(넓게 매칭) 동작으로 구현하고, 값이 확정되면
+좁힌다. 4는 미러링만 하므로 당장 불필요, 5는 화면 전달값을 그대로 저장, 6은 TODO.
 
 ### 7.1 사진 업로드 TODO 표식 (이번 pass에서 코드에 남길 것)
 
@@ -210,7 +226,6 @@ filterStrength}`만). 응답 유실 후 재시도하면 서버가 중복을 구�
 FilmRollSyncService({
   required AppDatabase db,
   Future<FilmRollResponse> Function(FilmRollCreateRequest)? createFilmRoll,
-  Future<FilmRollResponse?> Function()? getCurrentFilmRoll,
   Future<FilmRollResponse> Function(int)? getFilmRoll,
   Future<VisitCreateResponse> Function(int, VisitCreateRequest)? createVisit,
   Future<List<FilterResponse>> Function()? getFilters,
@@ -221,11 +236,12 @@ FilmRollSyncService({
 기본값은 각 정적 메서드 tear-off. 테스트는 `AppDatabase.forTesting`
 (인메모리) + 가짜 함수로 다음을 검증:
 
-- 신규 롤: 생성 호출 1회, `serverFilmRollId` 저장됨
+- 신규 롤: 생성 호출 1회(요청에 `clientFilmRollId` 포함), `serverFilmRollId` 저장됨
 - `serverFilmRollId` 이미 있음: 생성 호출 안 함, 방문만 전송
+- 생성 재요청(멱등): 서버가 기존 롤 반환 → 그 `filmRollId`를 그대로 저장, `created` false 취급 가능
+- 생성 제한 거절(다른 CAPTURING 롤 존재, 4xx) → `serverFilmRollId` null 유지, 미연동, `result.error` 없음(정상 보류)
 - 방문 전송: `isVisited && serverPlaceId != null`만, 성공 시 `visitSyncedAt` 세팅
 - `serverPlaceId == null` 방문: 건너뜀, `visitsSkipped` 카운트
-- 생성 충돌 → `getCurrentFilmRoll` 1회 → regionId 일치 시 채택 / 불일치 시 미연동
 - 방문 중복 응답 → `visitSyncedAt` 채움
 - 네트워크 오류 → 예외 안 던짐, `result.error` 채워짐, 로컬 데이터 불변
 - 계정 불일치 행 → 아무 API도 호출 안 함
@@ -248,6 +264,7 @@ FilmRollSyncService({
 - `lib/core/database/local_database.dart` (schemaVersion 4, onUpgrade)
 - `lib/core/database/local_database.g.dart` (재생성)
 - `lib/core/config/app_preferences.dart` (defaultFilterId)
+- `lib/data/models/film_roll_create_request.dart` (+`clientFilmRollId` 필드/`toJson`)
 - `lib/features/film_roll/domain/entity/film_roll.dart` (+3 필드)
 - `lib/features/film_roll/data/model/film_roll_mapper.dart`
 - `lib/features/film_roll/domain/entity/film_roll_place.dart` (+1 필드)
@@ -268,9 +285,9 @@ FilmRollSyncService({
 
 ## 10. 리스크
 
-- **생성 멱등성 부재** (§6.1): 백엔드가 멱등키를 안 받으면 `/current` 복구가
-  유일한 방법이고, 이는 사용자 지시의 취지("판단용 미사용")와 경계선에 있다.
-  오픈 질문 1·2 해소 전까지 이 방식으로 진행.
+- **생성 제한 식별 코드 미확정** (§6.1, 오픈 질문 2): "다른 CAPTURING 롤 존재"
+  거절의 정확한 status/errorCode를 몰라 "4xx면 제한으로 간주"로 넓게 처리한다.
+  멱등키(`clientFilmRollId`)가 정상 동작하면 이 4xx 자체가 드물다.
 - **드리프트 코드젠**: `local_database.g.dart` 재생성 필요 (`dart run build_runner`).
   CI/로컬 빌드에서 확인.
 - 서버 status가 실제로 진전하지 않는 상태(exit/develop 미구현)라 `serverStatus`

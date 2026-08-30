@@ -14,7 +14,7 @@
 
 - 신규 패키지 추가 금지 (기존 `drift`, `dio`, `shared_preferences`만 사용).
 - 상태관리 라이브러리 도입 금지 — 기존 `StatefulWidget` + `setState` + Controller 패턴 유지.
-- `GET /api/film-rolls/current`는 "현재 진행 중 롤 판단"에 사용 금지. Task 7의 생성-충돌 복구 1회 호출만 허용.
+- `GET /api/film-rolls/current`는 이번 pass에서 **일절 호출하지 않는다**. 생성은 `clientFilmRollId` 멱등키로 처리되고, 현재 진행 롤 판단은 로컬 기준.
 - 동기화는 로컬 행의 `userId`가 `AppPreferences.getCurrentUserId()`와 일치할 때만 수행.
 - `FilmRollSyncService`의 공개 메서드는 예외를 던지지 않는다 (결과 객체로 요약).
 - 서버 호출 실패로 로컬 DB 상태가 바뀌면 안 된다.
@@ -42,6 +42,7 @@
 - `lib/core/database/local_database.dart` — `schemaVersion` 4, `onUpgrade` v4 분기
 - `lib/core/database/local_database.g.dart` — build_runner 재생성 (수기 편집 금지)
 - `lib/core/config/app_preferences.dart` — `defaultFilterId` 접근자
+- `lib/data/models/film_roll_create_request.dart` — `clientFilmRollId` 필드 + `toJson`
 - `lib/features/film_roll/domain/entity/film_roll.dart` — `regionId`/`serverFilmRollId`/`serverStatus`
 - `lib/features/film_roll/data/model/film_roll_mapper.dart`
 - `lib/features/film_roll/domain/entity/film_roll_place.dart` — `visitSyncedAt`
@@ -660,9 +661,10 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ---
 
-## Task 6: FilmRollSyncResult + FilmRollSyncService 생성 경로
+## Task 6: FilmRollCreateRequest.clientFilmRollId + FilmRollSyncService 생성 경로
 
 **Files:**
+- Modify: `lib/data/models/film_roll_create_request.dart` (+`clientFilmRollId`)
 - Create: `lib/features/film_roll/data/sync/film_roll_sync_result.dart`
 - Create: `lib/features/film_roll/data/sync/film_roll_sync_service.dart`
 - Create: `test/features/film_roll/sync/film_roll_sync_service_test.dart`
@@ -671,6 +673,11 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Consumes: `FilmRollRepository` (`findById`, `linkServerFilmRoll`, `updateServerStatus`), `FilmRollPlaceRepository` (`findUnsyncedVisitedPlaces`, `markVisitSynced`), `AppPreferences` (`getCurrentUserId`, `getDefaultFilterId`, `setDefaultFilterId`), `FilmRollsApi`, `VisitsApi`, `FiltersApi` DTOs.
 - Produces:
   ```dart
+  // FilmRollCreateRequest에 필드 추가:
+  //   final String clientFilmRollId;  // 로컬 UUID (멱등키)
+  //   toJson()에 'clientFilmRollId': clientFilmRollId 포함
+  //   생성자 첫 파라미터로 required this.clientFilmRollId
+
   class FilmRollSyncResult {
     const FilmRollSyncResult({
       this.created = false, this.visitsPushed = 0, this.visitsSkipped = 0,
@@ -690,7 +697,6 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
       required FilmRollPlaceRepository filmRollPlaceRepository,
       AppPreferences? preferences,
       Future<FilmRollResponse> Function(FilmRollCreateRequest)? createFilmRoll,
-      Future<FilmRollResponse?> Function()? getCurrentFilmRoll,
       Future<FilmRollResponse> Function(int filmRollId)? getFilmRoll,
       Future<VisitCreateResponse> Function(int filmRollId, VisitCreateRequest)? createVisit,
       Future<List<FilterResponse>> Function()? getFilters,
@@ -698,7 +704,10 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     Future<FilmRollSyncResult> syncFilmRoll(String clientFilmRollId);
   }
   ```
-  이 Task는 `syncFilmRoll`의 **생성 경로만** 구현한다 (방문/미러링은 Task 7~9).
+  이 Task는 `syncFilmRoll`의 **생성 경로만** 구현한다 (방문/미러링은 Task 8~9).
+  create API는 `clientFilmRollId` 멱등키를 받으므로 응답 유실 후 재요청은
+  기존 롤을 그대로 반환한다 → `/current` 복구 불필요 (`getCurrentFilmRoll`
+  주입 파라미터 없음).
 
 - [ ] **Step 1: 실패 테스트 작성**
 
@@ -716,7 +725,7 @@ FilmRollResponse fakeResponse({int id = 900, String status = 'CAPTURING'}) =>
       createdAt: DateTime(2026), updatedAt: DateTime(2026),
     );
 
-test('serverFilmRollId가 없으면 서버에 생성하고 저장한다', () async {
+test('serverFilmRollId가 없으면 서버에 생성하고 저장한다 (요청에 clientFilmRollId 포함)', () async {
   await prefs.setCurrentUserId(7);
   await prefs.setDefaultFilterId('f1');
   final fr = await repository.findOrCreateActiveByRegion(
@@ -724,16 +733,19 @@ test('serverFilmRollId가 없으면 서버에 생성하고 저장한다', () asy
   // 로컬 행 userId를 7로 맞춘다 (헬퍼 or 직접 update).
 
   var createCalls = 0;
+  FilmRollCreateRequest? sent;
   final service = FilmRollSyncService(
     filmRollRepository: repository,
     filmRollPlaceRepository: placeRepository,
     preferences: prefs,
-    createFilmRoll: (req) async { createCalls++; return fakeResponse(); },
+    createFilmRoll: (req) async { createCalls++; sent = req; return fakeResponse(); },
   );
 
   final result = await service.syncFilmRoll(fr.id);
 
   expect(createCalls, 1);
+  expect(sent!.clientFilmRollId, fr.id);          // 로컬 UUID를 멱등키로 전송
+  expect(sent!.toJson()['clientFilmRollId'], fr.id);
   expect(result.created, isTrue);
   expect((await repository.findById(fr.id))!.serverFilmRollId, 900);
 });
@@ -766,14 +778,48 @@ test('생성 중 네트워크 오류는 예외를 던지지 않고 result.error�
   expect(result.hasError, isTrue);
   expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
 });
+
+test('멱등 재요청: 서버가 기존 롤을 반환하면 그 id를 저장한다', () async {
+  // createFilmRoll: (_) async => fakeResponse(id: 555, status: 'CAPTURING')
+  // (서버가 신규 생성이 아니라 기존 롤을 반환한 상황 — 응답 형태는 동일)
+  final result = await service.syncFilmRoll(fr.id);
+  expect((await repository.findById(fr.id))!.serverFilmRollId, 555);
+});
 ```
 
 - [ ] **Step 2: 실패 확인**
 
 Run: `flutter test test/features/film_roll/sync/film_roll_sync_service_test.dart`
-Expected: 컴파일 실패 — 클래스 미정의.
+Expected: 컴파일 실패 — `FilmRollCreateRequest.clientFilmRollId` / 클래스 미정의.
 
-- [ ] **Step 3: FilmRollSyncResult 작성**
+- [ ] **Step 3a: FilmRollCreateRequest에 clientFilmRollId 추가**
+
+`lib/data/models/film_roll_create_request.dart`:
+
+```dart
+class FilmRollCreateRequest {
+  const FilmRollCreateRequest({
+    required this.clientFilmRollId,
+    required this.regionId,
+    required this.filterId,
+    required this.filterStrength,
+  });
+
+  final String clientFilmRollId;
+  final int regionId;
+  final String filterId;
+  final double filterStrength;
+
+  Map<String, dynamic> toJson() => {
+    'clientFilmRollId': clientFilmRollId,
+    'regionId': regionId,
+    'filterId': filterId,
+    'filterStrength': filterStrength,
+  };
+}
+```
+
+- [ ] **Step 3b: FilmRollSyncResult 작성**
 
 `film_roll_sync_result.dart`에 위 Interfaces의 값 객체를 그대로 작성.
 
@@ -803,7 +849,6 @@ class FilmRollSyncService {
     required FilmRollPlaceRepository filmRollPlaceRepository,
     AppPreferences? preferences,
     Future<FilmRollResponse> Function(FilmRollCreateRequest)? createFilmRoll,
-    Future<FilmRollResponse?> Function()? getCurrentFilmRoll,
     Future<FilmRollResponse> Function(int)? getFilmRoll,
     Future<VisitCreateResponse> Function(int, VisitCreateRequest)? createVisit,
     Future<List<FilterResponse>> Function()? getFilters,
@@ -811,7 +856,6 @@ class FilmRollSyncService {
         _placeRepository = filmRollPlaceRepository,
         _preferences = preferences ?? AppPreferences.instance,
         _createFilmRoll = createFilmRoll ?? FilmRollsApi.createFilmRoll,
-        _getCurrentFilmRoll = getCurrentFilmRoll ?? FilmRollsApi.getCurrentFilmRoll,
         _getFilmRoll = getFilmRoll ?? FilmRollsApi.getFilmRoll,
         _createVisit = createVisit ?? VisitsApi.createVisit,
         _getFilters = getFilters ?? FiltersApi.getFilters;
@@ -820,7 +864,6 @@ class FilmRollSyncService {
   final FilmRollPlaceRepository _placeRepository;
   final AppPreferences _preferences;
   final Future<FilmRollResponse> Function(FilmRollCreateRequest) _createFilmRoll;
-  final Future<FilmRollResponse?> Function() _getCurrentFilmRoll;
   final Future<FilmRollResponse> Function(int) _getFilmRoll;
   final Future<VisitCreateResponse> Function(int, VisitCreateRequest) _createVisit;
   final Future<List<FilterResponse>> Function() _getFilters;
@@ -852,12 +895,15 @@ class FilmRollSyncService {
       }
     }
 
-    // 방문 전송 / 상태 미러링은 Task 7~9에서 채운다.
+    // 생성 4xx(다른 CAPTURING 롤) 세분화는 Task 7, 방문 전송은 Task 8,
+    // 상태 미러링은 Task 9에서 채운다.
     return FilmRollSyncResult(created: created, error: error);
   }
 
-  /// 서버 필름롤을 생성(또는 충돌 시 복구)하고 로컬에 연결한다.
+  /// 서버 필름롤을 생성(또는 멱등 반환)하고 로컬에 연결한다.
   /// 필터를 결정할 수 없으면 null을 반환한다(생성 보류).
+  /// create API는 `clientFilmRollId`(로컬 UUID)를 멱등키로 받으므로, 응답 유실
+  /// 후 재요청도 같은 롤을 그대로 돌려준다 → 별도 복구 로직 불필요.
   Future<int?> _ensureServerFilmRoll(filmRoll) async {
     final regionId = filmRoll.regionId;
     if (regionId == null) return null; // regionId 없이는 생성 불가.
@@ -865,31 +911,20 @@ class FilmRollSyncService {
     final filterId = await _resolveFilterId();
     if (filterId == null) return null;
 
-    await _filmRollRepository.linkFilterOnly(
+    final res = await _createFilmRoll(FilmRollCreateRequest(
       clientFilmRollId: filmRoll.id,
+      regionId: regionId,
       filterId: filterId,
       filterStrength: _defaultFilterStrength,
-    ); // 아래 참고: linkServerFilmRoll에 filter만 저장하는 오버로드가 필요 없으면
-       // linkServerFilmRoll 호출을 생성 성공 후로 미루고 filter는 그때 함께 저장.
-
-    try {
-      final res = await _createFilmRoll(FilmRollCreateRequest(
-        regionId: regionId,
-        filterId: filterId,
-        filterStrength: _defaultFilterStrength,
-      ));
-      await _filmRollRepository.linkServerFilmRoll(
-        clientFilmRollId: filmRoll.id,
-        serverFilmRollId: res.filmRollId,
-        serverStatus: res.status,
-        filterId: filterId,
-        filterStrength: _defaultFilterStrength,
-      );
-      return res.filmRollId;
-    } catch (e) {
-      // 생성 충돌 복구는 Task 7에서 구현. 이 Task에서는 rethrow.
-      rethrow;
-    }
+    ));
+    await _filmRollRepository.linkServerFilmRoll(
+      clientFilmRollId: filmRoll.id,
+      serverFilmRollId: res.filmRollId,
+      serverStatus: res.status,
+      filterId: filterId,
+      filterStrength: _defaultFilterStrength,
+    );
+    return res.filmRollId;
   }
 
   Future<String?> _resolveFilterId() async {
@@ -904,11 +939,13 @@ class FilmRollSyncService {
 }
 ```
 
-> 구현 정리 노트: 위 `linkFilterOnly` 호출은 불필요하다. **생성 성공 후
-> `linkServerFilmRoll`에서 `filterId`/`filterStrength`를 함께 저장**하면 되므로,
-> `_ensureServerFilmRoll`에서 filter 사전 저장 단계를 빼고 위 주석대로 단순화할 것.
-> `_resolveFilterId` 실패(예외)는 `syncFilmRoll`의 try/catch가 `result.error`로
-> 잡고, `filters.isEmpty` 또는 `regionId == null`은 null 반환 → 생성 보류.
+> 구현 노트: `filterId`/`filterStrength`는 생성 성공 후 `linkServerFilmRoll`에서
+> `serverFilmRollId`와 함께 저장한다(사전 저장 단계 없음). `_resolveFilterId`
+> 실패(예외)는 `syncFilmRoll`의 try/catch가 `result.error`로 잡고,
+> `filters.isEmpty` 또는 `regionId == null`은 null 반환 → 생성 보류.
+> `_createFilmRoll`이 4xx를 던지는 경우(다른 CAPTURING 롤 존재)는 Task 7에서
+> "미연동 후 재시도"로 처리한다. 이 Task의 try/catch는 그 4xx도 일단
+> `result.error`로 잡는다(Task 7에서 세분화).
 
 - [ ] **Step 5: 통과 확인**
 
@@ -931,69 +968,73 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ---
 
-## Task 7: 생성 충돌 복구 (getCurrentFilmRoll 1회)
+## Task 7: 생성 제한(다른 CAPTURING 롤) 처리
 
 **Files:**
 - Modify: `lib/features/film_roll/data/sync/film_roll_sync_service.dart`
 - Modify: `test/features/film_roll/sync/film_roll_sync_service_test.dart`
 
+**배경:** create API는 `clientFilmRollId` 멱등키를 받으므로, 우리 롤의 재요청은
+항상 기존 롤을 반환한다(Task 6에서 이미 처리됨). `_createFilmRoll`이 4xx를
+던지는 경우는 "우리 것이 아닌 다른 진행 CAPTURING 롤이 서버에 있음" 뿐이다.
+이때는 **연동하지 않고(`serverFilmRollId` null 유지) 조용히 보류**한다 —
+`result.error`로 취급하지 않는다(정상적인 "아직 못 함" 상태). `/current` 는
+호출하지 않는다.
+
 **Interfaces:**
-- Consumes: `_getCurrentFilmRoll` (이미 주입됨, Task 6).
-- Produces: `_ensureServerFilmRoll`이 `_createFilmRoll` 4xx(`DioException` with `ApiError` statusCode 400~499) 시 `_getCurrentFilmRoll()`를 1회 호출, 응답의 `regionId`가 로컬 `filmRoll.regionId`와 같으면 그 `filmRollId`를 채택해 `linkServerFilmRoll`, 아니면 null 반환(미연동).
+- Produces: `syncFilmRoll`이 `_ensureServerFilmRoll` 호출을 `try`로 감싸,
+  4xx(`DioException` + `ApiError` statusCode 400~499)면 `serverId = null` 유지
+  하고 `error` 를 설정하지 않은 채 정상 반환(`FilmRollSyncResult()` 빈 결과).
+  4xx가 아닌 오류는 기존대로 `result.error`.
 
 - [ ] **Step 1: 실패 테스트 추가**
 
 ```dart
-test('생성이 4xx로 거절되면 getCurrentFilmRoll로 복구하고 regionId 일치 시 채택', () async {
-  var currentCalls = 0;
+test('다른 CAPTURING 롤 존재로 생성이 4xx 거절되면 미연동·무오류로 보류한다', () async {
   final service = FilmRollSyncService(
     // createFilmRoll: (_) async => throw DioException(
     //   requestOptions: RequestOptions(path: '/api/film-rolls'),
-    //   error: const ApiError(statusCode: 409, message: '이미 미완료 필름롤이 있습니다'),
+    //   error: const ApiError(statusCode: 409, message: '이탈하지 않은 필름롤이 있습니다'),
     // ),
-    // getCurrentFilmRoll: () async { currentCalls++; return fakeResponse(id: 777); },
   );
   final result = await service.syncFilmRoll(fr.id);
-  expect(currentCalls, 1);
-  expect((await repository.findById(fr.id))!.serverFilmRollId, 777);
+  expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+  expect(result.hasError, isFalse);   // 정상 보류 — 다음 재시도에서 따라잡음
+  expect(result.created, isFalse);
 });
 
-test('복구 응답의 regionId가 다르면 연동하지 않는다', () async {
-  // getCurrentFilmRoll: () async => fakeResponse(id: 777) 이지만 regionId=99
-  // → serverFilmRollId 여전히 null, result.created == false, result.hasError == false
-});
-
-test('4xx가 아닌 5xx는 복구 시도 없이 result.error', () async {
-  // createFilmRoll: statusCode 500 → getCurrentFilmRoll 호출 안 됨
+test('4xx가 아닌 5xx는 result.error로 남긴다', () async {
+  // createFilmRoll: (_) async => throw DioException(error: ApiError(statusCode: 500, ...))
+  final result = await service.syncFilmRoll(fr.id);
+  expect(result.hasError, isTrue);
+  expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
 });
 ```
 
 - [ ] **Step 2: 실패 확인**
 
 Run: `flutter test test/features/film_roll/sync/film_roll_sync_service_test.dart`
-Expected: 새 테스트 FAIL.
+Expected: 새 테스트 FAIL (현재는 4xx도 `result.error`로 잡힘).
 
-- [ ] **Step 3: 복구 로직 구현**
+- [ ] **Step 3: 4xx 분기 구현**
 
-`_ensureServerFilmRoll`의 `catch (e)`를 교체:
+`syncFilmRoll`의 생성 블록을 교체:
 
 ```dart
-    } catch (e) {
-      if (!_isClientError(e)) rethrow;
-      // 생성 충돌 복구: 서버에 이미 미완료 롤이 있을 수 있다. /current를 딱 1회
-      // 조회해 같은 지역이면 그 id를 채택한다. (현재-롤 판단 용도가 아니라
-      // 생성 충돌 복구 전용 — spec §6.1)
-      final current = await _getCurrentFilmRoll();
-      if (current == null) return null;
-      if (current.regionId != regionId) return null;
-      await _filmRollRepository.linkServerFilmRoll(
-        clientFilmRollId: filmRoll.id,
-        serverFilmRollId: current.filmRollId,
-        serverStatus: current.status,
-        filterId: filterId,
-        filterStrength: _defaultFilterStrength,
-      );
-      return current.filmRollId;
+    if (serverId == null) {
+      try {
+        serverId = await _ensureServerFilmRoll(filmRoll);
+      } on DioException catch (e) {
+        if (_isClientError(e)) {
+          // 다른 진행 CAPTURING 롤이 서버에 있음 — 이번엔 보류, 다음 재시도.
+          return const FilmRollSyncResult();
+        }
+        return FilmRollSyncResult(error: e);
+      } catch (e) {
+        return FilmRollSyncResult(error: e);
+      }
+      if (serverId == null) return const FilmRollSyncResult(); // 필터 미결정 등
+      created = true;
     }
 ```
 
@@ -1012,8 +1053,8 @@ bool _isClientError(Object e) {
 }
 ```
 
-> 오픈 질문 2(정확한 errorCode) 확정 전까지 "생성 호출이 4xx면 복구 시도"로 넓게
-> 잡는다. 확정되면 `errorCode` 매칭으로 좁힐 것.
+> 오픈 질문 2(정확한 errorCode) 확정 전까지 "생성이 4xx면 제한으로 간주"로 넓게
+> 잡는다. 확정되면 `errorCode`/특정 status로 좁힐 것.
 
 - [ ] **Step 4: 통과 확인**
 
@@ -1024,7 +1065,7 @@ Expected: PASS
 
 ```bash
 git add lib/features/film_roll/data/sync test/features/film_roll/sync
-git commit -m "feat: 필름롤 생성 충돌 시 getCurrentFilmRoll 복구
+git commit -m "feat: 다른 진행 필름롤 존재 시 생성 보류 처리
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
@@ -1488,7 +1529,8 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ## Self-Review 메모
 
-- **Spec 커버리지**: §2 목표(생성·방문·미러링·트리거·계정스코프) → Task 1~10. §5 스키마 → Task 1. §5.3 필터 → Task 2, 6. §6.1 충돌 복구 → Task 7. §6.2 방문 중복 → Task 8. §8 테스트 전략 → 각 Task의 TDD 스텝.
+- **Spec 커버리지**: §2 목표(생성·방문·미러링·트리거·계정스코프) → Task 1~10. §5 스키마 → Task 1. §5.3 필터 → Task 2, 6. §6.1 생성 멱등/제한 → Task 6(멱등키 전송)·Task 7(4xx 보류). §6.2 방문 중복 → Task 8. §8 테스트 전략 → 각 Task의 TDD 스텝.
 - **비목표 확인**: 사진 업로드/exit/develop/상태기반 완료 게이팅은 Task에 없음 (의도). 사진 업로드는 백엔드 "1장씩 업로드" API 합의됨 — Task 8 Step 4에서 TODO 주석만 남김 (spec §7.6).
+- **멱등키 반영**: `FilmRollCreateRequest.clientFilmRollId` 추가(Task 6 Step 3a). `getCurrentFilmRoll` 주입/사용 없음. `/current` 호출 없음. Task 7은 "다른 CAPTURING 롤" 4xx를 무오류 보류로 처리(복구 로직 아님).
 - **타입 일관성**: `syncFilmRoll(String)`, `FilmRollSyncResult` 필드명(`created`/`visitsPushed`/`visitsSkipped`/`serverStatus`/`error`/`hasError`)은 Task 6에서 정의, 7~11에서 동일 사용. `linkServerFilmRoll` 파라미터명 Task 5에서 정의, Task 6~7에서 동일.
-- **오픈 질문(spec §7)**: errorCode/status 값 미확정 → Task 7·8에서 "넓게 매칭" 기본값으로 구현하고 주석에 명시. 백엔드 확정 시 좁히는 후속 필요.
+- **오픈 질문(spec §7)**: 생성 제한/방문 중복 식별 코드 미확정 → Task 7·8에서 "넓게 매칭(4xx)" 기본값으로 구현하고 주석에 명시. 백엔드 확정 시 좁히는 후속 필요.
