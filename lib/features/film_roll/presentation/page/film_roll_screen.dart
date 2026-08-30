@@ -41,6 +41,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
   late final FilmRollController _controller;
   FilmRollState _state = const FilmRollState.initial();
   bool _isResolvingRegion = false;
+  bool _isSyncing = false;
 
   @override
   void initState() {
@@ -172,6 +173,10 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_state.lastSyncHadError) ...[
+            _buildSyncErrorBanner(),
+            const SizedBox(height: ChaerokSpacing.sm),
+          ],
           _buildProgressCard(
             filmRoll.progress,
             filmRoll.visitedPlaceCount,
@@ -196,6 +201,54 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
         ],
       ),
     );
+  }
+
+  /// 백엔드 동기화가 부분 실패했을 때 노출되는 배너. 로컬 기록은 안전하며,
+  /// 사용자가 직접 재시도할 수 있음을 알린다.
+  Widget _buildSyncErrorBanner() {
+    return Container(
+      padding: const EdgeInsets.all(ChaerokSpacing.sm),
+      decoration: BoxDecoration(
+        color: ChaerokColors.surface,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+        border: Border.all(color: ChaerokColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.cloud_off_rounded,
+            size: ChaerokSpacing.md,
+            color: ChaerokColors.textSecondary,
+          ),
+          const SizedBox(width: ChaerokSpacing.xs),
+          Expanded(
+            child: Text(
+              '서버 동기화에 실패했어요. 로컬 기록은 안전합니다.',
+              style: ChaerokTypography.caption.copyWith(
+                color: ChaerokColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _isSyncing ? null : _onRetrySyncTap,
+            child: Text(_isSyncing ? '동기화 중…' : '재시도'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onRetrySyncTap() async {
+    setState(() => _isSyncing = true);
+    try {
+      final result = await _controller.retrySync();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.hasError ? '아직 동기화하지 못했어요.' : '동기화 완료')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
   }
 
   Widget _buildProgressCard(double progress, int visited, int total) {
