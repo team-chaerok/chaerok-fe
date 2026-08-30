@@ -12,9 +12,21 @@ import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart'
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
+import 'package:chaerok/features/location/data/location_verification_result.dart';
+import 'package:chaerok/shared/region/region_code.dart';
+import 'package:chaerok/shared/region/region_normalizer.dart';
 import 'package:dio/dio.dart';
 
 const _defaultFilterStrength = 1.0;
+
+/// 이번 세션에서 마지막으로 위치 인증된 지역([RegionCode]). 인증 이력이 없거나
+/// 지원 지역이 아니면 null. 기본 구현은 [LocationVerificationResult.sessionCache]를 읽는다.
+RegionCode? _sessionVerifiedRegion() {
+  final cityCountyName =
+      LocationVerificationResult.sessionCache?.region.cityCountyName;
+  if (cityCountyName == null) return null;
+  return RegionNormalizer.fromCityCountyName(cityCountyName);
+}
 
 /// 로컬 필름롤(생성/방문)을 백엔드에 반영하는 동기화 서비스.
 ///
@@ -35,13 +47,15 @@ class FilmRollSyncService {
     Future<VisitCreateResponse> Function(int filmRollId, VisitCreateRequest)?
     createVisit,
     Future<List<FilterResponse>> Function()? getFilters,
+    RegionCode? Function()? currentRegion,
   }) : _filmRollRepository = filmRollRepository,
        _placeRepository = filmRollPlaceRepository,
        _preferences = preferences ?? AppPreferences.instance,
        _createFilmRoll = createFilmRoll ?? FilmRollsApi.createFilmRoll,
        _getFilmRoll = getFilmRoll ?? FilmRollsApi.getFilmRoll,
        _createVisit = createVisit ?? VisitsApi.createVisit,
-       _getFilters = getFilters ?? FiltersApi.getFilters;
+       _getFilters = getFilters ?? FiltersApi.getFilters,
+       _currentRegion = currentRegion ?? _sessionVerifiedRegion;
 
   final FilmRollRepository _filmRollRepository;
   final FilmRollPlaceRepository _placeRepository;
@@ -53,6 +67,9 @@ class FilmRollSyncService {
   _createVisit;
   final Future<List<FilterResponse>> Function() _getFilters;
 
+  /// 현재 위치가 속한 지역을 반환한다(동기화는 이 지역과 필름롤 지역이 일치할 때만).
+  final RegionCode? Function() _currentRegion;
+
   Future<FilmRollSyncResult> syncFilmRoll(String clientFilmRollId) async {
     final filmRoll = await _filmRollRepository.findById(clientFilmRollId);
     // findById는 현재 로그인 계정으로 스코핑돼 있으므로, null이면 없는
@@ -61,6 +78,13 @@ class FilmRollSyncService {
 
     final currentUserId = await _preferences.getCurrentUserId();
     if (currentUserId == null) return const FilmRollSyncResult();
+
+    // 현재 위치가 이 필름롤의 지역과 일치할 때만 동기화한다. 필름 컬렉션에서
+    // 다른 지역 필름롤을 열어봐도 서버 생성/방문 요청이 나가지 않도록 한다.
+    // 위치 인증 이력이 없으면(sessionCache null) 확인 불가로 보고 보류한다.
+    if (_currentRegion() != filmRoll.regionCode) {
+      return const FilmRollSyncResult();
+    }
 
     var serverId = filmRoll.serverFilmRollId;
     var created = false;

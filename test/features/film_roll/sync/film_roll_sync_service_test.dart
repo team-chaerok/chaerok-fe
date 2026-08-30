@@ -107,6 +107,7 @@ void main() {
     Future<FilmRollResponse> Function(int)? getFilmRoll,
     Future<VisitCreateResponse> Function(int, VisitCreateRequest)? createVisit,
     Future<List<FilterResponse>> Function()? getFilters,
+    RegionCode? Function()? currentRegion,
   }) {
     return FilmRollSyncService(
       filmRollRepository: repository,
@@ -120,6 +121,8 @@ void main() {
           () async => const [
             FilterResponse(filterId: 'f1', name: 'F1', description: ''),
           ],
+      // seedFilmRoll이 공주 필름롤을 만드므로, 기본 현재 지역도 공주로 둔다.
+      currentRegion: currentRegion ?? () => RegionCode.gongju,
     );
   }
 
@@ -382,6 +385,56 @@ void main() {
 
       expect(result.serverStatus, isNull);
       expect(result.hasError, isFalse);
+    });
+  });
+
+  group('현재 위치 지역 가드', () {
+    test('현재 지역이 필름롤 지역과 다르면 아무 API도 호출하지 않는다', () async {
+      await prefs.setDefaultFilterId('f1');
+      final fr = await seedFilmRoll(); // 공주 필름롤
+      var createCalls = 0;
+
+      final result = await service(
+        currentRegion: () => RegionCode.yesan, // 사용자는 예산에 있음
+        createFilmRoll: (_) async {
+          createCalls++;
+          return _fakeResponse();
+        },
+      ).syncFilmRoll(fr.id);
+
+      expect(createCalls, 0);
+      expect(result.created, isFalse);
+      expect(result.hasError, isFalse);
+      expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+    });
+
+    test('위치 인증 이력이 없으면(currentRegion null) 동기화를 보류한다', () async {
+      await prefs.setDefaultFilterId('f1');
+      final fr = await seedFilmRoll();
+      var createCalls = 0;
+
+      await service(
+        currentRegion: () => null,
+        createFilmRoll: (_) async {
+          createCalls++;
+          return _fakeResponse();
+        },
+      ).syncFilmRoll(fr.id);
+
+      expect(createCalls, 0);
+      expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+    });
+
+    test('현재 지역이 필름롤 지역과 같으면 정상 동기화한다', () async {
+      await prefs.setDefaultFilterId('f1');
+      final fr = await seedFilmRoll();
+
+      final result = await service(
+        currentRegion: () => RegionCode.gongju,
+      ).syncFilmRoll(fr.id);
+
+      expect(result.created, isTrue);
+      expect((await repository.findById(fr.id))!.serverFilmRollId, 900);
     });
   });
 }
