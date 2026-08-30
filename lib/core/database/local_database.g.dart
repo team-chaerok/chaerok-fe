@@ -120,6 +120,61 @@ class $FilmRollsTable extends FilmRolls
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _regionIdMeta = const VerificationMeta(
+    'regionId',
+  );
+  @override
+  late final GeneratedColumn<int> regionId = GeneratedColumn<int>(
+    'region_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _filterIdMeta = const VerificationMeta(
+    'filterId',
+  );
+  @override
+  late final GeneratedColumn<String> filterId = GeneratedColumn<String>(
+    'filter_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _filterStrengthMeta = const VerificationMeta(
+    'filterStrength',
+  );
+  @override
+  late final GeneratedColumn<double> filterStrength = GeneratedColumn<double>(
+    'filter_strength',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverFilmRollIdMeta = const VerificationMeta(
+    'serverFilmRollId',
+  );
+  @override
+  late final GeneratedColumn<int> serverFilmRollId = GeneratedColumn<int>(
+    'server_film_roll_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverStatusMeta = const VerificationMeta(
+    'serverStatus',
+  );
+  @override
+  late final GeneratedColumn<String> serverStatus = GeneratedColumn<String>(
+    'server_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -133,6 +188,11 @@ class $FilmRollsTable extends FilmRolls
     createdAt,
     updatedAt,
     completedAt,
+    regionId,
+    filterId,
+    filterStrength,
+    serverFilmRollId,
+    serverStatus,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -216,6 +276,45 @@ class $FilmRollsTable extends FilmRolls
         ),
       );
     }
+    if (data.containsKey('region_id')) {
+      context.handle(
+        _regionIdMeta,
+        regionId.isAcceptableOrUnknown(data['region_id']!, _regionIdMeta),
+      );
+    }
+    if (data.containsKey('filter_id')) {
+      context.handle(
+        _filterIdMeta,
+        filterId.isAcceptableOrUnknown(data['filter_id']!, _filterIdMeta),
+      );
+    }
+    if (data.containsKey('filter_strength')) {
+      context.handle(
+        _filterStrengthMeta,
+        filterStrength.isAcceptableOrUnknown(
+          data['filter_strength']!,
+          _filterStrengthMeta,
+        ),
+      );
+    }
+    if (data.containsKey('server_film_roll_id')) {
+      context.handle(
+        _serverFilmRollIdMeta,
+        serverFilmRollId.isAcceptableOrUnknown(
+          data['server_film_roll_id']!,
+          _serverFilmRollIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('server_status')) {
+      context.handle(
+        _serverStatusMeta,
+        serverStatus.isAcceptableOrUnknown(
+          data['server_status']!,
+          _serverStatusMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -273,6 +372,26 @@ class $FilmRollsTable extends FilmRolls
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
       ),
+      regionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}region_id'],
+      ),
+      filterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}filter_id'],
+      ),
+      filterStrength: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}filter_strength'],
+      ),
+      serverFilmRollId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_film_roll_id'],
+      ),
+      serverStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}server_status'],
+      ),
     );
   }
 
@@ -299,6 +418,11 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
+  final int? regionId;
+  final String? filterId;
+  final double? filterStrength;
+  final int? serverFilmRollId;
+  final String? serverStatus;
   const FilmRollRow({
     required this.id,
     this.userId,
@@ -311,6 +435,11 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
+    this.regionId,
+    this.filterId,
+    this.filterStrength,
+    this.serverFilmRollId,
+    this.serverStatus,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -342,6 +471,21 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<DateTime>(completedAt);
     }
+    if (!nullToAbsent || regionId != null) {
+      map['region_id'] = Variable<int>(regionId);
+    }
+    if (!nullToAbsent || filterId != null) {
+      map['filter_id'] = Variable<String>(filterId);
+    }
+    if (!nullToAbsent || filterStrength != null) {
+      map['filter_strength'] = Variable<double>(filterStrength);
+    }
+    if (!nullToAbsent || serverFilmRollId != null) {
+      map['server_film_roll_id'] = Variable<int>(serverFilmRollId);
+    }
+    if (!nullToAbsent || serverStatus != null) {
+      map['server_status'] = Variable<String>(serverStatus);
+    }
     return map;
   }
 
@@ -366,6 +510,21 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      regionId: regionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(regionId),
+      filterId: filterId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(filterId),
+      filterStrength: filterStrength == null && nullToAbsent
+          ? const Value.absent()
+          : Value(filterStrength),
+      serverFilmRollId: serverFilmRollId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverFilmRollId),
+      serverStatus: serverStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverStatus),
     );
   }
 
@@ -392,6 +551,11 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      regionId: serializer.fromJson<int?>(json['regionId']),
+      filterId: serializer.fromJson<String?>(json['filterId']),
+      filterStrength: serializer.fromJson<double?>(json['filterStrength']),
+      serverFilmRollId: serializer.fromJson<int?>(json['serverFilmRollId']),
+      serverStatus: serializer.fromJson<String?>(json['serverStatus']),
     );
   }
   @override
@@ -413,6 +577,11 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'regionId': serializer.toJson<int?>(regionId),
+      'filterId': serializer.toJson<String?>(filterId),
+      'filterStrength': serializer.toJson<double?>(filterStrength),
+      'serverFilmRollId': serializer.toJson<int?>(serverFilmRollId),
+      'serverStatus': serializer.toJson<String?>(serverStatus),
     };
   }
 
@@ -428,6 +597,11 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> completedAt = const Value.absent(),
+    Value<int?> regionId = const Value.absent(),
+    Value<String?> filterId = const Value.absent(),
+    Value<double?> filterStrength = const Value.absent(),
+    Value<int?> serverFilmRollId = const Value.absent(),
+    Value<String?> serverStatus = const Value.absent(),
   }) => FilmRollRow(
     id: id ?? this.id,
     userId: userId.present ? userId.value : this.userId,
@@ -444,6 +618,15 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    regionId: regionId.present ? regionId.value : this.regionId,
+    filterId: filterId.present ? filterId.value : this.filterId,
+    filterStrength: filterStrength.present
+        ? filterStrength.value
+        : this.filterStrength,
+    serverFilmRollId: serverFilmRollId.present
+        ? serverFilmRollId.value
+        : this.serverFilmRollId,
+    serverStatus: serverStatus.present ? serverStatus.value : this.serverStatus,
   );
   FilmRollRow copyWithCompanion(FilmRollsCompanion data) {
     return FilmRollRow(
@@ -468,6 +651,17 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      regionId: data.regionId.present ? data.regionId.value : this.regionId,
+      filterId: data.filterId.present ? data.filterId.value : this.filterId,
+      filterStrength: data.filterStrength.present
+          ? data.filterStrength.value
+          : this.filterStrength,
+      serverFilmRollId: data.serverFilmRollId.present
+          ? data.serverFilmRollId.value
+          : this.serverFilmRollId,
+      serverStatus: data.serverStatus.present
+          ? data.serverStatus.value
+          : this.serverStatus,
     );
   }
 
@@ -484,7 +678,12 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
           ..write('selectedCourseTitle: $selectedCourseTitle, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('regionId: $regionId, ')
+          ..write('filterId: $filterId, ')
+          ..write('filterStrength: $filterStrength, ')
+          ..write('serverFilmRollId: $serverFilmRollId, ')
+          ..write('serverStatus: $serverStatus')
           ..write(')'))
         .toString();
   }
@@ -502,6 +701,11 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     createdAt,
     updatedAt,
     completedAt,
+    regionId,
+    filterId,
+    filterStrength,
+    serverFilmRollId,
+    serverStatus,
   );
   @override
   bool operator ==(Object other) =>
@@ -517,7 +721,12 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
           other.selectedCourseTitle == this.selectedCourseTitle &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.completedAt == this.completedAt);
+          other.completedAt == this.completedAt &&
+          other.regionId == this.regionId &&
+          other.filterId == this.filterId &&
+          other.filterStrength == this.filterStrength &&
+          other.serverFilmRollId == this.serverFilmRollId &&
+          other.serverStatus == this.serverStatus);
 }
 
 class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
@@ -532,6 +741,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> completedAt;
+  final Value<int?> regionId;
+  final Value<String?> filterId;
+  final Value<double?> filterStrength;
+  final Value<int?> serverFilmRollId;
+  final Value<String?> serverStatus;
   final Value<int> rowid;
   const FilmRollsCompanion({
     this.id = const Value.absent(),
@@ -545,6 +759,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.regionId = const Value.absent(),
+    this.filterId = const Value.absent(),
+    this.filterStrength = const Value.absent(),
+    this.serverFilmRollId = const Value.absent(),
+    this.serverStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FilmRollsCompanion.insert({
@@ -559,6 +778,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.completedAt = const Value.absent(),
+    this.regionId = const Value.absent(),
+    this.filterId = const Value.absent(),
+    this.filterStrength = const Value.absent(),
+    this.serverFilmRollId = const Value.absent(),
+    this.serverStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        regionCode = Value(regionCode),
@@ -579,6 +803,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? completedAt,
+    Expression<int>? regionId,
+    Expression<String>? filterId,
+    Expression<double>? filterStrength,
+    Expression<int>? serverFilmRollId,
+    Expression<String>? serverStatus,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -594,6 +823,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (completedAt != null) 'completed_at': completedAt,
+      if (regionId != null) 'region_id': regionId,
+      if (filterId != null) 'filter_id': filterId,
+      if (filterStrength != null) 'filter_strength': filterStrength,
+      if (serverFilmRollId != null) 'server_film_roll_id': serverFilmRollId,
+      if (serverStatus != null) 'server_status': serverStatus,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -610,6 +844,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? completedAt,
+    Value<int?>? regionId,
+    Value<String?>? filterId,
+    Value<double?>? filterStrength,
+    Value<int?>? serverFilmRollId,
+    Value<String?>? serverStatus,
     Value<int>? rowid,
   }) {
     return FilmRollsCompanion(
@@ -624,6 +863,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
+      regionId: regionId ?? this.regionId,
+      filterId: filterId ?? this.filterId,
+      filterStrength: filterStrength ?? this.filterStrength,
+      serverFilmRollId: serverFilmRollId ?? this.serverFilmRollId,
+      serverStatus: serverStatus ?? this.serverStatus,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -670,6 +914,21 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
+    if (regionId.present) {
+      map['region_id'] = Variable<int>(regionId.value);
+    }
+    if (filterId.present) {
+      map['filter_id'] = Variable<String>(filterId.value);
+    }
+    if (filterStrength.present) {
+      map['filter_strength'] = Variable<double>(filterStrength.value);
+    }
+    if (serverFilmRollId.present) {
+      map['server_film_roll_id'] = Variable<int>(serverFilmRollId.value);
+    }
+    if (serverStatus.present) {
+      map['server_status'] = Variable<String>(serverStatus.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -690,6 +949,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('completedAt: $completedAt, ')
+          ..write('regionId: $regionId, ')
+          ..write('filterId: $filterId, ')
+          ..write('filterStrength: $filterStrength, ')
+          ..write('serverFilmRollId: $serverFilmRollId, ')
+          ..write('serverStatus: $serverStatus, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -848,6 +1112,18 @@ class $FilmRollPlacesTable extends FilmRollPlaces
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _visitSyncedAtMeta = const VerificationMeta(
+    'visitSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> visitSyncedAt =
+      GeneratedColumn<DateTime>(
+        'visit_synced_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -863,6 +1139,7 @@ class $FilmRollPlacesTable extends FilmRollPlaces
     visitOrder,
     isVisited,
     visitedAt,
+    visitSyncedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -976,6 +1253,15 @@ class $FilmRollPlacesTable extends FilmRollPlaces
         visitedAt.isAcceptableOrUnknown(data['visited_at']!, _visitedAtMeta),
       );
     }
+    if (data.containsKey('visit_synced_at')) {
+      context.handle(
+        _visitSyncedAtMeta,
+        visitSyncedAt.isAcceptableOrUnknown(
+          data['visit_synced_at']!,
+          _visitSyncedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1041,6 +1327,10 @@ class $FilmRollPlacesTable extends FilmRollPlaces
         DriftSqlType.dateTime,
         data['${effectivePrefix}visited_at'],
       ),
+      visitSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}visit_synced_at'],
+      ),
     );
   }
 
@@ -1065,6 +1355,10 @@ class FilmRollPlaceRow extends DataClass
   final int visitOrder;
   final bool isVisited;
   final DateTime? visitedAt;
+
+  /// 이 장소의 방문 인증이 서버(`POST /film-rolls/{id}/visits`)에 반영된 시각.
+  /// null이면 아직 서버로 전송되지 않은 상태.
+  final DateTime? visitSyncedAt;
   const FilmRollPlaceRow({
     required this.id,
     required this.filmRollId,
@@ -1079,6 +1373,7 @@ class FilmRollPlaceRow extends DataClass
     required this.visitOrder,
     required this.isVisited,
     this.visitedAt,
+    this.visitSyncedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1103,6 +1398,9 @@ class FilmRollPlaceRow extends DataClass
     map['is_visited'] = Variable<bool>(isVisited);
     if (!nullToAbsent || visitedAt != null) {
       map['visited_at'] = Variable<DateTime>(visitedAt);
+    }
+    if (!nullToAbsent || visitSyncedAt != null) {
+      map['visit_synced_at'] = Variable<DateTime>(visitSyncedAt);
     }
     return map;
   }
@@ -1130,6 +1428,9 @@ class FilmRollPlaceRow extends DataClass
       visitedAt: visitedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(visitedAt),
+      visitSyncedAt: visitSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(visitSyncedAt),
     );
   }
 
@@ -1152,6 +1453,7 @@ class FilmRollPlaceRow extends DataClass
       visitOrder: serializer.fromJson<int>(json['visitOrder']),
       isVisited: serializer.fromJson<bool>(json['isVisited']),
       visitedAt: serializer.fromJson<DateTime?>(json['visitedAt']),
+      visitSyncedAt: serializer.fromJson<DateTime?>(json['visitSyncedAt']),
     );
   }
   @override
@@ -1171,6 +1473,7 @@ class FilmRollPlaceRow extends DataClass
       'visitOrder': serializer.toJson<int>(visitOrder),
       'isVisited': serializer.toJson<bool>(isVisited),
       'visitedAt': serializer.toJson<DateTime?>(visitedAt),
+      'visitSyncedAt': serializer.toJson<DateTime?>(visitSyncedAt),
     };
   }
 
@@ -1188,6 +1491,7 @@ class FilmRollPlaceRow extends DataClass
     int? visitOrder,
     bool? isVisited,
     Value<DateTime?> visitedAt = const Value.absent(),
+    Value<DateTime?> visitSyncedAt = const Value.absent(),
   }) => FilmRollPlaceRow(
     id: id ?? this.id,
     filmRollId: filmRollId ?? this.filmRollId,
@@ -1206,6 +1510,9 @@ class FilmRollPlaceRow extends DataClass
     visitOrder: visitOrder ?? this.visitOrder,
     isVisited: isVisited ?? this.isVisited,
     visitedAt: visitedAt.present ? visitedAt.value : this.visitedAt,
+    visitSyncedAt: visitSyncedAt.present
+        ? visitSyncedAt.value
+        : this.visitSyncedAt,
   );
   FilmRollPlaceRow copyWithCompanion(FilmRollPlacesCompanion data) {
     return FilmRollPlaceRow(
@@ -1230,6 +1537,9 @@ class FilmRollPlaceRow extends DataClass
           : this.visitOrder,
       isVisited: data.isVisited.present ? data.isVisited.value : this.isVisited,
       visitedAt: data.visitedAt.present ? data.visitedAt.value : this.visitedAt,
+      visitSyncedAt: data.visitSyncedAt.present
+          ? data.visitSyncedAt.value
+          : this.visitSyncedAt,
     );
   }
 
@@ -1248,7 +1558,8 @@ class FilmRollPlaceRow extends DataClass
           ..write('imageUrl: $imageUrl, ')
           ..write('visitOrder: $visitOrder, ')
           ..write('isVisited: $isVisited, ')
-          ..write('visitedAt: $visitedAt')
+          ..write('visitedAt: $visitedAt, ')
+          ..write('visitSyncedAt: $visitSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -1268,6 +1579,7 @@ class FilmRollPlaceRow extends DataClass
     visitOrder,
     isVisited,
     visitedAt,
+    visitSyncedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -1285,7 +1597,8 @@ class FilmRollPlaceRow extends DataClass
           other.imageUrl == this.imageUrl &&
           other.visitOrder == this.visitOrder &&
           other.isVisited == this.isVisited &&
-          other.visitedAt == this.visitedAt);
+          other.visitedAt == this.visitedAt &&
+          other.visitSyncedAt == this.visitSyncedAt);
 }
 
 class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
@@ -1302,6 +1615,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
   final Value<int> visitOrder;
   final Value<bool> isVisited;
   final Value<DateTime?> visitedAt;
+  final Value<DateTime?> visitSyncedAt;
   final Value<int> rowid;
   const FilmRollPlacesCompanion({
     this.id = const Value.absent(),
@@ -1317,6 +1631,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
     this.visitOrder = const Value.absent(),
     this.isVisited = const Value.absent(),
     this.visitedAt = const Value.absent(),
+    this.visitSyncedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FilmRollPlacesCompanion.insert({
@@ -1333,6 +1648,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
     required int visitOrder,
     this.isVisited = const Value.absent(),
     this.visitedAt = const Value.absent(),
+    this.visitSyncedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        filmRollId = Value(filmRollId),
@@ -1356,6 +1672,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
     Expression<int>? visitOrder,
     Expression<bool>? isVisited,
     Expression<DateTime>? visitedAt,
+    Expression<DateTime>? visitSyncedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1372,6 +1689,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
       if (visitOrder != null) 'visit_order': visitOrder,
       if (isVisited != null) 'is_visited': isVisited,
       if (visitedAt != null) 'visited_at': visitedAt,
+      if (visitSyncedAt != null) 'visit_synced_at': visitSyncedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1390,6 +1708,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
     Value<int>? visitOrder,
     Value<bool>? isVisited,
     Value<DateTime?>? visitedAt,
+    Value<DateTime?>? visitSyncedAt,
     Value<int>? rowid,
   }) {
     return FilmRollPlacesCompanion(
@@ -1406,6 +1725,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
       visitOrder: visitOrder ?? this.visitOrder,
       isVisited: isVisited ?? this.isVisited,
       visitedAt: visitedAt ?? this.visitedAt,
+      visitSyncedAt: visitSyncedAt ?? this.visitSyncedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1452,6 +1772,9 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
     if (visitedAt.present) {
       map['visited_at'] = Variable<DateTime>(visitedAt.value);
     }
+    if (visitSyncedAt.present) {
+      map['visit_synced_at'] = Variable<DateTime>(visitSyncedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1474,6 +1797,7 @@ class FilmRollPlacesCompanion extends UpdateCompanion<FilmRollPlaceRow> {
           ..write('visitOrder: $visitOrder, ')
           ..write('isVisited: $isVisited, ')
           ..write('visitedAt: $visitedAt, ')
+          ..write('visitSyncedAt: $visitSyncedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2112,6 +2436,11 @@ typedef $$FilmRollsTableCreateCompanionBuilder =
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> completedAt,
+      Value<int?> regionId,
+      Value<String?> filterId,
+      Value<double?> filterStrength,
+      Value<int?> serverFilmRollId,
+      Value<String?> serverStatus,
       Value<int> rowid,
     });
 typedef $$FilmRollsTableUpdateCompanionBuilder =
@@ -2127,6 +2456,11 @@ typedef $$FilmRollsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> completedAt,
+      Value<int?> regionId,
+      Value<String?> filterId,
+      Value<double?> filterStrength,
+      Value<int?> serverFilmRollId,
+      Value<String?> serverStatus,
       Value<int> rowid,
     });
 
@@ -2238,6 +2572,31 @@ class $$FilmRollsTableFilterComposer
 
   ColumnFilters<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get regionId => $composableBuilder(
+    column: $table.regionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filterId => $composableBuilder(
+    column: $table.filterId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get filterStrength => $composableBuilder(
+    column: $table.filterStrength,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverFilmRollId => $composableBuilder(
+    column: $table.serverFilmRollId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serverStatus => $composableBuilder(
+    column: $table.serverStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2355,6 +2714,31 @@ class $$FilmRollsTableOrderingComposer
     column: $table.completedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get regionId => $composableBuilder(
+    column: $table.regionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filterId => $composableBuilder(
+    column: $table.filterId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get filterStrength => $composableBuilder(
+    column: $table.filterStrength,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverFilmRollId => $composableBuilder(
+    column: $table.serverFilmRollId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serverStatus => $composableBuilder(
+    column: $table.serverStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FilmRollsTableAnnotationComposer
@@ -2407,6 +2791,27 @@ class $$FilmRollsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get regionId =>
+      $composableBuilder(column: $table.regionId, builder: (column) => column);
+
+  GeneratedColumn<String> get filterId =>
+      $composableBuilder(column: $table.filterId, builder: (column) => column);
+
+  GeneratedColumn<double> get filterStrength => $composableBuilder(
+    column: $table.filterStrength,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverFilmRollId => $composableBuilder(
+    column: $table.serverFilmRollId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get serverStatus => $composableBuilder(
+    column: $table.serverStatus,
     builder: (column) => column,
   );
 
@@ -2500,6 +2905,11 @@ class $$FilmRollsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<int?> regionId = const Value.absent(),
+                Value<String?> filterId = const Value.absent(),
+                Value<double?> filterStrength = const Value.absent(),
+                Value<int?> serverFilmRollId = const Value.absent(),
+                Value<String?> serverStatus = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FilmRollsCompanion(
                 id: id,
@@ -2513,6 +2923,11 @@ class $$FilmRollsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 completedAt: completedAt,
+                regionId: regionId,
+                filterId: filterId,
+                filterStrength: filterStrength,
+                serverFilmRollId: serverFilmRollId,
+                serverStatus: serverStatus,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2528,6 +2943,11 @@ class $$FilmRollsTableTableManager
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<int?> regionId = const Value.absent(),
+                Value<String?> filterId = const Value.absent(),
+                Value<double?> filterStrength = const Value.absent(),
+                Value<int?> serverFilmRollId = const Value.absent(),
+                Value<String?> serverStatus = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FilmRollsCompanion.insert(
                 id: id,
@@ -2541,6 +2961,11 @@ class $$FilmRollsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 completedAt: completedAt,
+                regionId: regionId,
+                filterId: filterId,
+                filterStrength: filterStrength,
+                serverFilmRollId: serverFilmRollId,
+                serverStatus: serverStatus,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2641,6 +3066,7 @@ typedef $$FilmRollPlacesTableCreateCompanionBuilder =
       required int visitOrder,
       Value<bool> isVisited,
       Value<DateTime?> visitedAt,
+      Value<DateTime?> visitSyncedAt,
       Value<int> rowid,
     });
 typedef $$FilmRollPlacesTableUpdateCompanionBuilder =
@@ -2658,6 +3084,7 @@ typedef $$FilmRollPlacesTableUpdateCompanionBuilder =
       Value<int> visitOrder,
       Value<bool> isVisited,
       Value<DateTime?> visitedAt,
+      Value<DateTime?> visitSyncedAt,
       Value<int> rowid,
     });
 
@@ -2759,6 +3186,11 @@ class $$FilmRollPlacesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<DateTime> get visitSyncedAt => $composableBuilder(
+    column: $table.visitSyncedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$FilmRollsTableFilterComposer get filmRollId {
     final $$FilmRollsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -2852,6 +3284,11 @@ class $$FilmRollPlacesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get visitSyncedAt => $composableBuilder(
+    column: $table.visitSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FilmRollsTableOrderingComposer get filmRollId {
     final $$FilmRollsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2927,6 +3364,11 @@ class $$FilmRollPlacesTableAnnotationComposer
   GeneratedColumn<DateTime> get visitedAt =>
       $composableBuilder(column: $table.visitedAt, builder: (column) => column);
 
+  GeneratedColumn<DateTime> get visitSyncedAt => $composableBuilder(
+    column: $table.visitSyncedAt,
+    builder: (column) => column,
+  );
+
   $$FilmRollsTableAnnotationComposer get filmRollId {
     final $$FilmRollsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -2994,6 +3436,7 @@ class $$FilmRollPlacesTableTableManager
                 Value<int> visitOrder = const Value.absent(),
                 Value<bool> isVisited = const Value.absent(),
                 Value<DateTime?> visitedAt = const Value.absent(),
+                Value<DateTime?> visitSyncedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FilmRollPlacesCompanion(
                 id: id,
@@ -3009,6 +3452,7 @@ class $$FilmRollPlacesTableTableManager
                 visitOrder: visitOrder,
                 isVisited: isVisited,
                 visitedAt: visitedAt,
+                visitSyncedAt: visitSyncedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3026,6 +3470,7 @@ class $$FilmRollPlacesTableTableManager
                 required int visitOrder,
                 Value<bool> isVisited = const Value.absent(),
                 Value<DateTime?> visitedAt = const Value.absent(),
+                Value<DateTime?> visitSyncedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FilmRollPlacesCompanion.insert(
                 id: id,
@@ -3041,6 +3486,7 @@ class $$FilmRollPlacesTableTableManager
                 visitOrder: visitOrder,
                 isVisited: isVisited,
                 visitedAt: visitedAt,
+                visitSyncedAt: visitSyncedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

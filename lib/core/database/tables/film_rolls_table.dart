@@ -22,6 +22,15 @@ class FilmRolls extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get completedAt => dateTime().nullable()();
 
+  // 백엔드 필름롤 동기화용. 로컬이 source of truth이며, 아래 컬럼은 서버
+  // 필름롤과의 연결/생성 파라미터를 보관한다. serverFilmRollId가 null이면
+  // "아직 서버에 생성되지 않음"으로 취급한다.
+  IntColumn get regionId => integer().nullable()();
+  TextColumn get filterId => text().nullable()();
+  RealColumn get filterStrength => real().nullable()();
+  IntColumn get serverFilmRollId => integer().nullable()();
+  TextColumn get serverStatus => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

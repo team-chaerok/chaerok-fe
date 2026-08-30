@@ -20,6 +20,10 @@ class FilmRollPlaces extends Table {
   BoolColumn get isVisited => boolean().withDefault(const Constant(false))();
   DateTimeColumn get visitedAt => dateTime().nullable()();
 
+  /// 이 장소의 방문 인증이 서버(`POST /film-rolls/{id}/visits`)에 반영된 시각.
+  /// null이면 아직 서버로 전송되지 않은 상태.
+  DateTimeColumn get visitSyncedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 

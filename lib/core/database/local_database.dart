@@ -24,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   static AppDatabase get instance => _instance ??= AppDatabase._();
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -50,6 +50,17 @@ class AppDatabase extends _$AppDatabase {
             'DROP INDEX IF EXISTS idx_unique_active_film_roll_per_region',
           );
           await _createActiveFilmRollUniqueIndex();
+        }
+        // v4: 필름롤 생성/방문을 백엔드에 반영하는 동기화 계층 도입. 전부
+        // nullable 컬럼이라 기존 행은 null로 남는다 — serverFilmRollId가 null이면
+        // "아직 서버에 생성 안 됨", visitSyncedAt가 null이면 "방문 미전송".
+        if (from < 4) {
+          await m.addColumn(filmRolls, filmRolls.regionId);
+          await m.addColumn(filmRolls, filmRolls.filterId);
+          await m.addColumn(filmRolls, filmRolls.filterStrength);
+          await m.addColumn(filmRolls, filmRolls.serverFilmRollId);
+          await m.addColumn(filmRolls, filmRolls.serverStatus);
+          await m.addColumn(filmRollPlaces, filmRollPlaces.visitSyncedAt);
         }
       },
       // FilmRolls 삭제 시 FilmRollPlaces/Photos가 cascade로 함께 삭제되도록
