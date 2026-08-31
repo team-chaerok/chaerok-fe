@@ -422,7 +422,7 @@ class _HomeHeader extends StatelessWidget {
       children: [
         const SizedBox(height: ChaerokSpacing.xs),
         Text(
-          '$_todayLabel · $regionName',
+          regionName != null ? '$_todayLabel · $regionName' : _todayLabel,
           style: ChaerokTypography.caption.copyWith(
             color: ChaerokColors.textSecondary,
           ),

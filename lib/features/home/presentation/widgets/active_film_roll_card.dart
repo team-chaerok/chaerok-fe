@@ -178,20 +178,20 @@ class _CapturedPhotoPlaceholderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: _photoItemHeight,
-      child: Row(
-        children: [
-          for (var i = 0; i < _slotCount; i++) ...[
-            if (i > 0) const SizedBox(width: _photoItemGap),
-            Container(
-              width: _photoItemWidth,
-              height: _photoItemHeight,
-              decoration: BoxDecoration(
-                color: ChaerokColors.textDisabled,
-                borderRadius: BorderRadius.circular(_photoItemRadius),
-              ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _slotCount,
+        separatorBuilder: (_, _) => const SizedBox(width: _photoItemGap),
+        itemBuilder: (context, index) {
+          return Container(
+            width: _photoItemWidth,
+            height: _photoItemHeight,
+            decoration: BoxDecoration(
+              color: ChaerokColors.textDisabled,
+              borderRadius: BorderRadius.circular(_photoItemRadius),
             ),
-          ],
-        ],
+          );
+        },
       ),
     );
   }
