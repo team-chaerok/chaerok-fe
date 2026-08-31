@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chaerok/core/database/local_database.dart';
@@ -30,9 +31,13 @@ class _FakeSyncService implements FilmRollSyncService {
   int calls = 0;
   FilmRollSyncResult next = const FilmRollSyncResult();
 
+  /// null이 아니면 syncFilmRoll이 이 completer가 완료될 때까지 대기한다.
+  Completer<void>? gate;
+
   @override
   Future<FilmRollSyncResult> syncFilmRoll(String clientFilmRollId) async {
     calls++;
+    if (gate != null) await gate!.future;
     return next;
   }
 }
@@ -127,5 +132,27 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(sync.calls, 2); // load 1회 + retrySync 1회. retrySync 내부에서 추가 트리거 없음.
+  });
+
+  test('동기화 진행 중 retrySync는 새 syncFilmRoll을 시작하지 않고 진행 중인 것을 공유한다', () async {
+    sync.gate = Completer<void>();
+    final c = controller();
+
+    await c
+        .load(); // _reload는 await, _triggerSync는 fire-and-forget으로 sync #1 시작(계류)
+    expect(sync.calls, 1);
+
+    final retryFut = c.retrySync(); // 계류 중인 #1을 공유 — 새로 시작하지 않음
+    await Future<void>.delayed(Duration.zero);
+    expect(sync.calls, 1);
+
+    sync.gate!.complete(); // #1 완료
+    await retryFut;
+    expect(sync.calls, 1);
+
+    // 완료 후에는 _inFlightSync가 비워져 다음 트리거가 새 동기화를 시작한다.
+    sync.gate = null;
+    await c.retrySync();
+    expect(sync.calls, 2);
   });
 }

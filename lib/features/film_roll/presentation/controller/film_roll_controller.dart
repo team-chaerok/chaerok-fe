@@ -54,6 +54,10 @@ class FilmRollController {
 
   FilmRollState _state = const FilmRollState.initial();
 
+  /// 진행 중인 동기화. 같은 필름롤에 대해 동시에 하나만 돌게 하고, 여러 트리거
+  /// (화면 로드·방문 후·재시도 버튼)가 겹치면 이 Future를 공유한다.
+  Future<FilmRollSyncResult>? _inFlightSync;
+
   FilmRollState get state => _state;
 
   /// 로컬 DB에서 필름롤/장소를 다시 읽어 상태에 반영한다(동기화는 시작하지 않음).
@@ -97,12 +101,19 @@ class FilmRollController {
     }
   }
 
+  /// 진행 중인 동기화가 있으면 그 Future를, 없으면 새로 시작해 반환한다.
+  /// 완료되면 [_inFlightSync]를 비워 다음 호출이 새 동기화를 시작하게 한다.
+  Future<FilmRollSyncResult> _sync() {
+    return _inFlightSync ??= _syncService
+        .syncFilmRoll(filmRollId)
+        .whenComplete(() => _inFlightSync = null);
+  }
+
   /// 백엔드 동기화를 백그라운드로 시도하고, 완료되면 부분 실패 여부를 상태에
   /// 반영한다. 화면 진입/방문 후 자동으로 호출된다(fire-and-forget).
   void _triggerSync() {
     unawaited(
-      _syncService
-          .syncFilmRoll(filmRollId)
+      _sync()
           .then((result) {
             _emit(_state.copyWith(lastSyncHadError: result.hasError));
           })
@@ -113,10 +124,11 @@ class FilmRollController {
   }
 
   /// 사용자가 "동기화 재시도"를 눌렀을 때. 결과를 기다렸다가 상태를 갱신한다.
+  /// 진행 중인 동기화가 있으면 [_sync]를 통해 그것을 공유한다(중복 요청 방지).
   /// [_reload]를 쓰는 이유: [load]는 끝에 다시 [_triggerSync]를 돌려 불필요한
   /// 백그라운드 동기화와 [lastSyncHadError] 재변경을 일으킨다.
   Future<FilmRollSyncResult> retrySync() async {
-    final result = await _syncService.syncFilmRoll(filmRollId);
+    final result = await _sync();
     await _reload();
     _emit(_state.copyWith(lastSyncHadError: result.hasError));
     return result;
