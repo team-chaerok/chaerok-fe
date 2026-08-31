@@ -2,11 +2,9 @@ import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/film_roll_create_request.dart';
 import 'package:chaerok/data/models/film_roll_response.dart';
-import 'package:chaerok/data/models/filter_response.dart';
 import 'package:chaerok/data/models/visit_create_request.dart';
 import 'package:chaerok/data/models/visit_create_response.dart';
 import 'package:chaerok/data/remote/film_rolls_api.dart';
-import 'package:chaerok/data/remote/filters_api.dart';
 import 'package:chaerok/data/remote/visits_api.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
@@ -46,7 +44,6 @@ class FilmRollSyncService {
     Future<FilmRollResponse> Function(int filmRollId)? getFilmRoll,
     Future<VisitCreateResponse> Function(int filmRollId, VisitCreateRequest)?
     createVisit,
-    Future<List<FilterResponse>> Function()? getFilters,
     RegionCode? Function()? currentRegion,
   }) : _filmRollRepository = filmRollRepository,
        _placeRepository = filmRollPlaceRepository,
@@ -54,7 +51,6 @@ class FilmRollSyncService {
        _createFilmRoll = createFilmRoll ?? FilmRollsApi.createFilmRoll,
        _getFilmRoll = getFilmRoll ?? FilmRollsApi.getFilmRoll,
        _createVisit = createVisit ?? VisitsApi.createVisit,
-       _getFilters = getFilters ?? FiltersApi.getFilters,
        _currentRegion = currentRegion ?? _sessionVerifiedRegion;
 
   final FilmRollRepository _filmRollRepository;
@@ -65,7 +61,6 @@ class FilmRollSyncService {
   final Future<FilmRollResponse> Function(int) _getFilmRoll;
   final Future<VisitCreateResponse> Function(int, VisitCreateRequest)
   _createVisit;
-  final Future<List<FilterResponse>> Function() _getFilters;
 
   /// 현재 위치가 속한 지역을 반환한다(동기화는 이 지역과 필름롤 지역이 일치할 때만).
   final RegionCode? Function() _currentRegion;
@@ -166,13 +161,15 @@ class FilmRollSyncService {
   }
 
   /// 서버 필름롤을 생성(또는 멱등 반환)하고 로컬에 연결한다.
-  /// 필터를 결정할 수 없으면 null을 반환한다(생성 보류).
+  /// [regionId]가 없으면 null을 반환한다(생성 보류).
   Future<int?> _ensureServerFilmRoll(FilmRoll filmRoll) async {
     final regionId = filmRoll.regionId;
     if (regionId == null) return null;
 
-    final filterId = await _resolveFilterId();
-    if (filterId == null) return null;
+    // 필터는 지역과 1:1로 대응한다(filterId == RegionCode.name):
+    //   1 gongju / 2 buyeo / 3 seosan / 4 yesan. 서버가 regionId와 filterId의
+    //   일치를 요구하므로 필름롤 지역에서 직접 유도한다.
+    final filterId = filmRoll.regionCode.name;
 
     final res = await _createFilmRoll(
       FilmRollCreateRequest(
@@ -190,16 +187,6 @@ class FilmRollSyncService {
       filterStrength: _defaultFilterStrength,
     );
     return res.filmRollId;
-  }
-
-  Future<String?> _resolveFilterId() async {
-    final cached = await _preferences.getDefaultFilterId();
-    if (cached != null && cached.isNotEmpty) return cached;
-    final filters = await _getFilters();
-    if (filters.isEmpty) return null;
-    final first = filters.first.filterId;
-    await _preferences.setDefaultFilterId(first);
-    return first;
   }
 
   bool _isClientError(Object e) {

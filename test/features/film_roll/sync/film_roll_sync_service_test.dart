@@ -6,7 +6,6 @@ import 'package:chaerok/core/file/local_photo_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/film_roll_create_request.dart';
 import 'package:chaerok/data/models/film_roll_response.dart';
-import 'package:chaerok/data/models/filter_response.dart';
 import 'package:chaerok/data/models/visit_create_request.dart';
 import 'package:chaerok/data/models/visit_create_response.dart';
 import 'package:chaerok/features/film_roll/data/local/film_roll_local_data_source.dart';
@@ -106,7 +105,6 @@ void main() {
     Future<FilmRollResponse> Function(FilmRollCreateRequest)? createFilmRoll,
     Future<FilmRollResponse> Function(int)? getFilmRoll,
     Future<VisitCreateResponse> Function(int, VisitCreateRequest)? createVisit,
-    Future<List<FilterResponse>> Function()? getFilters,
     RegionCode? Function()? currentRegion,
   }) {
     return FilmRollSyncService(
@@ -116,11 +114,6 @@ void main() {
       createFilmRoll: createFilmRoll ?? (_) async => _fakeResponse(),
       getFilmRoll: getFilmRoll ?? (id) async => _fakeResponse(id: id),
       createVisit: createVisit ?? (_, __) async => VisitCreateResponse.empty(),
-      getFilters:
-          getFilters ??
-          () async => const [
-            FilterResponse(filterId: 'f1', name: 'F1', description: ''),
-          ],
       // seedFilmRoll이 공주 필름롤을 만드므로, 기본 현재 지역도 공주로 둔다.
       currentRegion: currentRegion ?? () => RegionCode.gongju,
     );
@@ -128,7 +121,6 @@ void main() {
 
   group('생성', () {
     test('serverFilmRollId가 없으면 생성하고 clientFilmRollId를 멱등키로 보낸다', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
       var calls = 0;
       FilmRollCreateRequest? sent;
@@ -168,7 +160,6 @@ void main() {
     });
 
     test('멱등 재요청: 서버가 기존 롤을 반환하면 그 id를 저장한다', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
 
       await service(
@@ -194,34 +185,28 @@ void main() {
       expect(result.created, isFalse);
     });
 
-    test('필터 캐시 없음 + getFilters 실패 시 생성 보류(무오류)', () async {
-      await prefs.setDefaultFilterId(null);
-      final fr = await seedFilmRoll();
+    test('filterId를 필름롤 지역 코드로 보낸다 (regionId와 일치)', () async {
+      final fr = await repository.findOrCreateActiveByRegion(
+        regionCode: RegionCode.yesan,
+        regionName: '예산군',
+        regionId: 4,
+      );
+      FilmRollCreateRequest? sent;
 
-      final result = await service(
-        getFilters: () async => throw Exception('net'),
-        createFilmRoll: (_) async => _fakeResponse(),
+      await service(
+        currentRegion: () => RegionCode.yesan,
+        createFilmRoll: (req) async {
+          sent = req;
+          return _fakeResponse();
+        },
       ).syncFilmRoll(fr.id);
 
-      expect(result.created, isFalse);
-      expect(result.hasError, isTrue);
-      expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
-    });
-
-    test('getFilters가 빈 목록이면 생성 보류', () async {
-      await prefs.setDefaultFilterId(null);
-      final fr = await seedFilmRoll();
-
-      final result = await service(
-        getFilters: () async => const [],
-      ).syncFilmRoll(fr.id);
-
-      expect(result.created, isFalse);
-      expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+      expect(sent!.regionId, 4);
+      expect(sent!.filterId, 'yesan');
+      expect(sent!.toJson()['filterId'], 'yesan');
     });
 
     test('생성 중 네트워크 5xx 오류는 예외를 던지지 않고 result.error에 담긴다', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
 
       final result = await service(
@@ -233,7 +218,6 @@ void main() {
     });
 
     test('다른 CAPTURING 롤 존재로 4xx 거절되면 미연동·무오류 보류', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
 
       final result = await service(
@@ -249,7 +233,6 @@ void main() {
 
   group('방문 전송', () {
     Future<FilmRoll> seedLinkedWithPlaces() async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
       await repository.linkServerFilmRoll(
         clientFilmRollId: fr.id,
@@ -390,7 +373,6 @@ void main() {
 
   group('현재 위치 지역 가드', () {
     test('현재 지역이 필름롤 지역과 다르면 아무 API도 호출하지 않는다', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll(); // 공주 필름롤
       var createCalls = 0;
 
@@ -409,7 +391,6 @@ void main() {
     });
 
     test('위치 인증 이력이 없으면(currentRegion null) 동기화를 보류한다', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
       var createCalls = 0;
 
@@ -426,7 +407,6 @@ void main() {
     });
 
     test('현재 지역이 필름롤 지역과 같으면 정상 동기화한다', () async {
-      await prefs.setDefaultFilterId('f1');
       final fr = await seedFilmRoll();
 
       final result = await service(

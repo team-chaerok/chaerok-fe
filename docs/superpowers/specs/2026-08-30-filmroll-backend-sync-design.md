@@ -140,17 +140,24 @@ class FilmRollSyncResult {
 참고: create 요청에 `clientFilmRollId`(로컬 UUID)가 포함되므로,
 `FilmRollCreateRequest` 모델에 해당 필드를 추가해야 한다 (`toJson`에도).
 
-### 5.3 필터 기본값
+### 5.3 필터 = 지역 코드
 
-로컬 생성 시점에는 필터를 모른다. `syncFilmRoll`이 생성 직전 JIT로 결정:
+**필터는 지역과 1:1로 고정 대응한다** (백엔드 확인: `filterId == RegionCode.name`).
 
-1. `AppPreferences.getDefaultFilterId()` 캐시 확인
-2. 없으면 `FiltersApi.getFilters()` → `[0].filterId` 사용, 캐시에 저장
-3. `filterStrength`는 상수 `1.0`
-4. 필터 조회 실패 + 캐시 없음 → 생성 보류 (필터 없이 생성 불가), 다음 재시도
+| regionId | filterId |
+|---|---|
+| 1 | `gongju` |
+| 2 | `buyeo` |
+| 3 | `seosan` |
+| 4 | `yesan` |
 
-`AppPreferences`에 `getDefaultFilterId()` / `setDefaultFilterId(String?)` 추가
-(`shared_preferences`, 키 `default_filter_id`).
+서버가 `regionId`와 `filterId`의 일치를 요구하므로, `syncFilmRoll`은
+`filmRoll.regionCode.name`을 그대로 `filterId`로 보낸다. `filterStrength`는 상수
+`1.0`, `filterVersion`은 서버가 결정.
+
+> 초기 설계는 `AppPreferences.defaultFilterId` 캐시에 `FiltersApi.getFilters()[0]`을
+> 저장해 재사용했으나, 그 방식은 지역과 무관하게 첫 필터(`gongju`)를 모든
+> 필름롤에 붙여 regionId 불일치를 유발했다. 캐시/`getFilters` 조회 로직은 제거.
 
 ## 6. 오류 / 멱등성
 
