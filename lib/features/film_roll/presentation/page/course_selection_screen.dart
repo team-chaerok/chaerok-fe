@@ -45,6 +45,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
     try {
       final response = await CoursesApi.getRecommendedCourses(widget.regionId);
+      debugPrint(response.toString());
+
       if (!mounted) return;
       setState(() {
         _courses = response.courses;
@@ -52,6 +54,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
       });
     } catch (e, st) {
       log('추천 코스 조회 실패', name: _tag, error: e, stackTrace: st);
+
       if (!mounted) return;
       setState(() {
         _errorMessage = apiErrorMessage(e);
