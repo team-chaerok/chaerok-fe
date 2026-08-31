@@ -56,7 +56,8 @@ class FilmRollController {
 
   FilmRollState get state => _state;
 
-  Future<void> load() async {
+  /// 로컬 DB에서 필름롤/장소를 다시 읽어 상태에 반영한다(동기화는 시작하지 않음).
+  Future<void> _reload() async {
     _emit(_state.copyWith(status: FilmRollLoadStatus.loading));
     try {
       final filmRoll = await _filmRollRepository.findById(filmRollId);
@@ -78,7 +79,6 @@ class FilmRollController {
           lastSyncHadError: _state.lastSyncHadError,
         ),
       );
-      _triggerSync();
     } catch (e, st) {
       log('필름롤 조회 실패', name: _tag, error: e, stackTrace: st);
       _emit(
@@ -87,6 +87,13 @@ class FilmRollController {
           errorMessage: e.toString(),
         ),
       );
+    }
+  }
+
+  Future<void> load() async {
+    await _reload();
+    if (_state.status == FilmRollLoadStatus.loaded) {
+      _triggerSync();
     }
   }
 
@@ -106,9 +113,11 @@ class FilmRollController {
   }
 
   /// 사용자가 "동기화 재시도"를 눌렀을 때. 결과를 기다렸다가 상태를 갱신한다.
+  /// [_reload]를 쓰는 이유: [load]는 끝에 다시 [_triggerSync]를 돌려 불필요한
+  /// 백그라운드 동기화와 [lastSyncHadError] 재변경을 일으킨다.
   Future<FilmRollSyncResult> retrySync() async {
     final result = await _syncService.syncFilmRoll(filmRollId);
-    await load();
+    await _reload();
     _emit(_state.copyWith(lastSyncHadError: result.hasError));
     return result;
   }

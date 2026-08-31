@@ -1383,15 +1383,14 @@ class EnterRegionUseCase {
 - [ ] **Step 5: FilmRollController 트리거 + retrySync**
 
 - 생성자에 `FilmRollSyncService? syncService` 추가, `_syncService = syncService ?? FilmRollModule.instance.filmRollSyncService`.
-- `load()`의 성공 `_emit(...)` 직후: `unawaited(_syncService.syncFilmRoll(filmRollId));`
-- `completeVisit()`의 `await load();` 다음: `unawaited(_syncService.syncFilmRoll(filmRollId));` (load가 이미 트리거하지만 completeVisit 경로를 명시적으로 한 번 더 — 중복 호출은 멱등하므로 허용. 단순화를 위해 load만 트리거하고 completeVisit엔 넣지 않아도 됨 — 구현자 판단, 테스트는 completeVisit 후 최소 1회 호출을 요구).
+- 데이터 조회부를 `_reload()`(동기화 트리거 없음)로 분리하고, `load()`는 `await _reload()` 후 로드 성공 시에만 `_triggerSync()` 호출. `completeVisit()` 등은 `load()`를 그대로 써서 방문 후 동기화가 걸리게 한다.
 - `FilmRollState`에 `final bool lastSyncHadError;` (기본 false) + `copyWith` 반영.
-- 신규 메서드:
+- 신규 메서드 — 재시도는 `load()`가 아니라 `_reload()`를 써서 **추가 백그라운드 동기화·lastSyncHadError 재변경을 피한다**:
 
 ```dart
   Future<FilmRollSyncResult> retrySync() async {
     final result = await _syncService.syncFilmRoll(filmRollId);
-    await load();
+    await _reload();
     _emit(_state.copyWith(lastSyncHadError: result.hasError));
     return result;
   }

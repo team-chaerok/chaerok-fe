@@ -116,4 +116,16 @@ void main() {
 
     expect(c.state.lastSyncHadError, isFalse);
   });
+
+  test('retrySync는 syncFilmRoll을 한 번만 호출한다(load 재트리거 없음)', () async {
+    final c = controller();
+    await c.load();
+    await Future<void>.delayed(Duration.zero);
+    expect(sync.calls, 1);
+
+    await c.retrySync();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(sync.calls, 2); // load 1회 + retrySync 1회. retrySync 내부에서 추가 트리거 없음.
+  });
 }
