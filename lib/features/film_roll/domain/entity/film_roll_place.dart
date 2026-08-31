@@ -16,6 +16,7 @@ class FilmRollPlace {
     this.externalPlaceId,
     this.imageUrl,
     this.visitedAt,
+    this.visitSyncedAt,
   });
 
   final String id;
@@ -31,5 +32,8 @@ class FilmRollPlace {
   final int visitOrder;
   final bool isVisited;
   final DateTime? visitedAt;
+
+  /// 이 장소의 방문 인증이 서버에 반영된 시각. null이면 서버 미전송.
+  final DateTime? visitSyncedAt;
   final int photoCount;
 }

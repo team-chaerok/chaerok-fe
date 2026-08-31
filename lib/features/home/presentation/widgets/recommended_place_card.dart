@@ -28,8 +28,8 @@ class RecommendedPlaceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(ChaerokRadius.lg),
         child: Ink(
           decoration: BoxDecoration(
-            color: ChaerokColors.surface,
-            border: Border.all(color: ChaerokColors.border),
+            color: const Color(0xFFFAF9F6),
+            border: Border.all(color: const Color.fromRGBO(226, 228, 221, 1)),
             borderRadius: BorderRadius.circular(ChaerokRadius.lg),
             boxShadow: isFeatured ? ChaerokShadows.card : null,
           ),
@@ -42,6 +42,7 @@ class RecommendedPlaceCard extends StatelessWidget {
     );
   }
 
+  /// 카드가 큰 형태로 표시되는 경우, 즉 추천 장소를 강조하는 경우.
   Widget _buildFeatured() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,7 +51,10 @@ class RecommendedPlaceCard extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 2,
-              child: _PlaceImagePlaceholder(mood: data.placeholderMood),
+              child: _PlaceImage(
+                imageUrl: data.imageUrl,
+                mood: data.placeholderMood,
+              ),
             ),
             if (data.isRecorded) const _RecordedBadge(),
           ],
@@ -68,6 +72,7 @@ class RecommendedPlaceCard extends StatelessWidget {
     );
   }
 
+  /// 카드가 작은 형태로 표시되는 경우, 즉 추천 장소를 강조하지 않는 경우.
   Widget _buildCompact() {
     return SizedBox(
       height: 76,
@@ -76,9 +81,12 @@ class RecommendedPlaceCard extends StatelessWidget {
           Stack(
             children: [
               SizedBox(
-                width: 100,
-                height: 76,
-                child: _PlaceImagePlaceholder(mood: data.placeholderMood),
+                width: 91,
+                height: 68,
+                child: _PlaceImage(
+                  imageUrl: data.imageUrl,
+                  mood: data.placeholderMood,
+                ),
               ),
               if (data.isRecorded) const _RecordedBadge(),
             ],
@@ -147,7 +155,7 @@ class _PlaceInformation extends StatelessWidget {
           data.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: ChaerokTypography.headingMedium,
+          style: ChaerokTypography.bodyLarge,
         ),
         const SizedBox(height: ChaerokSpacing.xxs),
         Row(
@@ -157,7 +165,7 @@ class _PlaceInformation extends StatelessWidget {
                 data.category,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ChaerokTypography.labelSmall.copyWith(
+                style: ChaerokTypography.caption.copyWith(
                   color: ChaerokColors.textSecondary,
                 ),
               ),
@@ -178,7 +186,7 @@ class _PlaceInformation extends StatelessWidget {
               ),
               Text(
                 distance,
-                style: ChaerokTypography.labelSmall.copyWith(
+                style: ChaerokTypography.caption.copyWith(
                   color: ChaerokColors.textSecondary,
                 ),
               ),
@@ -186,6 +194,60 @@ class _PlaceInformation extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// 관광지 대표 사진을 채워 넣되, URL이 없거나 로딩에 실패하면
+/// [mood] 기반 일러스트([_PlaceImagePlaceholder])로 폴백한다.
+class _PlaceImage extends StatelessWidget {
+  const _PlaceImage({required this.imageUrl, required this.mood});
+
+  final String? imageUrl;
+  final PlacePlaceholderMood mood;
+
+  /// TourAPI가 내려주는 `http://tong.visitkorea.or.kr/...` 는 cleartext라
+  /// Android 9+ 기본 설정에서 차단된다. 동일 호스트가 https도 제공하므로
+  /// 스킴을 올려서 로드한다. 빈 문자열/null 은 null 로 정규화한다.
+  static String? _normalized(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('http://')) {
+      return 'https://${trimmed.substring('http://'.length)}';
+    }
+    return trimmed;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = _PlaceImagePlaceholder(mood: mood);
+    final url = _normalized(imageUrl);
+    if (url == null) return placeholder;
+
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      semanticLabel: '관광지 대표 사진',
+      errorBuilder: (context, error, stackTrace) => placeholder,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const ColoredBox(
+          color: ChaerokColors.sageLight,
+          child: Center(
+            child: SizedBox(
+              width: ChaerokSpacing.lg,
+              height: ChaerokSpacing.lg,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: ChaerokColors.primary,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

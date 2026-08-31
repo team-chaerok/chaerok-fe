@@ -40,6 +40,7 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
   Future<FilmRoll> findOrCreateActiveByRegion({
     required RegionCode regionCode,
     required String regionName,
+    required int regionId,
   }) {
     return _db.transaction(() async {
       final userId = await _filmRollDs.currentUserId();
@@ -60,6 +61,19 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
         userId: userId,
       );
       if (existing != null) {
+        // 계정 스코프 도입 이전이나 서버 동기화 도입(v4) 이전에 생성돼
+        // regionId가 비어있는 행은, 재진입 시 서버 생성에 쓸 수 있도록 채운다.
+        if (existing.regionId == null) {
+          await _filmRollDs.update(
+            existing.id,
+            FilmRollsCompanion(
+              regionId: Value(regionId),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          final refreshed = await _filmRollDs.findById(existing.id);
+          return _toEntity(refreshed!);
+        }
         return _toEntity(existing);
       }
 
@@ -73,6 +87,7 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
         status: FilmRollStatus.inProgress,
         createdAt: now,
         updatedAt: now,
+        regionId: Value(regionId),
       );
 
       try {
@@ -228,6 +243,44 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
   @override
   Future<void> claimLegacyData(int userId) {
     return _filmRollDs.claimLegacyData(userId);
+  }
+
+  @override
+  Future<void> linkServerFilmRoll({
+    required String clientFilmRollId,
+    required int serverFilmRollId,
+    String? serverStatus,
+    String? filterId,
+    double? filterStrength,
+  }) {
+    return _filmRollDs.update(
+      clientFilmRollId,
+      FilmRollsCompanion(
+        serverFilmRollId: Value(serverFilmRollId),
+        serverStatus: serverStatus == null
+            ? const Value.absent()
+            : Value(serverStatus),
+        filterId: filterId == null ? const Value.absent() : Value(filterId),
+        filterStrength: filterStrength == null
+            ? const Value.absent()
+            : Value(filterStrength),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Future<void> updateServerStatus({
+    required String clientFilmRollId,
+    required String serverStatus,
+  }) {
+    return _filmRollDs.update(
+      clientFilmRollId,
+      FilmRollsCompanion(
+        serverStatus: Value(serverStatus),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<FilmRoll> _toEntity(FilmRollRow row) async {

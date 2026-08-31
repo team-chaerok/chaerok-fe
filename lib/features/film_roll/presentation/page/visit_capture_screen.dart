@@ -341,7 +341,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                       const SizedBox(height: ChaerokSpacing.md),
                       Text(
                         _cameraName,
-                        style: ChaerokTypography.headingLarge.copyWith(
+                        style: ChaerokTypography.titleMedium.copyWith(
                           color: ChaerokColors.textPrimary,
                         ),
                       ),

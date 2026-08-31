@@ -22,6 +22,9 @@ extension FilmRollMapper on FilmRollRow {
       createdAt: createdAt,
       updatedAt: updatedAt,
       completedAt: completedAt,
+      regionId: regionId,
+      serverFilmRollId: serverFilmRollId,
+      serverStatus: serverStatus,
     );
   }
 }

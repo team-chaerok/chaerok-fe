@@ -11,7 +11,7 @@ class LoggingInterceptor extends Interceptor {
     log(
       '[REQUEST]\n'
       '  Method : ${options.method}\n'
-      '  Path   : ${options.path}\n'
+      '  URI    : ${options.uri}\n'
       '  Body   : ${options.data}',
       name: _tag,
     );
@@ -35,8 +35,9 @@ class LoggingInterceptor extends Interceptor {
     log(
       '[ERROR]\n'
       '  Status : ${err.response?.statusCode ?? '-'}\n'
-      '  Path   : ${err.requestOptions.path}\n'
-      '  Message: ${err.message}',
+      '  URI    : ${err.requestOptions.uri}\n'
+      '  Message: ${err.message}\n'
+      '  Data   : ${err.response?.data}',
       name: _tag,
       error: err,
     );

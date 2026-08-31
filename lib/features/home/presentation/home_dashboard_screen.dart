@@ -41,6 +41,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// 홈 화면 캐러셀에 노출할 최근 촬영 사진 수(전체가 아닌 미리보기).
   static const _recentPhotoPreviewLimit = 10;
 
+  /// 홈 콘텐츠 공통 좌우 패딩. ActiveFilmRollCard만 이 패딩을 적용하지 않아
+  /// 화면 가장자리까지 노출된다.
+  static const _contentPadding = EdgeInsets.symmetric(
+    horizontal: ChaerokSpacing.xl,
+  );
+
   UserResponse? _user;
   LocationVerificationResult? _locationResult;
   FilmRoll? _recoveredFilmRoll;
@@ -164,6 +170,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return RecommendedPlaceSummaryData(
       name: place.title,
       category: place.categoryDetail,
+      imageUrl: place.firstImageUrl,
       distance: distance,
       placeholderMood: moods[index % moods.length],
       isRecorded: NearbyPlaceRecorder.isRecorded(place, filmRollPlaces),
@@ -237,6 +244,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     try {
       final filmRoll = await FilmRollModule.instance.enterRegion(
         locationResult.region.cityCountyName,
+        regionId: locationResult.region.regionId,
       );
       if (!mounted) return;
       await Navigator.of(context).push(
@@ -267,45 +275,79 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 지름 593 고정 원. left/right를 둘 다 주면 자식 폭이 화면 폭으로 강제돼
+    // 원이 393으로 줄어들기 때문에, left만 음수로 줘서 화면 중앙에 두고
+    // 좌우로 넘치는 부분은 Stack 기본 클립(Clip.hardEdge)으로 잘리게 한다.
+    const circleDiameter = 593.0;
+    final circleLeft = (MediaQuery.sizeOf(context).width - circleDiameter) / 2;
+
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ChaerokSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _HomeHeader(
-                userNickname: _user?.nickname,
-                regionName: _locationResult?.region.cityCountyName,
+      // 배경 원을 스크롤 뷰 바깥 Stack 자식으로 둬서 스크롤에 따라 움직이지 않는다.
+      body: Stack(
+        children: [
+          Positioned(
+            top: -382,
+            left: circleLeft,
+            child: Container(
+              height: circleDiameter,
+              width: circleDiameter,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: ChaerokColors.sageLight,
               ),
-              const SizedBox(height: ChaerokSpacing.lg),
-              if (_weather != null) ...[
-                WeatherCard(data: _weather!),
-                const SizedBox(height: ChaerokSpacing.lg),
-              ],
-              if (_recoveredFilmRoll != null)
-                GestureDetector(
-                  onTap: _onResumeFilmRollTap,
-                  child: ActiveFilmRollCard(
-                    data: FilmRollSummaryData(
-                      name: _recoveredFilmRoll!.title,
-                      capturedCount: _recoveredFilmRoll!.visitedPlaceCount,
-                      totalCount: _recoveredFilmRoll!.totalPlaceCount,
-                      photoThumbnailPaths: _recentPhotoThumbnailPaths,
-                    ),
-                  ),
-                )
-              else
-                _buildStartFilmRollCard(),
-              if (_nearbyPlaces.isNotEmpty) ...[
-                const SizedBox(height: ChaerokSpacing.lg),
-                _buildNearbyPlacesSection(),
-              ],
-            ],
+            ),
           ),
-        ),
+          SingleChildScrollView(
+            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+            // 홈 콘텐츠는 좌우 패딩(_contentPadding)을 개별 자식에 적용하고,
+            // ActiveFilmRollCard만 패딩 없이 화면 가장자리까지(full-bleed) 노출한다.
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: _contentPadding,
+                  child: _HomeHeader(
+                    userNickname: _user?.nickname,
+                    regionName: _locationResult?.region.cityCountyName,
+                  ),
+                ),
+                const SizedBox(height: ChaerokSpacing.md),
+                if (_weather != null) ...[
+                  Padding(
+                    padding: _contentPadding,
+                    child: WeatherCard(data: _weather!),
+                  ),
+                  const SizedBox(height: ChaerokSpacing.lg),
+                ],
+                if (_recoveredFilmRoll != null)
+                  GestureDetector(
+                    onTap: _onResumeFilmRollTap,
+                    child: ActiveFilmRollCard(
+                      data: FilmRollSummaryData(
+                        name: _recoveredFilmRoll!.title,
+                        capturedCount: _recoveredFilmRoll!.visitedPlaceCount,
+                        totalCount: _recoveredFilmRoll!.totalPlaceCount,
+                        photoThumbnailPaths: _recentPhotoThumbnailPaths,
+                      ),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: _contentPadding,
+                    child: _buildStartFilmRollCard(),
+                  ),
+                if (_nearbyPlaces.isNotEmpty) ...[
+                  const SizedBox(height: ChaerokSpacing.xxl),
+                  Padding(
+                    padding: _contentPadding,
+                    child: _buildNearbyPlacesSection(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -314,7 +356,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('가까운 채록 장소', style: ChaerokTypography.headingLarge),
+        const Text('가까운 채록 장소', style: ChaerokTypography.titleMedium),
         const SizedBox(height: ChaerokSpacing.sm),
         for (final place in _nearbyPlaces) ...[
           RecommendedPlaceCard(data: place, onTap: () {}),
@@ -336,7 +378,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('필름롤', style: ChaerokTypography.labelLarge),
+          const Text('필름롤', style: ChaerokTypography.bodyMedium),
           const SizedBox(height: ChaerokSpacing.xs),
           Text(
             _locationResult != null
@@ -362,34 +404,37 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({required this.userNickname, required this.regionName});
 
+  static const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
   final String? userNickname;
   final String? regionName;
+
+  /// "8월 14일 금요일"처럼 오늘 날짜를 한글 형식으로 표시한다.
+  String get _todayLabel {
+    final now = DateTime.now();
+    return '${now.month}월 ${now.day}일 ${_weekdayNames[now.weekday - 1]}요일';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          userNickname != null ? '안녕하세요, $userNickname님' : '안녕하세요',
-          style: ChaerokTypography.bodyMedium.copyWith(
-            color: ChaerokColors.textPrimary,
-          ),
-        ),
         const SizedBox(height: ChaerokSpacing.xs),
         Text(
-          '현재 지역',
-          style: ChaerokTypography.labelSmall.copyWith(
+          regionName != null ? '$_todayLabel · $regionName' : _todayLabel,
+          style: ChaerokTypography.caption.copyWith(
             color: ChaerokColors.textSecondary,
           ),
         ),
         const SizedBox(height: ChaerokSpacing.xxs),
         Text(
-          regionName ?? '확인 중...',
-          style: ChaerokTypography.displayMedium.copyWith(
-            color: ChaerokColors.primaryDark,
+          userNickname != null ? '$userNickname님,\n오늘의 여행 기록을 남겨주세요' : '안녕하세요',
+          style: ChaerokTypography.titleLarge.copyWith(
+            color: ChaerokColors.textPrimary,
           ),
         ),
+        const SizedBox(height: ChaerokSpacing.xs),
       ],
     );
   }

@@ -12,4 +12,11 @@ abstract class FilmRollPlaceRepository {
   /// 해당 필름롤에 방문 기록 또는 사진이 하나라도 있는지 여부.
   /// 코스 변경 차단 정책(방문/사진 기록이 있으면 변경 차단) 판단에 사용된다.
   Future<bool> hasAnyVisitedOrPhoto(String filmRollId);
+
+  /// 방문 처리(`isVisited`)됐지만 아직 서버에 전송되지 않은(`visitSyncedAt == null`)
+  /// 장소 목록. 필름롤 동기화 시 서버로 보낼 방문을 고르는 데 쓴다.
+  Future<List<FilmRollPlace>> findUnsyncedVisitedPlaces(String filmRollId);
+
+  /// 방문이 서버에 반영됐음을 기록한다.
+  Future<void> markVisitSynced(String filmRollPlaceId, {required DateTime at});
 }

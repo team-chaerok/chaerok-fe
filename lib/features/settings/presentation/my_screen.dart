@@ -218,7 +218,7 @@ class _MyScreenState extends State<MyScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Mock 위치 (디버그)', style: ChaerokTypography.labelLarge),
+          const Text('Mock 위치 (디버그)', style: ChaerokTypography.bodyMedium),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
@@ -258,7 +258,7 @@ class _MyScreenState extends State<MyScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('위치 인증 결과 (디버그)', style: ChaerokTypography.labelLarge),
+          const Text('위치 인증 결과 (디버그)', style: ChaerokTypography.bodyMedium),
           const SizedBox(height: ChaerokSpacing.xxs),
           Text(
             '${result.region.provinceName} ${result.region.cityCountyName} '

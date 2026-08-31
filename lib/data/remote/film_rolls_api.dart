@@ -9,6 +9,9 @@ class FilmRollsApi {
   const FilmRollsApi._();
 
   /// [필름 롤 생성] API 호출
+  /// FE 로컬 FilmRoll의 clientFilmRollId로 서버 FilmRoll을 생성한다.
+  /// 같은 사용자와 clientFilmRollId 재요청은 기존 FilmRoll을 반환한다.
+  /// 이탈하지 않은 CAPTURING FilmRoll이 이미 있을 때만 새로운 FilmRoll 생성을 제한한다.
   /// 로그인 사용자의 촬영용 필름 롤을 생성한다. 사용자에게 이미 미완료 필름 롤이
   /// 있으면 새 필름 롤을 생성할 수 없다. FAILED 상태도 재시도 가능한 미완료
   /// 상태에 포함된다.

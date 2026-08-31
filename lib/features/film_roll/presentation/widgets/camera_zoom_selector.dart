@@ -71,7 +71,7 @@ class _ZoomOption extends StatelessWidget {
         ),
         child: Text(
           '${_formatZoom(zoom)}x',
-          style: ChaerokTypography.labelSmall.copyWith(
+          style: ChaerokTypography.caption.copyWith(
             color: isSelected ? Colors.white : ChaerokColors.textSecondary,
           ),
         ),

@@ -25,12 +25,17 @@ class RecommendedPlaceSummaryData {
     required this.name,
     required this.category,
     required this.placeholderMood,
+    this.imageUrl,
     this.distance,
     this.isRecorded = false,
   });
 
   final String name;
   final String category;
+
+  /// 관광지 대표 사진(한국관광공사 TourAPI `firstImageUrl`) URL.
+  /// 없으면 [placeholderMood] 기반 일러스트로 대체한다.
+  final String? imageUrl;
 
   /// 현재 위치를 확인할 수 없으면(예: 위치 권한 미허용) null.
   final String? distance;

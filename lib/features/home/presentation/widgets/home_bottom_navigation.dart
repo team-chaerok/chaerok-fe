@@ -20,9 +20,9 @@ class HomeBottomNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: ChaerokColors.surface,
-        border: Border(top: BorderSide(color: ChaerokColors.border)),
+        border: const Border(top: BorderSide(color: ChaerokColors.border)),
         boxShadow: ChaerokShadows.card,
       ),
       child: SafeArea(
@@ -55,7 +55,7 @@ class HomeBottomNavigation extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '카메라',
-                    style: ChaerokTypography.labelSmall.copyWith(
+                    style: ChaerokTypography.caption.copyWith(
                       color: ChaerokColors.primaryDark,
                       fontSize: 10,
                     ),
@@ -118,7 +118,7 @@ class _NavigationItem extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 label,
-                style: ChaerokTypography.labelSmall.copyWith(
+                style: ChaerokTypography.caption.copyWith(
                   color: color,
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,

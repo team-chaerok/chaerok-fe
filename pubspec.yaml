@@ -99,7 +99,15 @@ flutter:
         - asset: assets/fonts/Jeongnimsaji-M.ttf
           weight: 500
         - asset: assets/fonts/Jeongnimsaji-L.ttf
-          weight: 500
+          weight: 600
+        - asset: assets/fonts/Jeongnimsaji-B.ttf
+          weight: 700
+    - family: NanumSquareRound
+      fonts:
+        - asset: assets/fonts/NanumSquareRoundR.ttf
+          weight: 400
+        - asset: assets/fonts/NanumSquareRoundB.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   assets:

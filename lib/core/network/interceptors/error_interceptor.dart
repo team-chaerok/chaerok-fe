@@ -13,8 +13,9 @@ class ErrorInterceptor extends Interceptor {
     log(
       '[ERROR]\n'
       '  Type   : ${err.type}\n'
-      '  Path   : ${err.requestOptions.path}\n'
-      '  Message: ${err.message}',
+      '  URI    : ${err.requestOptions.uri}\n'
+      '  Message: ${err.message}\n'
+      '  Data   : ${err.response?.data}',
       name: _tag,
       error: err.error,
       stackTrace: err.stackTrace,

@@ -141,7 +141,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('닉네임', style: ChaerokTypography.labelLarge),
+        const Text('닉네임', style: ChaerokTypography.bodyMedium),
         const SizedBox(height: ChaerokSpacing.xs),
         TextField(
           controller: _nicknameController,

@@ -11,10 +11,10 @@ class ChaerokColors {
   static const Color skyBlue = Color(0xFFD7E5F6);
 
   static const Color background = Color(0xFFFEFBF6);
-  static const Color surface = Color(0xFFF9FBF4);
+  static const Color surface = Color(0xFFF7F6F2);
 
   static const Color textPrimary = Color(0xFF000000);
-  static const Color textSecondary = Color(0xFF768265);
+  static const Color textSecondary = Color(0xFF7F8775);
   static const Color textDisabled = Color(0xFFB2B2B2);
 
   static const Color border = Color(0xFFE2E4DD);

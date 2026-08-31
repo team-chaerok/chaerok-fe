@@ -133,7 +133,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '진행중인 필름롤이 없어요',
-                      style: ChaerokTypography.labelLarge,
+                      style: ChaerokTypography.bodyMedium,
                     ),
                   ),
                 ),

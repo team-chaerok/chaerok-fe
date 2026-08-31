@@ -73,10 +73,12 @@ void main() {
     final first = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
     final second = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
 
     expect(second.id, first.id);
@@ -86,12 +88,14 @@ void main() {
     final userAFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.yesan,
       regionName: '예산군',
+      regionId: 1,
     );
 
     await AppPreferences.instance.setCurrentUserId(2);
     final userBFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.yesan,
       regionName: '예산군',
+      regionId: 1,
     );
 
     expect(userBFilmRoll.id, isNot(userAFilmRoll.id));
@@ -100,6 +104,7 @@ void main() {
     final userAAgain = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.yesan,
       regionName: '예산군',
+      regionId: 1,
     );
     expect(userAAgain.id, userAFilmRoll.id);
   });
@@ -109,14 +114,17 @@ void main() {
       filmRollRepository.findOrCreateActiveByRegion(
         regionCode: RegionCode.buyeo,
         regionName: '부여군',
+        regionId: 1,
       ),
       filmRollRepository.findOrCreateActiveByRegion(
         regionCode: RegionCode.buyeo,
         regionName: '부여군',
+        regionId: 1,
       ),
       filmRollRepository.findOrCreateActiveByRegion(
         regionCode: RegionCode.buyeo,
         regionName: '부여군',
+        regionId: 1,
       ),
     ]);
 
@@ -128,6 +136,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.seosan,
       regionName: '서산시',
+      regionId: 1,
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
@@ -150,6 +159,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.yesan,
       regionName: '예산군',
+      regionId: 1,
     );
 
     await expectLater(
@@ -174,6 +184,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.yesan,
       regionName: '예산군',
+      regionId: 1,
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
@@ -194,6 +205,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
@@ -219,6 +231,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
@@ -245,6 +258,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
@@ -271,6 +285,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
     await filmRollRepository.selectCourse(
       filmRollId: filmRoll.id,
@@ -294,6 +309,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
 
     await AppPreferences.instance.setCurrentUserId(2);
@@ -307,6 +323,7 @@ void main() {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,
       regionName: '공주시',
+      regionId: 1,
     );
 
     await filmRollRepository.deleteFilmRoll(filmRoll.id);
