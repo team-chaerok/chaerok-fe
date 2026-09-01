@@ -9,6 +9,7 @@ import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/o_auth_login_response.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
+import 'package:chaerok/features/auth/data/apple_auth_service.dart';
 import 'package:chaerok/features/auth/data/current_account_sync.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
@@ -17,9 +18,10 @@ import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/social_login_button.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-enum _LoginProvider { kakao, google }
+enum _LoginProvider { kakao, google, apple }
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -76,6 +78,34 @@ class _LoginScreenState extends State<LoginScreen> {
       await _handleLoginResponse(context, response);
     } catch (e, st) {
       log('구글 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _loadingProvider = null);
+    }
+  }
+
+  Future<void> _onAppleLoginTap(BuildContext context) async {
+    if (_loadingProvider != null) return;
+    log('애플 로그인 버튼 탭', name: _tag);
+    setState(() => _loadingProvider = _LoginProvider.apple);
+    try {
+      final result = await AppleAuthService().signIn();
+      final response = await AuthApi.login(
+        OAuthLoginRequest(
+          provider: OAuthProvider.apple,
+          idToken: result.idToken,
+          nonce: result.hashedNonce,
+        ),
+      );
+      log(
+        '애플 로그인 응답 수신 (registered: ${response.registered}, '
+        'hasTokens: ${response.tokens != null}, '
+        'hasSignupToken: ${response.signupToken != null})',
+        name: _tag,
+      );
+      if (!context.mounted) return;
+      await _handleLoginResponse(context, response);
+    } catch (e, st) {
+      log('애플 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
     } finally {
       if (mounted) setState(() => _loadingProvider = null);
     }
@@ -185,6 +215,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 isLoading: _loadingProvider == _LoginProvider.google,
                 isEnabled: _loadingProvider == null,
               ),
+              if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                const SizedBox(height: ChaerokSpacing.sm),
+                SocialLoginButton(
+                  logo: 'assets/images/apple-logo.svg',
+                  label: 'Apple로 계속하기',
+                  onTap: () => _onAppleLoginTap(context),
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  isLoading: _loadingProvider == _LoginProvider.apple,
+                  isEnabled: _loadingProvider == null,
+                ),
+              ],
               const SizedBox(height: ChaerokSpacing.md),
               const Text(
                 '로그인 시 약관 동의가 필요합니다.',
