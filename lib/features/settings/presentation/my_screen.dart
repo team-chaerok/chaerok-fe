@@ -209,6 +209,8 @@ class _MyScreenState extends State<MyScreen> {
         return '카카오';
       case OAuthProvider.google:
         return '구글';
+      case OAuthProvider.apple:
+        return 'Apple';
     }
   }
 
