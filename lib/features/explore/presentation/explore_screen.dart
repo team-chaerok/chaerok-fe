@@ -2,18 +2,22 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/api_error.dart';
-import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
+import 'package:chaerok/features/explore/data/bookmark_store.dart';
+import 'package:chaerok/features/explore/domain/explore_category_filter.dart';
+import 'package:chaerok/features/explore/domain/explore_place.dart';
+import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
+import 'package:chaerok/features/explore/presentation/widgets/film_roll_progress_view.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
-import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
-import 'package:chaerok/features/home/presentation/widgets/place_category_menu.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/region/region_code.dart';
@@ -24,34 +28,76 @@ import 'package:geolocator/geolocator.dart';
 
 const _serviceProvinceName = '충청남도';
 
-/// 채록길 탭: 4개 지원 지역(공주/부여/서산/예산) 중 하나를 골라 관광지를 둘러보고,
-/// 필름롤을 시작하는 화면. 관광지 조회는 위치 인증 화면(`LocationVerificationScreen`)이
-/// GPS 이후 수행하는 것과 동일한 지역 검증 → 외부 장소 조회 호출을 GPS 없이 재사용한다.
+enum _ExploreMode { loading, exploring, progress }
+
+/// 채록길 탭: 진행중인 필름롤 유무로 두 모드를 전환하는 단일 화면.
+///
+/// - 필름롤 없음 → **탐색 모드**: 지역/검색/카테고리 필터 + 지도 + 주변 장소
+///   리스트에서 시작할 채록길을 고른다.
+/// - 필름롤 있음 → **진행 모드**([FilmRollProgressView]): 진행률/현상 조건/
+///   스팟 인증/촬영으로 선택한 필름롤을 채워간다.
+///
+/// 모드 재평가는 [ExploreScreenState.reevaluate]로 이뤄지며, 탭 재진입/카메라
+/// 액션 종료 시 `MainTabScreen`이 `GlobalKey`로 호출한다.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
 
   @override
-  State<ExploreScreen> createState() => _ExploreScreenState();
+  State<ExploreScreen> createState() => ExploreScreenState();
 }
 
-class _ExploreScreenState extends State<ExploreScreen> {
+class ExploreScreenState extends State<ExploreScreen> {
   static const _tag = 'ExploreScreen';
+  static const double _mapHeight = 240;
 
+  _ExploreMode _mode = _ExploreMode.loading;
+  FilmRoll? _activeFilmRoll;
+  bool _mapEnabled = false;
+
+  // 탐색 모드 상태.
   RegionCode _selectedRegion = RegionCode.gongju;
-  int _selectedCategoryIndex = 0;
+  ExploreCategoryFilter _selectedFilter = ExploreCategoryFilter.all;
   bool _isLoading = true;
   bool _isEnteringFilmRoll = false;
   String? _errorMessage;
   int? _regionId;
-  List<PlaceListResponse> _places = const [];
+  List<ExplorePlace> _regionPlaces = const [];
+  List<ExplorePlace> _searchResults = const [];
+  String _searchKeyword = '';
+  Set<String> _bookmarkedKeys = const {};
   Position? _currentPosition;
   int _fetchRequestId = 0;
+  int _searchRequestId = 0;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadCurrentPosition());
-    unawaited(_fetchPlaces());
+    unawaited(_loadBookmarks());
+    unawaited(reevaluate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _mapEnabled = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  /// 진행중 필름롤 유무를 다시 확인해 모드를 갱신한다.
+  Future<void> reevaluate() async {
+    final active = await FilmRollModule.instance.recoverLastActiveFilmRoll();
+    if (!mounted) return;
+    setState(() {
+      _activeFilmRoll = active;
+      _mode = active == null ? _ExploreMode.exploring : _ExploreMode.progress;
+    });
+    if (active == null && _regionPlaces.isEmpty) {
+      unawaited(_fetchPlaces());
+    }
   }
 
   Future<void> _loadCurrentPosition() async {
@@ -64,9 +110,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  Future<void> _loadBookmarks() async {
+    final keys = await BookmarkStore.instance.bookmarkedKeys();
+    if (!mounted) return;
+    setState(() => _bookmarkedKeys = keys);
+  }
+
   Future<void> _onRegionSelected(RegionCode region) async {
     if (region == _selectedRegion) return;
-    setState(() => _selectedRegion = region);
+    setState(() {
+      _selectedRegion = region;
+      _searchKeyword = '';
+      _searchResults = const [];
+    });
     await _fetchPlaces();
   }
 
@@ -89,7 +145,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (!mounted || requestId != _fetchRequestId) return;
       setState(() {
         _regionId = resolvedRegion.regionId;
-        _places = places;
+        _regionPlaces = places
+            .map(ExplorePlace.fromListResponse)
+            .toList(growable: false);
         _isLoading = false;
       });
     } catch (e, st) {
@@ -102,27 +160,132 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  /// 선택한 지역의 로컬 필름롤을 찾거나 새로 생성해 진입한다.
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      unawaited(_search(value.trim()));
+    });
+  }
+
+  Future<void> _search(String keyword) async {
+    setState(() => _searchKeyword = keyword);
+    if (keyword.isEmpty) {
+      setState(() => _searchResults = const []);
+      return;
+    }
+    final regionId = _regionId;
+    if (regionId == null) return;
+
+    final requestId = ++_searchRequestId;
+    try {
+      final results = await PlacesApi.searchPlaces(
+        regionId: regionId,
+        keyword: keyword,
+      );
+      if (!mounted || requestId != _searchRequestId) return;
+      setState(() {
+        _searchResults = results
+            .map(ExplorePlace.fromSearchResponse)
+            .toList(growable: false);
+      });
+    } catch (e, st) {
+      log('장소 검색 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted || requestId != _searchRequestId) return;
+      setState(() => _searchResults = const []);
+    }
+  }
+
+  List<ExplorePlace> get _visiblePlaces {
+    final source = _searchKeyword.isNotEmpty ? _searchResults : _regionPlaces;
+    return source
+        .where((place) => _selectedFilter.matches(place, isRecorded: false))
+        .toList(growable: false);
+  }
+
+  String? _distanceLabel(ExplorePlace place) {
+    final position = _currentPosition;
+    if (position == null) return null;
+    final meters = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      place.latitude,
+      place.longitude,
+    );
+    if (meters < 1000) return '${meters.round()}m';
+    return '${(meters / 1000).toStringAsFixed(1)}km';
+  }
+
+  Future<void> _onToggleBookmark(ExplorePlace place) async {
+    final nowBookmarked = await BookmarkStore.instance.toggle(
+      BookmarkedPlace.fromExplorePlace(place),
+    );
+    if (!mounted) return;
+    setState(() {
+      _bookmarkedKeys = {
+        for (final key in _bookmarkedKeys)
+          if (key != place.identityKey) key,
+        if (nowBookmarked) place.identityKey,
+      };
+    });
+  }
+
+  void _onShowPlaceDetail(ExplorePlace place) {
+    unawaited(_showPlaceDetailSheet(place));
+  }
+
+  Future<void> _showPlaceDetailSheet(ExplorePlace place) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ChaerokColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(ChaerokRadius.lg),
+        ),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(ChaerokSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(place.title, style: ChaerokTypography.titleMedium),
+              const SizedBox(height: ChaerokSpacing.xs),
+              Text(
+                '${place.categoryDetailLabel}'
+                '${_distanceLabel(place) != null ? ' · ${_distanceLabel(place)}' : ''}',
+                style: ChaerokTypography.bodyMedium.copyWith(
+                  color: ChaerokColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: ChaerokSpacing.xs),
+              Text(
+                place.address,
+                style: ChaerokTypography.caption.copyWith(
+                  color: ChaerokColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 선택한 지역의 로컬 필름롤을 찾거나 새로 생성하고 진행 모드로 전환한다.
   Future<void> _onEnterRegionTap() async {
     if (_isEnteringFilmRoll) return;
-    // 진입 버튼은 _regionId가 확인된 뒤에만 활성화되지만(build의 isEnabled),
-    // 방어적으로 한 번 더 확인한다.
     final regionId = _regionId;
     if (regionId == null) return;
 
     setState(() => _isEnteringFilmRoll = true);
     try {
-      final filmRoll = await FilmRollModule.instance.enterRegion(
+      await FilmRollModule.instance.enterRegion(
         _selectedRegion.cityCountyName,
         regionId: regionId,
       );
       if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              FilmRollScreen(filmRollId: filmRoll.id, regionId: regionId),
-        ),
-      );
+      await reevaluate();
     } on UnsupportedRegionException {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -139,32 +302,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  String? _distanceLabel(PlaceListResponse place) {
-    final position = _currentPosition;
-    if (position == null) return null;
-
-    final meters = Geolocator.distanceBetween(
-      position.latitude,
-      position.longitude,
-      place.latitude,
-      place.longitude,
-    );
-    if (meters < 1000) return '${meters.round()}m';
-    return '${(meters / 1000).toStringAsFixed(1)}km';
-  }
-
-  RecommendedPlaceSummaryData _toSummaryData(
-    PlaceListResponse place,
-    int index,
-  ) {
+  RecommendedPlaceSummaryData _toSummaryData(ExplorePlace place, int index) {
     const moods = PlacePlaceholderMood.values;
     return RecommendedPlaceSummaryData(
       name: place.title,
-      category: place.categoryDetail,
-      imageUrl: place.firstImageUrl,
+      category: place.categoryDetailLabel,
+      imageUrl: place.imageUrl,
       distance: _distanceLabel(place),
       placeholderMood: moods[index % moods.length],
     );
+  }
+
+  List<ExploreMapMarker> _buildExploringMarkers(List<ExplorePlace> places) {
+    return [
+      for (final (index, place) in places.indexed)
+        ExploreMapMarker(
+          id: place.identityKey,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          label: place.title,
+          state: index == 0
+              ? ExploreMarkerState.recommended
+              : ExploreMarkerState.normal,
+        ),
+    ];
   }
 
   @override
@@ -174,32 +335,67 @@ class _ExploreScreenState extends State<ExploreScreen> {
       appBar: AppBar(
         backgroundColor: ChaerokColors.background,
         elevation: 0,
-        title: const Text('채록길', style: ChaerokTypography.titleMedium),
+        title: Text(
+          _mode == _ExploreMode.progress
+              ? (_activeFilmRoll?.title ?? '채록길')
+              : '채록길',
+          style: ChaerokTypography.titleMedium,
+        ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              ChaerokSpacing.md,
-              ChaerokSpacing.sm,
-              ChaerokSpacing.md,
-              0,
-            ),
-            child: _buildRegionSelector(),
+      body: switch (_mode) {
+        _ExploreMode.loading => const Center(child: ChaerokLoadingIndicator()),
+        _ExploreMode.progress => FilmRollProgressView(
+          key: ValueKey(_activeFilmRoll!.id),
+          filmRoll: _activeFilmRoll!,
+          currentPosition: _currentPosition,
+          mapEnabled: _mapEnabled,
+          onCompleted: () => unawaited(reevaluate()),
+          onRequestPosition: _loadCurrentPosition,
+        ),
+        _ExploreMode.exploring => _buildExploring(),
+      },
+    );
+  }
+
+  Widget _buildExploring() {
+    final places = _visiblePlaces;
+    return Column(
+      children: [
+        SizedBox(
+          height: _mapHeight,
+          child: ExploreMapView(
+            markers: _buildExploringMarkers(places),
+            enabled: _mapEnabled,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
-            child: PlaceCategoryMenu(
-              selectedIndex: _selectedCategoryIndex,
-              onSelected: (index) {
-                setState(() => _selectedCategoryIndex = index);
-              },
-            ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ChaerokSpacing.md,
+            ChaerokSpacing.sm,
+            ChaerokSpacing.md,
+            0,
           ),
-          Expanded(child: _buildPlacesList()),
-          _buildFooter(),
-        ],
-      ),
+          child: _buildRegionSelector(),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ChaerokSpacing.md,
+            ChaerokSpacing.xs,
+            ChaerokSpacing.md,
+            0,
+          ),
+          child: _buildSearchField(),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ChaerokSpacing.md,
+            vertical: ChaerokSpacing.xs,
+          ),
+          child: _buildCategoryFilter(),
+        ),
+        Expanded(child: _buildPlacesList(places)),
+        _buildFooter(),
+      ],
     );
   }
 
@@ -231,11 +427,58 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildPlacesList() {
+  Widget _buildSearchField() {
+    return TextField(
+      onChanged: _onSearchChanged,
+      textInputAction: TextInputAction.search,
+      style: ChaerokTypography.bodyMedium,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: '장소 검색',
+        prefixIcon: const Icon(Icons.search, size: 20),
+        filled: true,
+        fillColor: ChaerokColors.surface,
+        contentPadding: const EdgeInsets.symmetric(vertical: ChaerokSpacing.sm),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(ChaerokRadius.md),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilter() {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: ExploreCategoryFilter.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
+        itemBuilder: (context, index) {
+          final filter = ExploreCategoryFilter.values[index];
+          final isSelected = filter == _selectedFilter;
+          return ChoiceChip(
+            label: Text(filter.label),
+            selected: isSelected,
+            onSelected: (_) => setState(() => _selectedFilter = filter),
+            selectedColor: ChaerokColors.primary,
+            backgroundColor: ChaerokColors.sageLight,
+            labelStyle: ChaerokTypography.caption.copyWith(
+              color: isSelected
+                  ? ChaerokColors.surface
+                  : ChaerokColors.primaryDark,
+            ),
+            side: BorderSide.none,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPlacesList(List<ExplorePlace> places) {
     if (_isLoading) {
       return const Center(child: ChaerokLoadingIndicator());
     }
-
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -259,23 +502,37 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
       );
     }
-
-    if (_places.isEmpty) {
-      return const Center(
-        child: Text('이 지역의 관광지 정보가 없어요', style: ChaerokTypography.bodyMedium),
+    if (places.isEmpty) {
+      return Center(
+        child: Text(
+          _searchKeyword.isNotEmpty ? '검색 결과가 없어요' : '이 지역의 관광지 정보가 없어요',
+          style: ChaerokTypography.bodyMedium,
+        ),
       );
     }
 
     return ListView.separated(
       padding: const EdgeInsets.all(ChaerokSpacing.md),
-      itemCount: _places.length,
+      itemCount: places.length,
       separatorBuilder: (_, _) => const SizedBox(height: ChaerokSpacing.sm),
       itemBuilder: (context, index) {
-        final place = _places[index];
-        return RecommendedPlaceCard(
-          data: _toSummaryData(place, index),
-          isFeatured: index == 0,
-          onTap: () {},
+        final place = places[index];
+        return Stack(
+          children: [
+            RecommendedPlaceCard(
+              data: _toSummaryData(place, index),
+              isFeatured: index == 0,
+              onTap: () => _onShowPlaceDetail(place),
+            ),
+            Positioned(
+              top: ChaerokSpacing.xs,
+              right: ChaerokSpacing.xs,
+              child: _BookmarkButton(
+                isBookmarked: _bookmarkedKeys.contains(place.identityKey),
+                onPressed: () => _onToggleBookmark(place),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -291,10 +548,39 @@ class _ExploreScreenState extends State<ExploreScreen> {
       child: SafeArea(
         top: false,
         child: ChaerokButton(
-          text: '${_selectedRegion.displayName}에서 필름롤 시작하기',
+          text: '${_selectedRegion.displayName}에서 이 채록길 시작하기',
           isEnabled: _regionId != null && !_isLoading,
           isLoading: _isEnteringFilmRoll,
           onPressed: _onEnterRegionTap,
+        ),
+      ),
+    );
+  }
+}
+
+class _BookmarkButton extends StatelessWidget {
+  const _BookmarkButton({required this.isBookmarked, required this.onPressed});
+
+  final bool isBookmarked;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ChaerokColors.surface,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(ChaerokSpacing.xs),
+          child: Icon(
+            isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+            size: 20,
+            color: isBookmarked
+                ? ChaerokColors.primaryDark
+                : ChaerokColors.textSecondary,
+          ),
         ),
       ),
     );
