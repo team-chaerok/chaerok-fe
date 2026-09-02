@@ -1,0 +1,575 @@
+import 'dart:async';
+import 'dart:developer';
+
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
+import 'package:chaerok/core/design_system/chaerok_radius.dart';
+import 'package:chaerok/core/design_system/chaerok_spacing.dart';
+import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/data/models/api_error.dart';
+import 'package:chaerok/data/models/course_response.dart';
+import 'package:chaerok/data/models/resolve_region_request.dart';
+import 'package:chaerok/data/models/visit_list_response.dart';
+import 'package:chaerok/data/remote/regions_api.dart';
+import 'package:chaerok/data/remote/visits_api.dart';
+import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/domain/visit_verification.dart';
+import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
+import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
+import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+
+const _serviceProvinceName = '충청남도';
+
+/// 진행 상태 기준 스팟 필터.
+enum _ProgressFilter {
+  all('전체'),
+  unvisited('미방문'),
+  verifiable('인증 가능'),
+  visited('방문 완료'),
+  photographed('촬영한 장소');
+
+  const _ProgressFilter(this.label);
+
+  final String label;
+}
+
+/// 채록길 탭의 진행 모드 본문.
+///
+/// 진행중 필름롤의 진행률·현상 조건·스팟 목록·방문 인증/촬영을 담당한다.
+/// 로컬 진행 데이터는 `FilmRollController`를 재사용하고, 현상(완료) 조건은
+/// 서버 필름롤이 있을 때만 `VisitsApi.getVisits`로 조회한다.
+class FilmRollProgressView extends StatefulWidget {
+  const FilmRollProgressView({
+    super.key,
+    required this.filmRoll,
+    required this.currentPosition,
+    required this.mapEnabled,
+    required this.onCompleted,
+    required this.onRequestPosition,
+  });
+
+  final FilmRoll filmRoll;
+  final Position? currentPosition;
+  final bool mapEnabled;
+
+  /// 필름롤을 완료해 탐색 모드로 돌아가야 할 때 호출.
+  final VoidCallback onCompleted;
+
+  /// 현재 위치를 다시 잡아야 할 때 호출(부모가 위치를 재조회).
+  final Future<void> Function() onRequestPosition;
+
+  @override
+  State<FilmRollProgressView> createState() => _FilmRollProgressViewState();
+}
+
+class _FilmRollProgressViewState extends State<FilmRollProgressView> {
+  static const _tag = 'FilmRollProgressView';
+  static const double _mapHeight = 240;
+
+  late final FilmRollController _controller;
+  FilmRollState _state = const FilmRollState.initial();
+  VisitListResponse? _visits;
+  _ProgressFilter _filter = _ProgressFilter.all;
+  bool _isResolvingRegion = false;
+  bool _isCompleting = false;
+  ExploreMapMarker? _focusMarker;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = FilmRollController(
+      filmRollId: widget.filmRoll.id,
+      onStateChanged: (state) {
+        if (!mounted) return;
+        setState(() => _state = state);
+        if (state.status == FilmRollLoadStatus.loaded) {
+          unawaited(_loadVisits());
+        }
+      },
+    );
+    unawaited(_controller.load());
+  }
+
+  FilmRoll? get _filmRoll => _state.filmRoll ?? widget.filmRoll;
+
+  int? get _serverFilmRollId => _filmRoll?.serverFilmRollId;
+
+  Future<void> _loadVisits() async {
+    final serverId = _serverFilmRollId;
+    if (serverId == null) return;
+    try {
+      final visits = await VisitsApi.getVisits(serverId);
+      if (!mounted) return;
+      setState(() => _visits = visits);
+    } catch (e, st) {
+      log('방문 현황 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
+  }
+
+  Future<void> _onSelectCourseTap() async {
+    final filmRoll = _filmRoll;
+    if (filmRoll == null) return;
+
+    var regionId = filmRoll.regionId;
+    if (regionId == null) {
+      setState(() => _isResolvingRegion = true);
+      try {
+        final region = await RegionsApi.resolveRegion(
+          ResolveRegionRequest(
+            provinceName: _serviceProvinceName,
+            cityCountyName: filmRoll.regionName,
+          ),
+        );
+        regionId = region.regionId;
+      } catch (e, st) {
+        log('지역 재조회 실패', name: _tag, error: e, stackTrace: st);
+        if (!mounted) return;
+        _showSnackBar(apiErrorMessage(e));
+        return;
+      } finally {
+        if (mounted) setState(() => _isResolvingRegion = false);
+      }
+    }
+
+    if (!mounted) return;
+    final selected = await Navigator.of(context).push<CourseResponse>(
+      MaterialPageRoute(
+        builder: (_) => CourseSelectionScreen(regionId: regionId!),
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final success = await _controller.selectCourse(selected);
+    if (!mounted || success) return;
+    final message = _controller.state.errorMessage;
+    if (message != null) _showSnackBar(message);
+  }
+
+  Future<void> _onVisitTap(FilmRollPlace place) async {
+    final gate = evaluateVisitGate(
+      position: widget.currentPosition,
+      placeLatitude: place.latitude,
+      placeLongitude: place.longitude,
+      alreadyVisited: place.isVisited,
+    );
+    if (!gate.canVerify) {
+      _showSnackBar(gate.message);
+      if (gate.status == VisitGateStatus.noPosition ||
+          gate.status == VisitGateStatus.inaccurate) {
+        await widget.onRequestPosition();
+      }
+      return;
+    }
+
+    final filmRoll = _filmRoll;
+    if (filmRoll == null) return;
+    final captured = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => VisitCaptureScreen(
+          filmRollId: filmRoll.id,
+          filmRollPlaceId: place.id,
+        ),
+      ),
+    );
+    if (captured != true || !mounted) return;
+    await _controller.completeVisit(place.id);
+    await _loadVisits();
+  }
+
+  /// 방문 인증과 별개로 필름 카메라만 여는 동선. 촬영/저장은 하되 방문 인증은
+  /// 하지 않는다(인증은 거리 게이트를 통과한 "방문 인증하기"로만).
+  Future<void> _onOpenCameraTap(FilmRollPlace place) async {
+    final filmRoll = _filmRoll;
+    if (filmRoll == null) return;
+    final captured = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => VisitCaptureScreen(
+          filmRollId: filmRoll.id,
+          filmRollPlaceId: place.id,
+        ),
+      ),
+    );
+    if (captured != true || !mounted) return;
+    await _controller.load();
+  }
+
+  void _onBrowseNextSpotTap(FilmRollPlace nextPlace) {
+    setState(() {
+      _filter = _ProgressFilter.unvisited;
+      _focusMarker = _markerFor(nextPlace, ExploreMarkerState.next);
+    });
+  }
+
+  Future<void> _onCompleteTap() async {
+    setState(() => _isCompleting = true);
+    try {
+      final success = await _controller.completeFilmRoll();
+      if (!mounted) return;
+      if (success) {
+        widget.onCompleted();
+        return;
+      }
+      final message = _controller.state.errorMessage;
+      if (message != null) _showSnackBar(message);
+    } finally {
+      if (mounted) setState(() => _isCompleting = false);
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  FilmRollPlace? get _nextPlace {
+    final places = [..._state.places]
+      ..sort((a, b) => a.visitOrder.compareTo(b.visitOrder));
+    for (final place in places) {
+      if (!place.isVisited) return place;
+    }
+    return null;
+  }
+
+  bool _isVerifiable(FilmRollPlace place) {
+    return evaluateVisitGate(
+      position: widget.currentPosition,
+      placeLatitude: place.latitude,
+      placeLongitude: place.longitude,
+      alreadyVisited: place.isVisited,
+    ).canVerify;
+  }
+
+  ExploreMapMarker _markerFor(FilmRollPlace place, ExploreMarkerState state) {
+    return ExploreMapMarker(
+      id: place.id,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      label: place.name,
+      state: state,
+    );
+  }
+
+  List<ExploreMapMarker> _buildMarkers() {
+    final nextId = _nextPlace?.id;
+    return [
+      for (final place in _state.places)
+        _markerFor(
+          place,
+          place.isVisited
+              ? ExploreMarkerState.visited
+              : place.id == nextId
+              ? ExploreMarkerState.next
+              : _isVerifiable(place)
+              ? ExploreMarkerState.verifiable
+              : ExploreMarkerState.unvisited,
+        ),
+    ];
+  }
+
+  List<FilmRollPlace> _filteredPlaces() {
+    return _state.places.where((place) {
+      switch (_filter) {
+        case _ProgressFilter.all:
+          return true;
+        case _ProgressFilter.unvisited:
+          return !place.isVisited;
+        case _ProgressFilter.verifiable:
+          return !place.isVisited && _isVerifiable(place);
+        case _ProgressFilter.visited:
+          return place.isVisited;
+        case _ProgressFilter.photographed:
+          return place.photoCount > 0;
+      }
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_state.status) {
+      case FilmRollLoadStatus.loading:
+        return const Center(child: ChaerokLoadingIndicator());
+      case FilmRollLoadStatus.error:
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(ChaerokSpacing.xxl),
+            child: Text(
+              _state.errorMessage ?? '오류가 발생했습니다.',
+              textAlign: TextAlign.center,
+              style: ChaerokTypography.bodyMedium.copyWith(
+                color: ChaerokColors.error,
+              ),
+            ),
+          ),
+        );
+      case FilmRollLoadStatus.loaded:
+        return _buildLoaded();
+    }
+  }
+
+  Widget _buildLoaded() {
+    final filmRoll = _filmRoll!;
+    final hasCourse = filmRoll.selectedCourseId != null;
+
+    return Column(
+      children: [
+        SizedBox(
+          height: _mapHeight,
+          child: ExploreMapView(
+            markers: _buildMarkers(),
+            focus: _focusMarker,
+            enabled: widget.mapEnabled,
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(ChaerokSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildProgressCard(filmRoll),
+                const SizedBox(height: ChaerokSpacing.md),
+                if (!hasCourse)
+                  ChaerokButton(
+                    text: '추천 코스 선택하기',
+                    isLoading: _isResolvingRegion,
+                    onPressed: _onSelectCourseTap,
+                  )
+                else
+                  ..._buildCourseSection(filmRoll),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressCard(FilmRoll filmRoll) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ChaerokSpacing.lg),
+      decoration: BoxDecoration(
+        color: ChaerokColors.surface,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+        border: Border.all(color: ChaerokColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${filmRoll.title} 진행 중', style: ChaerokTypography.bodyMedium),
+          const SizedBox(height: ChaerokSpacing.xs),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(ChaerokRadius.full),
+            child: LinearProgressIndicator(
+              value: filmRoll.progress,
+              minHeight: 8,
+              backgroundColor: ChaerokColors.primaryLight,
+              color: ChaerokColors.primary,
+            ),
+          ),
+          const SizedBox(height: ChaerokSpacing.xxs),
+          Text(
+            '방문 ${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount} 곳',
+            style: ChaerokTypography.bodyMedium.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: ChaerokSpacing.xxs),
+          Text(_developConditionLabel(), style: ChaerokTypography.caption),
+        ],
+      ),
+    );
+  }
+
+  String _developConditionLabel() {
+    final visits = _visits;
+    if (visits != null) {
+      final base =
+          '서로 다른 관광 유형 '
+          '${visits.visitedCategoryCount}/${visits.requiredCategoryCount}';
+      return visits.visitRequirementMet ? '$base · 현상 조건을 충족했어요' : base;
+    }
+    if (_serverFilmRollId == null) {
+      return '서버 동기화가 완료되면 현상 조건을 확인할 수 있어요';
+    }
+    return '현상 조건을 확인하는 중이에요';
+  }
+
+  List<Widget> _buildCourseSection(FilmRoll filmRoll) {
+    final nextPlace = _nextPlace;
+    final filtered = _filteredPlaces();
+
+    return [
+      if (nextPlace != null) ...[
+        _buildNextSpotCard(nextPlace),
+        const SizedBox(height: ChaerokSpacing.md),
+      ],
+      _buildProgressFilterRow(),
+      const SizedBox(height: ChaerokSpacing.sm),
+      if (filtered.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: ChaerokSpacing.lg),
+          child: Text(
+            '해당하는 장소가 없어요',
+            textAlign: TextAlign.center,
+            style: ChaerokTypography.bodyMedium.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+        )
+      else
+        ...filtered.map(_buildPlaceTile),
+      const SizedBox(height: ChaerokSpacing.md),
+      ChaerokButton(
+        text: '필름롤 완료하기',
+        isEnabled: filmRoll.isCompletable,
+        isLoading: _isCompleting,
+        onPressed: _onCompleteTap,
+      ),
+    ];
+  }
+
+  Widget _buildNextSpotCard(FilmRollPlace place) {
+    final gate = evaluateVisitGate(
+      position: widget.currentPosition,
+      placeLatitude: place.latitude,
+      placeLongitude: place.longitude,
+      alreadyVisited: place.isVisited,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ChaerokSpacing.lg),
+      decoration: BoxDecoration(
+        color: ChaerokColors.surface,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+        border: Border.all(color: ChaerokColors.primary),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('다음 장소', style: ChaerokTypography.caption),
+          const SizedBox(height: ChaerokSpacing.xxs),
+          Text(place.name, style: ChaerokTypography.bodyLarge),
+          const SizedBox(height: ChaerokSpacing.xxs),
+          Text(
+            place.address,
+            style: ChaerokTypography.caption.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: ChaerokSpacing.xs),
+          Text(
+            gate.message,
+            style: ChaerokTypography.caption.copyWith(
+              color: gate.canVerify
+                  ? ChaerokColors.primaryDark
+                  : ChaerokColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: ChaerokSpacing.sm),
+          ChaerokButton(text: '방문 인증하기', onPressed: () => _onVisitTap(place)),
+          const SizedBox(height: ChaerokSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _onOpenCameraTap(place),
+                  child: const Text('필름 카메라 열기'),
+                ),
+              ),
+              const SizedBox(width: ChaerokSpacing.xs),
+              Expanded(
+                child: TextButton(
+                  onPressed: () => _onBrowseNextSpotTap(place),
+                  child: const Text('다음 코스 둘러보기'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressFilterRow() {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _ProgressFilter.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
+        itemBuilder: (context, index) {
+          final filter = _ProgressFilter.values[index];
+          final isSelected = filter == _filter;
+          return ChoiceChip(
+            label: Text(filter.label),
+            selected: isSelected,
+            onSelected: (_) => setState(() => _filter = filter),
+            selectedColor: ChaerokColors.primary,
+            backgroundColor: ChaerokColors.sageLight,
+            labelStyle: ChaerokTypography.caption.copyWith(
+              color: isSelected
+                  ? ChaerokColors.surface
+                  : ChaerokColors.primaryDark,
+            ),
+            side: BorderSide.none,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPlaceTile(FilmRollPlace place) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: ChaerokSpacing.sm),
+      padding: const EdgeInsets.all(ChaerokSpacing.md),
+      decoration: BoxDecoration(
+        color: ChaerokColors.surface,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+        border: Border.all(color: ChaerokColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(place.name, style: ChaerokTypography.bodyLarge),
+                const SizedBox(height: ChaerokSpacing.xxs),
+                Text(
+                  _placeStatusLabel(place),
+                  style: ChaerokTypography.caption.copyWith(
+                    color: ChaerokColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: ChaerokSpacing.sm),
+          if (place.isVisited)
+            const Icon(Icons.check_circle, color: ChaerokColors.primary)
+          else
+            TextButton(
+              onPressed: () => _onVisitTap(place),
+              child: const Text('방문 인증'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _placeStatusLabel(FilmRollPlace place) {
+    if (place.isVisited) {
+      return place.photoCount > 0 ? '방문 완료 · 사진 ${place.photoCount}장' : '방문 완료';
+    }
+    return _isVerifiable(place) ? '현재 위치에서 인증 가능' : '미방문';
+  }
+}
