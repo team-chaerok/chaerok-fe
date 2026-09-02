@@ -47,6 +47,27 @@ class AppleAuthService {
     }
   }
 
+  /// 회원탈퇴 시 백엔드가 Apple 서버에 토큰 폐기(revoke)를 요청하려면
+  /// 사용자 재인증으로 발급받은 단회성 authorizationCode가 필요하다.
+  /// 사용자가 Apple 인증 시트를 취소하면 null을 반환하고, 그 외 실패는 rethrow 한다.
+  Future<String?> getAuthorizationCode() async {
+    log('애플 재인증(회원탈퇴용) 시도', name: _tag);
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [],
+      );
+      log('애플 재인증 성공', name: _tag);
+      return credential.authorizationCode;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        log('사용자가 애플 재인증 취소', name: _tag);
+        return null;
+      }
+      log('애플 재인증 실패 - code: ${e.code}', name: _tag, error: e);
+      rethrow;
+    }
+  }
+
   String _sha256ofString(String input) =>
       sha256.convert(utf8.encode(input)).toString();
 }

@@ -96,9 +96,10 @@ class DioClient {
 
   Future<ApiResponse<T>> delete<T>(
     String path, {
+    dynamic data,
     T Function(dynamic)? fromJson,
   }) async {
-    final response = await _dio.delete(path);
+    final response = await _dio.delete(path, data: data);
     return _toApiResponse(response, fromJson);
   }
 

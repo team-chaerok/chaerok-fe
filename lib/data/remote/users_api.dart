@@ -31,7 +31,12 @@ class UsersApi {
 
   /// [회원탈퇴] API 호출
   /// 인증된 사용자의 계정과 인증 관련 데이터를 삭제합니다.
-  static Future<void> withdraw() async {
-    await DioClient.instance.delete<void>('/api/users/me');
+  /// Apple 사용자는 백엔드가 Apple 서버에 토큰 폐기를 요청할 수 있도록
+  /// 재인증으로 발급받은 [authorizationCode]를 함께 전달해야 합니다.
+  static Future<void> withdraw({String? authorizationCode}) async {
+    await DioClient.instance.delete<void>(
+      '/api/users/me',
+      data: {'authorizationCode': authorizationCode},
+    );
   }
 }

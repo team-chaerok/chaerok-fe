@@ -7,9 +7,11 @@ import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
+import 'package:chaerok/data/models/o_auth_login_request.dart';
 import 'package:chaerok/data/models/refresh_token_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
 import 'package:chaerok/data/remote/users_api.dart';
+import 'package:chaerok/features/auth/data/apple_auth_service.dart';
 import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
@@ -64,7 +66,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _loadingAction = _SettingsAction.withdraw);
 
     try {
-      await UsersApi.withdraw();
+      final me = await UsersApi.getMyInformation();
+      String? appleAuthorizationCode;
+      if (me.provider == OAuthProvider.apple) {
+        appleAuthorizationCode = await AppleAuthService()
+            .getAuthorizationCode();
+        if (appleAuthorizationCode == null) {
+          // 사용자가 Apple 재인증 시트를 취소 → 탈퇴를 중단한다.
+          log('회원탈퇴 - Apple 재인증 취소로 중단', name: _tag);
+          if (mounted) setState(() => _loadingAction = null);
+          return;
+        }
+      }
+      await UsersApi.withdraw(authorizationCode: appleAuthorizationCode);
     } catch (e, st) {
       log('회원탈퇴 API 실패', name: _tag, error: e, stackTrace: st);
       if (!context.mounted) return;
