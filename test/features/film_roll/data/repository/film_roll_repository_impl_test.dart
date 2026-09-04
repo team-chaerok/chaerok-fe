@@ -155,52 +155,6 @@ void main() {
     expect(updated!.visitedPlaceCount, 1);
   });
 
-  test('완료 조건(코스 선택 + 전체 방문)을 충족하지 못하면 완료가 차단된다', () async {
-    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
-      regionCode: RegionCode.yesan,
-      regionName: '예산군',
-      regionId: 1,
-    );
-
-    await expectLater(
-      filmRollRepository.completeFilmRoll(filmRoll.id),
-      throwsA(isA<FilmRollNotCompletableException>()),
-    );
-
-    await filmRollRepository.selectCourse(
-      filmRollId: filmRoll.id,
-      courseId: 'course-1',
-      courseTitle: '테스트 코스',
-      places: const [_testPlace],
-    );
-
-    await expectLater(
-      filmRollRepository.completeFilmRoll(filmRoll.id),
-      throwsA(isA<FilmRollNotCompletableException>()),
-    );
-  });
-
-  test('완료 조건을 충족하면 필름롤이 completed 상태가 된다', () async {
-    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
-      regionCode: RegionCode.yesan,
-      regionName: '예산군',
-      regionId: 1,
-    );
-    await filmRollRepository.selectCourse(
-      filmRollId: filmRoll.id,
-      courseId: 'course-1',
-      courseTitle: '테스트 코스',
-      places: const [_testPlace],
-    );
-    final places = await placeRepository.findByFilmRoll(filmRoll.id);
-    await placeRepository.markVisited(places.first.id);
-
-    await filmRollRepository.completeFilmRoll(filmRoll.id);
-
-    final completed = await filmRollRepository.findById(filmRoll.id);
-    expect(completed!.status, FilmRollStatus.completed);
-  });
-
   test('방문 기록이 있는 상태에서 다른 코스로 변경하면 차단된다', () async {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,

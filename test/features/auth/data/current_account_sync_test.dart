@@ -20,10 +20,6 @@ class _FakeFilmRollRepository implements FilmRollRepository {
   }
 
   @override
-  Future<void> completeFilmRoll(String filmRollId) =>
-      throw UnimplementedError();
-
-  @override
   Future<void> deleteFilmRoll(String filmRollId) => throw UnimplementedError();
 
   @override
