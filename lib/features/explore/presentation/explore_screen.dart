@@ -357,6 +357,9 @@ class ExploreScreenState extends State<ExploreScreen> {
           mapEnabled: _mapEnabled,
           onCompleted: () => unawaited(reevaluate()),
           onRequestPosition: _loadCurrentPosition,
+          onPositionResolved: (position) {
+            if (mounted) setState(() => _currentPosition = position);
+          },
         ),
         _ExploreMode.exploring => _buildExploring(),
       },
