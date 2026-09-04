@@ -14,11 +14,15 @@ import 'package:chaerok/data/remote/visits_api.dart';
 import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/domain/region_departure.dart';
+import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/visit_verification.dart';
+import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
+import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
@@ -54,6 +58,7 @@ class FilmRollProgressView extends StatefulWidget {
     required this.onCompleted,
     required this.onRequestPosition,
     required this.onPositionResolved,
+    required this.onExited,
   });
 
   final FilmRoll filmRoll;
@@ -62,6 +67,10 @@ class FilmRollProgressView extends StatefulWidget {
 
   /// 필름롤을 완료해 탐색 모드로 돌아가야 할 때 호출.
   final VoidCallback onCompleted;
+
+  /// 지역 이탈이 확정(현상 예약 또는 조건 미충족 종료)돼 이 화면을 벗어나야
+  /// 할 때 호출. 부모가 모드를 다시 판별한다(`ExploreScreen.reevaluate`).
+  final VoidCallback onExited;
 
   /// 현재 위치를 다시 잡아야 할 때 호출(부모가 위치를 재조회).
   final Future<void> Function() onRequestPosition;
@@ -89,6 +98,14 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   bool _isVerifyingLocation = false;
   ExploreMapMarker? _focusMarker;
 
+  // 지역 이탈 감지 상태. 다이얼로그는 세션(이 위젯 생존 기간) 중 지역을
+  // 벗어난 첫 시점에 1번만 띄우고, 사용자가 "머무르기"를 선택하면 이후엔
+  // 상단 배너로만 안내한다. 다시 지역 안으로 들어오면 판정을 리셋한다.
+  bool _departureCheckInFlight = false;
+  bool _exitDialogShown = false;
+  bool _showDepartedBanner = false;
+  bool _isExiting = false;
+
   @override
   void initState() {
     super.initState();
@@ -103,6 +120,15 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
       },
     );
     unawaited(_controller.load());
+    unawaited(_checkRegionDeparture());
+  }
+
+  @override
+  void didUpdateWidget(covariant FilmRollProgressView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentPosition != oldWidget.currentPosition) {
+      unawaited(_checkRegionDeparture());
+    }
   }
 
   FilmRoll? get _filmRoll => _state.filmRoll ?? widget.filmRoll;
@@ -266,6 +292,129 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // ─────────────────────────────────────────────────────────────────────
+  // 지역 이탈 감지 · 확정
+  // ─────────────────────────────────────────────────────────────────────
+
+  /// [widget.currentPosition]이 갱신될 때마다 신선한 좌표로 행정구역을 다시
+  /// 조회해 필름롤 지역을 벗어났는지 판정한다. 세션 캐시(`LocationVerificationResult`)
+  /// 는 이동을 반영하지 못하므로 쓰지 않는다.
+  Future<void> _checkRegionDeparture() async {
+    if (_departureCheckInFlight || _isExiting) return;
+    final filmRoll = _filmRoll;
+    final position = widget.currentPosition;
+    if (filmRoll == null || position == null) return;
+
+    _departureCheckInFlight = true;
+    try {
+      final administrativeRegion =
+          await KakaoLocalApiService.resolveAdministrativeRegion(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
+      if (!mounted) return;
+
+      final departure = evaluateRegionDeparture(
+        filmRollRegion: filmRoll.regionCode,
+        currentCityCountyName: administrativeRegion?.cityCountyName,
+        position: position,
+      );
+
+      switch (departure) {
+        case RegionDepartureStatus.inside:
+          _exitDialogShown = false;
+          if (_showDepartedBanner) {
+            setState(() => _showDepartedBanner = false);
+          }
+        case RegionDepartureStatus.unknown:
+          // 위치/역지오코딩을 신뢰할 수 없다 — 조용히 무시하고 기존 상태 유지.
+          break;
+        case RegionDepartureStatus.departed:
+          if (_exitDialogShown) {
+            if (!_showDepartedBanner) {
+              setState(() => _showDepartedBanner = true);
+            }
+          } else {
+            _exitDialogShown = true;
+            await _showExitConfirmDialog();
+          }
+      }
+    } catch (e, st) {
+      log('지역 이탈 판정 실패', name: _tag, error: e, stackTrace: st);
+    } finally {
+      _departureCheckInFlight = false;
+    }
+  }
+
+  Future<void> _showExitConfirmDialog() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('지역을 벗어났어요'),
+        content: const Text('현상을 시작하면 이 필름롤은 더 이상 촬영할 수 없어요.\n지금 현상을 시작할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('머무르기'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('현상 시작하기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      if (mounted) setState(() => _showDepartedBanner = true);
+      return;
+    }
+    await _startExit();
+  }
+
+  Future<void> _startExit() async {
+    final filmRoll = _filmRoll;
+    if (filmRoll == null) return;
+
+    setState(() => _isExiting = true);
+    try {
+      final result = await FilmRollModule.instance.exitFilmRoll(filmRoll);
+      if (!mounted) return;
+      if (result.isDeveloping) {
+        widget.onExited();
+        return;
+      }
+      await _showExpiredDialog();
+      if (!mounted) return;
+      widget.onExited();
+    } on ExitNotSyncedException {
+      if (!mounted) return;
+      _showSnackBar('아직 서버와 동기화되지 않았어요. 잠시 후 다시 시도해 주세요.');
+    } catch (e, st) {
+      log('지역 이탈 확정 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      _showSnackBar('지역 이탈을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      if (mounted) setState(() => _isExiting = false);
+    }
+  }
+
+  Future<void> _showExpiredDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('필름롤이 종료됐어요'),
+        content: const Text('현상 조건을 충족하지 못해 이 필름롤은 종료됐어요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
   FilmRollPlace? get _nextPlace {
     final places = [..._state.places]
       ..sort((a, b) => a.visitOrder.compareTo(b.visitOrder));
@@ -371,6 +520,10 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_showDepartedBanner) ...[
+                  _buildDepartedBanner(),
+                  const SizedBox(height: ChaerokSpacing.md),
+                ],
                 _buildProgressCard(filmRoll),
                 const SizedBox(height: ChaerokSpacing.md),
                 if (!hasCourse)
@@ -386,6 +539,33 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDepartedBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ChaerokSpacing.md),
+      decoration: BoxDecoration(
+        color: ChaerokColors.sageLight,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '지역을 벗어났어요',
+              style: ChaerokTypography.bodyMedium.copyWith(
+                color: ChaerokColors.primaryDark,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _isExiting ? null : _showExitConfirmDialog,
+            child: const Text('현상 시작하기'),
+          ),
+        ],
+      ),
     );
   }
 
