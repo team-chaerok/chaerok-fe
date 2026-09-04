@@ -75,6 +75,8 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   late final FilmRollController _controller;
   FilmRollState _state = const FilmRollState.initial();
   VisitListResponse? _visits;
+  bool _visitsLoadFailed = false;
+  bool _isLoadingVisits = false;
   _ProgressFilter _filter = _ProgressFilter.all;
   bool _isResolvingRegion = false;
   bool _isCompleting = false;
@@ -102,13 +104,21 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
 
   Future<void> _loadVisits() async {
     final serverId = _serverFilmRollId;
-    if (serverId == null) return;
+    if (serverId == null || _isLoadingVisits) return;
+    setState(() {
+      _isLoadingVisits = true;
+      _visitsLoadFailed = false;
+    });
     try {
       final visits = await VisitsApi.getVisits(serverId);
       if (!mounted) return;
       setState(() => _visits = visits);
     } catch (e, st) {
       log('방문 현황 조회 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      setState(() => _visitsLoadFailed = true);
+    } finally {
+      if (mounted) setState(() => _isLoadingVisits = false);
     }
   }
 
@@ -382,7 +392,27 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
             ),
           ),
           const SizedBox(height: ChaerokSpacing.xxs),
-          Text(_developConditionLabel(), style: ChaerokTypography.caption),
+          if (_visitsLoadFailed && _visits == null)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '현상 조건을 불러오지 못했어요',
+                    style: ChaerokTypography.caption.copyWith(
+                      color: ChaerokColors.error,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isLoadingVisits
+                      ? null
+                      : () => unawaited(_loadVisits()),
+                  child: Text(_isLoadingVisits ? '불러오는 중…' : '다시 시도'),
+                ),
+              ],
+            )
+          else
+            Text(_developConditionLabel(), style: ChaerokTypography.caption),
         ],
       ),
     );

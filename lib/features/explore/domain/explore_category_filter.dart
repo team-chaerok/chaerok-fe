@@ -8,7 +8,6 @@ import 'package:chaerok/features/explore/domain/explore_place.dart';
 /// 영문 enum 값 대신 한글 분류를 줄 가능성에 대비 — analyze ⚠️3).
 enum ExploreCategoryFilter {
   all('전체'),
-  unrecorded('미기록'),
   nature('자연'),
   culture('문화'),
   heritage('유적'),
@@ -19,12 +18,10 @@ enum ExploreCategoryFilter {
 
   final String label;
 
-  bool matches(ExplorePlace place, {required bool isRecorded}) {
+  bool matches(ExplorePlace place) {
     switch (this) {
       case ExploreCategoryFilter.all:
         return true;
-      case ExploreCategoryFilter.unrecorded:
-        return !isRecorded;
       case ExploreCategoryFilter.food:
         return place.categoryGroup == PlaceCategoryGroup.food ||
             _labelHasAny(place, const ['음식', '식당', '맛집']);

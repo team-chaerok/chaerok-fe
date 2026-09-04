@@ -142,6 +142,12 @@ class _ExploreMapViewState extends State<ExploreMapView> {
           ),
           text: marker.label,
         );
+        // 비동기 대기 중 새 동기화가 시작됐다면 방금 추가한 POI는 최신 동기화의
+        // "기존 제거" 대상에 포함되지 않으므로 즉시 직접 제거한다.
+        if (generation != _syncGeneration || !mounted) {
+          await poi.remove();
+          return;
+        }
         _pois.add(poi);
       }
     } catch (e, st) {

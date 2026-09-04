@@ -69,6 +69,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   int _fetchRequestId = 0;
   int _searchRequestId = 0;
   Timer? _searchDebounce;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -84,6 +85,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -118,6 +120,10 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   Future<void> _onRegionSelected(RegionCode region) async {
     if (region == _selectedRegion) return;
+    // 이전 지역의 지연 검색 콜백과 진행 중인 검색 응답을 무효화한다.
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+    _searchController.clear();
     setState(() {
       _selectedRegion = region;
       _searchKeyword = '';
@@ -198,7 +204,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   List<ExplorePlace> get _visiblePlaces {
     final source = _searchKeyword.isNotEmpty ? _searchResults : _regionPlaces;
     return source
-        .where((place) => _selectedFilter.matches(place, isRecorded: false))
+        .where((place) => _selectedFilter.matches(place))
         .toList(growable: false);
   }
 
@@ -429,6 +435,7 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   Widget _buildSearchField() {
     return TextField(
+      controller: _searchController,
       onChanged: _onSearchChanged,
       textInputAction: TextInputAction.search,
       style: ChaerokTypography.bodyMedium,

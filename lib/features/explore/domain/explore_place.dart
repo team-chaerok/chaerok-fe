@@ -87,6 +87,13 @@ class ExplorePlace {
   final int? serverId;
   final String? imageUrl;
 
+  /// 장소를 진입 경로와 무관하게 동일하게 식별하는 키.
+  ///
+  /// 지역 목록(`PlaceListResponse.id`는 nullable)과 검색(`PlaceSearchResponse.id`는
+  /// 필수)에서 같은 장소가 서로 다른 필드 조합으로 올 수 있다. 두 응답 모두
+  /// TourAPI/Kakao 장소면 외부 ID(`tourContentId`/`kakaoPlaceId`)를 함께 내려주므로,
+  /// **외부 ID를 최우선**으로 써서 `serverId` 유무에 따라 키가 갈라지지 않게 한다.
+  /// 외부 ID가 없는 순수 DB 장소만 `serverId`(두 응답 모두 보유)로 식별한다.
   static String _identityKey({
     required String source,
     required int? serverId,
@@ -95,13 +102,15 @@ class ExplorePlace {
     required String title,
     required String address,
   }) {
-    if (serverId != null) return 'place:$source:$serverId';
     final externalId = switch (source) {
       _kakaoSource => kakaoPlaceId,
       _tourApiSource => tourContentId,
       _ => null,
     };
-    if (externalId != null) return 'external:$source:$externalId';
+    if (externalId != null && externalId.isNotEmpty) {
+      return 'external:$source:$externalId';
+    }
+    if (serverId != null) return 'place:$serverId';
     return 'title:$source:$title:$address';
   }
 }

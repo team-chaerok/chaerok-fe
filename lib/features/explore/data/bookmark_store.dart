@@ -68,6 +68,10 @@ class BookmarkStore {
 
   static BookmarkStore get instance => _instance ??= BookmarkStore._();
 
+  /// [toggle]의 읽기-수정-쓰기 구간을 직렬화하는 락. 서로 다른 장소를 빠르게
+  /// 연속 토글해도 마지막 쓰기가 이전 쓰기를 덮어쓰지 않게 한다.
+  Future<void> _writeLock = Future<void>.value();
+
   Future<List<BookmarkedPlace>> list() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
@@ -95,7 +99,15 @@ class BookmarkStore {
   }
 
   /// 북마크를 토글하고 토글 후 상태(true=북마크됨)를 반환한다.
-  Future<bool> toggle(BookmarkedPlace place) async {
+  /// 읽기-수정-쓰기 전체를 [_writeLock]으로 직렬화한다.
+  Future<bool> toggle(BookmarkedPlace place) {
+    final result = _writeLock.then((_) => _toggleLocked(place));
+    // 한 번의 실패가 이후 토글을 막지 않도록 락 체인에서는 에러를 삼킨다.
+    _writeLock = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<bool> _toggleLocked(BookmarkedPlace place) async {
     final prefs = await SharedPreferences.getInstance();
     final current = await list();
     final exists = current.any((e) => e.identityKey == place.identityKey);
