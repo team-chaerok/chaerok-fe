@@ -4,5 +4,6 @@
 storePassword=<키스토어 비밀번호>
 keyPassword=<키(alias) 비밀번호>
 keyAlias=upload
-# 키스토어 파일 경로. android/ 기준 상대경로 또는 절대경로.
+# 키스토어 파일 경로. android/ 디렉터리 기준 상대경로 또는 절대경로.
+# 예) android/upload-keystore.jks 에 두면 아래처럼:
 storeFile=upload-keystore.jks

@@ -16,9 +16,27 @@ val localProperties = Properties().apply {
 // 파일이 없으면(다른 개발자의 `flutter run --release` 등) debug 키로 폴백한다.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
-val hasReleaseKeystore = keystorePropertiesFile.exists()
-if (hasReleaseKeystore) {
-    keystoreProperties.load(keystorePropertiesFile.inputStream())
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
+// `storeFile` 경로는 `android/`(rootProject) 기준으로 해석한다 — key.properties.example과 일치.
+val releaseStoreFile = keystoreProperties.getProperty("storeFile")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { rootProject.file(it) }
+
+// 릴리스 서명은 4개 속성이 모두 채워지고 키스토어 파일이 실제로 존재할 때만 사용한다.
+// 하나라도 빠지면 debug 키로 폴백해 "debug 서명" 산출물이 조용히 나가는 것을 막는다.
+val hasReleaseKeystore = releaseStoreFile?.isFile == true &&
+    !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyAlias").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyPassword").isNullOrBlank()
+
+if (keystorePropertiesFile.exists() && !hasReleaseKeystore) {
+    logger.warn(
+        "key.properties가 있지만 storeFile/storePassword/keyAlias/keyPassword 중 " +
+            "일부가 비었거나 키스토어 파일이 없어 debug 키로 폴백합니다."
+    )
 }
 
 android {
@@ -52,7 +70,7 @@ android {
             if (hasReleaseKeystore) {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storeFile = releaseStoreFile
                 storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
