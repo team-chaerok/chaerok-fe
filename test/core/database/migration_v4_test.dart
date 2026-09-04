@@ -10,7 +10,9 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 4);
+    // 정확한 버전이 아니라 v4에서 도입된 컬럼이 이후 스키마에서도 계속
+    // 존재하는지를 확인한다(버전이 계속 올라가도 이 회귀 테스트가 깨지지 않도록).
+    expect(db.schemaVersion, greaterThanOrEqualTo(4));
 
     await db
         .into(db.filmRolls)

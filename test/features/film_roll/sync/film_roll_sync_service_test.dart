@@ -416,5 +416,16 @@ void main() {
       expect(result.created, isTrue);
       expect((await repository.findById(fr.id))!.serverFilmRollId, 900);
     });
+
+    test('skipRegionCheck가 true면 지역이 달라도 동기화한다(지역 이탈 확정용)', () async {
+      final fr = await seedFilmRoll(); // 공주 필름롤
+
+      final result = await service(
+        currentRegion: () => RegionCode.yesan, // 이미 지역을 벗어난 상태
+      ).syncFilmRoll(fr.id, skipRegionCheck: true);
+
+      expect(result.created, isTrue);
+      expect((await repository.findById(fr.id))!.serverFilmRollId, 900);
+    });
   });
 }

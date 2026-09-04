@@ -55,6 +55,19 @@ class _FakeFilmRollRepository implements FilmRollRepository {
   }) => throw UnimplementedError();
 
   @override
+  Future<void> markDeveloping({
+    required String clientFilmRollId,
+    required DateTime developAvailableAt,
+    String? serverStatus,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> markExpired({
+    required String clientFilmRollId,
+    String? serverStatus,
+  }) => throw UnimplementedError();
+
+  @override
   Future<void> selectCourse({
     required String filmRollId,
     required String courseId,

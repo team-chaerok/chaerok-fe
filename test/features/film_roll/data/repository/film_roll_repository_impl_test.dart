@@ -330,4 +330,64 @@ void main() {
 
     expect(await filmRollRepository.findById(filmRoll.id), isNull);
   });
+
+  test('markDeveloping은 필름롤을 developing 상태로 전환하고 완료 예정 시각을 저장한다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.seosan,
+      regionName: '서산시',
+      regionId: 1,
+    );
+    final developAvailableAt = DateTime(2026, 9, 5, 16);
+
+    await filmRollRepository.markDeveloping(
+      clientFilmRollId: filmRoll.id,
+      developAvailableAt: developAvailableAt,
+      serverStatus: 'READY_TO_RENDER',
+    );
+
+    final updated = await filmRollRepository.findById(filmRoll.id);
+    expect(updated!.status, FilmRollStatus.developing);
+    expect(updated.developAvailableAt, developAvailableAt);
+    expect(updated.serverStatus, 'READY_TO_RENDER');
+  });
+
+  test('markExpired는 필름롤을 expired 상태로 전환한다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+      regionId: 1,
+    );
+
+    await filmRollRepository.markExpired(
+      clientFilmRollId: filmRoll.id,
+      serverStatus: 'EXPIRED',
+    );
+
+    final updated = await filmRollRepository.findById(filmRoll.id);
+    expect(updated!.status, FilmRollStatus.expired);
+    expect(updated.serverStatus, 'EXPIRED');
+  });
+
+  test('developing 필름롤이 있어도 같은 지역에 새 진행중 필름롤을 만들 수 있다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.buyeo,
+      regionName: '부여군',
+      regionId: 1,
+    );
+    await filmRollRepository.markDeveloping(
+      clientFilmRollId: filmRoll.id,
+      developAvailableAt: DateTime(2026, 9, 5, 16),
+    );
+
+    // 부분 유니크 인덱스는 status='inProgress'에만 걸려 있어, developing으로
+    // 전환된 필름롤은 "지역당 진행중 1개" 제약에서 자동으로 빠진다.
+    final newFilmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.buyeo,
+      regionName: '부여군',
+      regionId: 1,
+    );
+
+    expect(newFilmRoll.id, isNot(filmRoll.id));
+    expect(newFilmRoll.status, FilmRollStatus.inProgress);
+  });
 }
