@@ -19,6 +19,7 @@ import 'package:chaerok/features/film_roll/presentation/controller/film_roll_con
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
+import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -52,6 +53,7 @@ class FilmRollProgressView extends StatefulWidget {
     required this.mapEnabled,
     required this.onCompleted,
     required this.onRequestPosition,
+    required this.onPositionResolved,
   });
 
   final FilmRoll filmRoll;
@@ -63,6 +65,10 @@ class FilmRollProgressView extends StatefulWidget {
 
   /// 현재 위치를 다시 잡아야 할 때 호출(부모가 위치를 재조회).
   final Future<void> Function() onRequestPosition;
+
+  /// 방문 인증 시점에 새로 조회한 좌표를 부모에 올려, 지도 마커·"인증 가능"
+  /// 필터 등 다른 표시도 최신 좌표 기준으로 맞추게 한다.
+  final ValueChanged<Position> onPositionResolved;
 
   @override
   State<FilmRollProgressView> createState() => _FilmRollProgressViewState();
@@ -80,6 +86,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   _ProgressFilter _filter = _ProgressFilter.all;
   bool _isResolvingRegion = false;
   bool _isCompleting = false;
+  bool _isVerifyingLocation = false;
   ExploreMapMarker? _focusMarker;
 
   @override
@@ -162,8 +169,29 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   }
 
   Future<void> _onVisitTap(FilmRollPlace place) async {
+    if (_isVerifyingLocation) return;
+
+    if (place.isVisited) {
+      _showSnackBar(
+        const VisitGateResult(VisitGateStatus.alreadyVisited).message,
+      );
+      return;
+    }
+
+    // 방문 인증은 "지금 여기"를 증명해야 하므로, 부모가 미리 잡아둔 좌표 대신
+    // 버튼을 누른 시점의 좌표를 새로 조회해 게이트를 평가한다.
+    setState(() => _isVerifyingLocation = true);
+    final Position? position;
+    try {
+      position = await LocationPermissionService.getCurrentPosition();
+    } finally {
+      if (mounted) setState(() => _isVerifyingLocation = false);
+    }
+    if (!mounted) return;
+    if (position != null) widget.onPositionResolved(position);
+
     final gate = evaluateVisitGate(
-      position: widget.currentPosition,
+      position: position,
       placeLatitude: place.latitude,
       placeLongitude: place.longitude,
       alreadyVisited: place.isVisited,
@@ -505,7 +533,11 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
             ),
           ),
           const SizedBox(height: ChaerokSpacing.sm),
-          ChaerokButton(text: '방문 인증하기', onPressed: () => _onVisitTap(place)),
+          ChaerokButton(
+            text: '방문 인증하기',
+            isLoading: _isVerifyingLocation,
+            onPressed: () => _onVisitTap(place),
+          ),
           const SizedBox(height: ChaerokSpacing.xs),
           Row(
             children: [
@@ -588,7 +620,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
             const Icon(Icons.check_circle, color: ChaerokColors.primary)
           else
             TextButton(
-              onPressed: () => _onVisitTap(place),
+              onPressed: _isVerifyingLocation ? null : () => _onVisitTap(place),
               child: const Text('방문 인증'),
             ),
         ],
