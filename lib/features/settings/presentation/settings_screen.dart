@@ -48,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       await TokenStorage.instance.clear();
       await AppPreferences.instance.setCurrentUserId(null);
+      await AppPreferences.instance.setTester(false);
     }
 
     if (!context.mounted) return;
@@ -105,6 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await TokenStorage.instance.clear();
       await AppPreferences.instance.setCurrentUserId(null);
+      await AppPreferences.instance.setTester(false);
     } catch (e, st) {
       log('토큰 삭제 실패', name: _tag, error: e, stackTrace: st);
     }

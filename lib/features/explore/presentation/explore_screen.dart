@@ -91,6 +91,9 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   /// 진행중 필름롤 유무를 다시 확인해 모드를 갱신한다.
   Future<void> reevaluate() async {
+    // 탭 재진입 시 위치를 다시 잡는다. 다른 탭(마이)에서 QA용 Mock 지점을
+    // 바꾼 뒤 돌아온 경우에도 방문 게이트가 최신 좌표로 평가된다.
+    unawaited(_loadCurrentPosition());
     final active = await FilmRollModule.instance.recoverLastActiveFilmRoll();
     if (!mounted) return;
     setState(() {

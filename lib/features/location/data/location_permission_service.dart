@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'dart:io';
 
+import 'package:chaerok/core/location/mock_location_gate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -50,7 +51,16 @@ class LocationPermissionService {
   }
 
   /// 현재 위치 좌표를 조회합니다. 권한이 없으면 null을 반환합니다.
+  ///
+  /// mock 위치가 활성(개발/QA 빌드이거나 테스트 계정 + 사용자가 켬)이면
+  /// 권한·GPS 조회를 건너뛰고 저장된 지점의 mock 좌표를 반환한다. 방문 인증
+  /// 게이트까지 mock 좌표가 흐르도록 위치 조회의 단일 진입점에서 처리한다.
   static Future<Position?> getCurrentPosition() async {
+    if (await MockLocationGate.isActive()) {
+      log('mock 위치 사용 - 실제 GPS 조회 생략', name: _tag);
+      return MockLocationGate.currentMockPosition();
+    }
+
     final status = await checkStatus();
     if (!status.isGranted) {
       log('위치 권한 없음 - 좌표 조회 불가', name: _tag);

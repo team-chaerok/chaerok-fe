@@ -55,6 +55,10 @@ class CurrentAccountSync {
       final user = await fetchCurrentUserOrDefault();
       await repository.claimLegacyData(user.id);
       await preferences.setCurrentUserId(user.id);
+      // 테스터 플래그는 로그인/회원가입 시 갱신된다. 세션 재개(위 조기 반환)
+      // 경로에서는 재조회하지 않으므로, 마이 탭 진입 시 재갱신하고
+      // 로그아웃·탈퇴 시 false로 지운다(SettingsScreen).
+      await preferences.setTester(user.isTester);
     } catch (e, st) {
       log('현재 계정 동기화 실패', name: _tag, error: e, stackTrace: st);
     }

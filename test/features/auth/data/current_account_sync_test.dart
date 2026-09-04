@@ -74,6 +74,15 @@ const _testUser = UserResponse(
   role: UserRole.user,
 );
 
+const _testerUser = UserResponse(
+  id: 43,
+  provider: OAuthProvider.kakao,
+  nickname: '심사용',
+  email: null,
+  role: UserRole.user,
+  isTester: true,
+);
+
 void main() {
   late _FakeFilmRollRepository repository;
 
@@ -91,6 +100,24 @@ void main() {
     expect(repository.claimCallCount, 1);
     expect(repository.claimedUserId, 42);
     expect(await AppPreferences.instance.getCurrentUserId(), 42);
+  });
+
+  test('동기화 시 서버가 내려준 isTester 플래그를 저장한다', () async {
+    await CurrentAccountSync.sync(
+      fetchCurrentUser: () async => _testerUser,
+      filmRollRepository: repository,
+    );
+
+    expect(await AppPreferences.instance.isTester(), true);
+  });
+
+  test('일반 계정 동기화 시 isTester는 false로 저장된다', () async {
+    await CurrentAccountSync.sync(
+      fetchCurrentUser: () async => _testUser,
+      filmRollRepository: repository,
+    );
+
+    expect(await AppPreferences.instance.isTester(), false);
   });
 
   test('로컬에 이미 계정 id가 있으면 네트워크 조회/귀속 없이 그대로 둔다', () async {
