@@ -44,4 +44,16 @@ void main() {
 
     expect(UserResponse.fromJson(json).isTester, true);
   });
+
+  test('isTester 필드가 boolean이 아닌 값이면 예외 없이 false로 파싱한다', () {
+    for (final invalid in <Object>['true', 1, 'TESTER', 0]) {
+      final json = baseJson()..['isTester'] = invalid;
+
+      expect(
+        UserResponse.fromJson(json).isTester,
+        false,
+        reason: '$invalid (${invalid.runtimeType})',
+      );
+    }
+  });
 }

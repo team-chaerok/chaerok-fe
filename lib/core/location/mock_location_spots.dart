@@ -15,10 +15,11 @@ const double kMockGpsAccuracyMeters = 12;
 /// (100m 거리 + 50m 정확도)를 그대로 통과시킨다.
 ///
 /// ⚠️ 확인 필요: 아래 좌표는 각 지역 대표 관광지 기준의 **후보값**이다.
-/// 병합 전 반드시 해당 지역 추천 코스(`PlacesApi.getExternalPlaces`)의 실제
-/// 스팟 좌표와 `Geolocator.distanceBetween`으로 대조해 100m(권장 60m) 이내인지
-/// 확인하고, 어긋나면 코스 스팟 좌표에 맞춰 조정한다. 코스 데이터가 개편되면
-/// 이 대조 절차를 다시 수행한다.
+/// 방문 인증 대상은 `CoursesApi.getRecommendedCourses`가 내려준
+/// `CourseResponse.places`(선택 시 `FilmRollPlace`로 저장)의 좌표이므로,
+/// 병합 전 반드시 그 좌표와 `Geolocator.distanceBetween`으로 대조해
+/// `kVisitVerifiableRadiusMeters`(100m, 권장 60m) 이내인지 확인하고, 어긋나면
+/// 코스 스팟 좌표에 맞춰 조정한다. 코스 데이터가 개편되면 대조를 다시 한다.
 const Map<RegionCode, List<MockLocationSpot>> mockLocationSpots = {
   RegionCode.gongju: [
     (label: '공산성 금서루', latitude: 36.46574, longitude: 127.12376),

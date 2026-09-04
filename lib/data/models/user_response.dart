@@ -24,7 +24,10 @@ class UserResponse {
       nickname: json['nickname'] as String,
       email: json['email'] as String?,
       role: UserRole.fromJson(json['role'] as String),
-      isTester: json['isTester'] as bool? ?? false,
+      // 서버가 boolean이 아닌 값(문자열/숫자/누락)을 보내도 예외 없이 false로.
+      // 잘못된 파싱으로 예외가 나면 CurrentAccountSync가 setTester를 건너뛰어
+      // 이전 테스터 상태가 남을 수 있으므로 방어적으로 처리한다.
+      isTester: json['isTester'] == true,
     );
   }
 
