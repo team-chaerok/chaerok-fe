@@ -8,16 +8,14 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/course_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
-import 'package:chaerok/data/models/visit_list_response.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
-import 'package:chaerok/data/remote/visits_api.dart';
 import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/region_departure.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
+import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/domain/visit_verification.dart';
-import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
@@ -55,7 +53,6 @@ class FilmRollProgressView extends StatefulWidget {
     required this.filmRoll,
     required this.currentPosition,
     required this.mapEnabled,
-    required this.onCompleted,
     required this.onRequestPosition,
     required this.onPositionResolved,
     required this.onExited,
@@ -64,9 +61,6 @@ class FilmRollProgressView extends StatefulWidget {
   final FilmRoll filmRoll;
   final Position? currentPosition;
   final bool mapEnabled;
-
-  /// 필름롤을 완료해 탐색 모드로 돌아가야 할 때 호출.
-  final VoidCallback onCompleted;
 
   /// 지역 이탈이 확정(현상 예약 또는 조건 미충족 종료)돼 이 화면을 벗어나야
   /// 할 때 호출. 부모가 모드를 다시 판별한다(`ExploreScreen.reevaluate`).
@@ -89,12 +83,8 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
 
   late final FilmRollController _controller;
   FilmRollState _state = const FilmRollState.initial();
-  VisitListResponse? _visits;
-  bool _visitsLoadFailed = false;
-  bool _isLoadingVisits = false;
   _ProgressFilter _filter = _ProgressFilter.all;
   bool _isResolvingRegion = false;
-  bool _isCompleting = false;
   bool _isVerifyingLocation = false;
   ExploreMapMarker? _focusMarker;
 
@@ -114,9 +104,6 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
       onStateChanged: (state) {
         if (!mounted) return;
         setState(() => _state = state);
-        if (state.status == FilmRollLoadStatus.loaded) {
-          unawaited(_loadVisits());
-        }
       },
     );
     unawaited(_controller.load());
@@ -134,26 +121,6 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   FilmRoll? get _filmRoll => _state.filmRoll ?? widget.filmRoll;
 
   int? get _serverFilmRollId => _filmRoll?.serverFilmRollId;
-
-  Future<void> _loadVisits() async {
-    final serverId = _serverFilmRollId;
-    if (serverId == null || _isLoadingVisits) return;
-    setState(() {
-      _isLoadingVisits = true;
-      _visitsLoadFailed = false;
-    });
-    try {
-      final visits = await VisitsApi.getVisits(serverId);
-      if (!mounted) return;
-      setState(() => _visits = visits);
-    } catch (e, st) {
-      log('방문 현황 조회 실패', name: _tag, error: e, stackTrace: st);
-      if (!mounted) return;
-      setState(() => _visitsLoadFailed = true);
-    } finally {
-      if (mounted) setState(() => _isLoadingVisits = false);
-    }
-  }
 
   Future<void> _onSelectCourseTap() async {
     final filmRoll = _filmRoll;
@@ -243,7 +210,6 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
     );
     if (captured != true || !mounted) return;
     await _controller.completeVisit(place.id);
-    await _loadVisits();
   }
 
   /// 방문 인증과 별개로 필름 카메라만 여는 동선. 촬영/저장은 하되 방문 인증은
@@ -268,22 +234,6 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
       _filter = _ProgressFilter.unvisited;
       _focusMarker = _markerFor(nextPlace, ExploreMarkerState.next);
     });
-  }
-
-  Future<void> _onCompleteTap() async {
-    setState(() => _isCompleting = true);
-    try {
-      final success = await _controller.completeFilmRoll();
-      if (!mounted) return;
-      if (success) {
-        widget.onCompleted();
-        return;
-      }
-      final message = _controller.state.errorMessage;
-      if (message != null) _showSnackBar(message);
-    } finally {
-      if (mounted) setState(() => _isCompleting = false);
-    }
   }
 
   void _showSnackBar(String message) {
@@ -348,11 +298,17 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
 
   Future<void> _showExitConfirmDialog() async {
     if (!mounted) return;
+    final isCompletable = _filmRoll?.isCompletable(_state.places) ?? false;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('지역을 벗어났어요'),
-        content: const Text('현상을 시작하면 이 필름롤은 더 이상 촬영할 수 없어요.\n지금 현상을 시작할까요?'),
+        content: Text(
+          isCompletable
+              ? '현상을 시작하면 이 필름롤은 더 이상 촬영할 수 없어요.\n지금 현상을 시작할까요?'
+              : '아직 현상 조건(서로 다른 유형 $requiredVisitCategoryCount곳 방문)을 채우지 '
+                    '못했어요.\n지금 벗어나면 현상되지 않아요.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -360,7 +316,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('현상 시작하기'),
+            child: Text(isCompletable ? '현상 시작하기' : '그래도 벗어나기'),
           ),
         ],
       ),
@@ -373,12 +329,9 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   }
 
   Future<void> _startExit() async {
-    final filmRoll = _filmRoll;
-    if (filmRoll == null) return;
-
     setState(() => _isExiting = true);
     try {
-      final result = await FilmRollModule.instance.exitFilmRoll(filmRoll);
+      final result = await _controller.exitFilmRoll();
       if (!mounted) return;
       if (result.isDeveloping) {
         widget.onExited();
@@ -570,6 +523,12 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   }
 
   Widget _buildProgressCard(FilmRoll filmRoll) {
+    final visitedCategoryCount =
+        filmRoll.visitedCategoryCount ??
+        countDistinctVisitedCategories(_state.places);
+    final requiredCategoryCount =
+        filmRoll.requiredCategoryCount ?? requiredVisitCategoryCount;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(ChaerokSpacing.lg),
@@ -586,7 +545,9 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
           ClipRRect(
             borderRadius: BorderRadius.circular(ChaerokRadius.full),
             child: LinearProgressIndicator(
-              value: filmRoll.progress,
+              value: requiredCategoryCount == 0
+                  ? 0
+                  : visitedCategoryCount / requiredCategoryCount,
               minHeight: 8,
               backgroundColor: ChaerokColors.primaryLight,
               color: ChaerokColors.primary,
@@ -594,13 +555,24 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
           ),
           const SizedBox(height: ChaerokSpacing.xxs),
           Text(
-            '방문 ${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount} 곳',
+            _developConditionLabel(
+              filmRoll,
+              visitedCategoryCount,
+              requiredCategoryCount,
+            ),
             style: ChaerokTypography.bodyMedium.copyWith(
               color: ChaerokColors.textSecondary,
             ),
           ),
           const SizedBox(height: ChaerokSpacing.xxs),
-          if (_visitsLoadFailed && _visits == null)
+          Text(
+            '방문 ${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount} 곳',
+            style: ChaerokTypography.caption.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+          if (_state.visitsLoadFailed) ...[
+            const SizedBox(height: ChaerokSpacing.xxs),
             Row(
               children: [
                 Expanded(
@@ -612,32 +584,38 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _isLoadingVisits
+                  onPressed: _state.isLoadingVisits
                       ? null
-                      : () => unawaited(_loadVisits()),
-                  child: Text(_isLoadingVisits ? '불러오는 중…' : '다시 시도'),
+                      : () => unawaited(_controller.loadVisits()),
+                  child: Text(_state.isLoadingVisits ? '불러오는 중…' : '다시 시도'),
                 ),
               ],
-            )
-          else
-            Text(_developConditionLabel(), style: ChaerokTypography.caption),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  String _developConditionLabel() {
-    final visits = _visits;
-    if (visits != null) {
-      final base =
-          '서로 다른 관광 유형 '
-          '${visits.visitedCategoryCount}/${visits.requiredCategoryCount}';
-      return visits.visitRequirementMet ? '$base · 현상 조건을 충족했어요' : base;
+  /// 현상 조건 표시 문구. 서버 값([FilmRoll.visitRequirementMet])이 있으면 그
+  /// 충족 여부를 우선 반영하고, 아직 조회 전이면 동기화/로딩 상태를 덧붙인다.
+  String _developConditionLabel(
+    FilmRoll filmRoll,
+    int visitedCategoryCount,
+    int requiredCategoryCount,
+  ) {
+    final base = '서로 다른 관광 유형 $visitedCategoryCount/$requiredCategoryCount';
+    final requirementMet = filmRoll.visitRequirementMet;
+    if (requirementMet != null) {
+      return requirementMet ? '$base · 현상 조건을 충족했어요' : base;
     }
     if (_serverFilmRollId == null) {
-      return '서버 동기화가 완료되면 현상 조건을 확인할 수 있어요';
+      return '$base · 서버 동기화가 완료되면 정확한 조건을 확인할 수 있어요';
     }
-    return '현상 조건을 확인하는 중이에요';
+    if (_state.isLoadingVisits) {
+      return '$base · 현상 조건을 확인하는 중이에요';
+    }
+    return base;
   }
 
   List<Widget> _buildCourseSection(FilmRoll filmRoll) {
@@ -666,10 +644,10 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
         ...filtered.map(_buildPlaceTile),
       const SizedBox(height: ChaerokSpacing.md),
       ChaerokButton(
-        text: '필름롤 완료하기',
-        isEnabled: filmRoll.isCompletable,
-        isLoading: _isCompleting,
-        onPressed: _onCompleteTap,
+        text: '지역을 벗어나 현상하기',
+        isEnabled: filmRoll.isCompletable(_state.places),
+        isLoading: _isExiting,
+        onPressed: _isExiting ? null : _showExitConfirmDialog,
       ),
     ];
   }

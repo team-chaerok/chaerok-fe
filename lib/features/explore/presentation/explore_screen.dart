@@ -382,7 +382,6 @@ class ExploreScreenState extends State<ExploreScreen>
           filmRoll: _activeFilmRoll!,
           currentPosition: _currentPosition,
           mapEnabled: _mapEnabled,
-          onCompleted: () => unawaited(reevaluate()),
           onExited: () => unawaited(reevaluate()),
           onRequestPosition: _loadCurrentPosition,
           onPositionResolved: (position) {

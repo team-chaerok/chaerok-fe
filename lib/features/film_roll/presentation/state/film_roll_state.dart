@@ -11,6 +11,8 @@ class FilmRollState {
     this.places = const [],
     this.errorMessage,
     this.lastSyncHadError = false,
+    this.isLoadingVisits = false,
+    this.visitsLoadFailed = false,
   });
 
   const FilmRollState.initial() : this(status: FilmRollLoadStatus.loading);
@@ -23,6 +25,12 @@ class FilmRollState {
   /// 직전 백엔드 동기화 시도가 부분 실패했는지 여부(재시도 어피던스 노출용).
   final bool lastSyncHadError;
 
+  /// 현상 조건 조회(`VisitsApi.getVisits`)가 진행 중인지 여부.
+  final bool isLoadingVisits;
+
+  /// 직전 현상 조건 조회가 실패했는지 여부.
+  final bool visitsLoadFailed;
+
   bool get hasSelectedCourse => filmRoll?.selectedCourseId != null;
 
   FilmRollState copyWith({
@@ -31,6 +39,8 @@ class FilmRollState {
     List<FilmRollPlace>? places,
     String? errorMessage,
     bool? lastSyncHadError,
+    bool? isLoadingVisits,
+    bool? visitsLoadFailed,
   }) {
     return FilmRollState(
       status: status ?? this.status,
@@ -38,6 +48,8 @@ class FilmRollState {
       places: places ?? this.places,
       errorMessage: errorMessage,
       lastSyncHadError: lastSyncHadError ?? this.lastSyncHadError,
+      isLoadingVisits: isLoadingVisits ?? this.isLoadingVisits,
+      visitsLoadFailed: visitsLoadFailed ?? this.visitsLoadFailed,
     );
   }
 }

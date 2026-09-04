@@ -57,10 +57,6 @@ abstract class FilmRollRepository {
     required List<CourseCandidatePlace> places,
   });
 
-  /// 완료 조건(코스 선택 + 전체 장소 방문)을 검증하고 필름롤을 완료 처리한다.
-  /// 조건을 충족하지 못하면 [FilmRollNotCompletableException]을 던진다.
-  Future<void> completeFilmRoll(String filmRollId);
-
   /// 필름롤과 연관된 장소/사진 레코드(DB) 및 사진 원본 파일을 함께 삭제한다.
   Future<void> deleteFilmRoll(String filmRollId);
 
