@@ -22,6 +22,10 @@ class FilmRolls extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get completedAt => dateTime().nullable()();
 
+  // v5: 지역 이탈 확정(exit) 후 현상 완료 예정 시각. developing 상태에서만
+  // 값이 채워지며, 현상 대기 화면의 카운트다운 기준으로 쓰인다.
+  DateTimeColumn get developAvailableAt => dateTime().nullable()();
+
   // 백엔드 필름롤 동기화용. 로컬이 source of truth이며, 아래 컬럼은 서버
   // 필름롤과의 연결/생성 파라미터를 보관한다. serverFilmRollId가 null이면
   // "아직 서버에 생성되지 않음"으로 취급한다.

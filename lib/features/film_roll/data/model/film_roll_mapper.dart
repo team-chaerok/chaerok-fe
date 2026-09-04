@@ -25,6 +25,7 @@ extension FilmRollMapper on FilmRollRow {
       regionId: regionId,
       serverFilmRollId: serverFilmRollId,
       serverStatus: serverStatus,
+      developAvailableAt: developAvailableAt,
     );
   }
 }

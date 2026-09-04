@@ -13,8 +13,10 @@ import 'package:chaerok/features/explore/data/bookmark_store.dart';
 import 'package:chaerok/features/explore/domain/explore_category_filter.dart';
 import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
+import 'package:chaerok/features/explore/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/explore/presentation/widgets/film_roll_progress_view.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
@@ -28,17 +30,21 @@ import 'package:geolocator/geolocator.dart';
 
 const _serviceProvinceName = '충청남도';
 
-enum _ExploreMode { loading, exploring, progress }
+enum _ExploreMode { loading, exploring, progress, developing }
 
-/// 채록길 탭: 진행중인 필름롤 유무로 두 모드를 전환하는 단일 화면.
+/// 채록길 탭: 진행중인 필름롤 유무로 세 모드를 전환하는 단일 화면.
 ///
 /// - 필름롤 없음 → **탐색 모드**: 지역/검색/카테고리 필터 + 지도 + 주변 장소
 ///   리스트에서 시작할 채록길을 고른다.
-/// - 필름롤 있음 → **진행 모드**([FilmRollProgressView]): 진행률/현상 조건/
+/// - 필름롤 진행중 → **진행 모드**([FilmRollProgressView]): 진행률/현상 조건/
 ///   스팟 인증/촬영으로 선택한 필름롤을 채워간다.
+/// - 필름롤 현상 대기중 → **현상 대기 모드**([FilmRollDevelopingView]): 지역
+///   이탈이 확정돼 현상 완료를 기다리는 동안 남은 시간을 보여준다.
 ///
 /// 모드 재평가는 [ExploreScreenState.reevaluate]로 이뤄지며, 탭 재진입/카메라
-/// 액션 종료 시 `MainTabScreen`이 `GlobalKey`로 호출한다.
+/// 액션 종료 시 `MainTabScreen`이 `GlobalKey`로 호출한다. 앱이 포그라운드로
+/// 복귀할 때도([didChangeAppLifecycleState]) 재평가해, 백그라운드에 있는 동안
+/// 지역을 벗어난 경우 진행 모드가 최신 위치로 이탈을 감지할 수 있게 한다.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
 
@@ -46,7 +52,8 @@ class ExploreScreen extends StatefulWidget {
   State<ExploreScreen> createState() => ExploreScreenState();
 }
 
-class ExploreScreenState extends State<ExploreScreen> {
+class ExploreScreenState extends State<ExploreScreen>
+    with WidgetsBindingObserver {
   static const _tag = 'ExploreScreen';
   static const double _mapHeight = 240;
 
@@ -74,6 +81,7 @@ class ExploreScreenState extends State<ExploreScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_loadCurrentPosition());
     unawaited(_loadBookmarks());
     unawaited(reevaluate());
@@ -84,21 +92,37 @@ class ExploreScreenState extends State<ExploreScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  /// 진행중 필름롤 유무를 다시 확인해 모드를 갱신한다.
+  /// 앱이 포그라운드로 복귀하면 모드를 재평가한다. 진행 모드에서 백그라운드에
+  /// 머무는 동안 지역을 벗어났을 수 있으므로, 최신 위치로 이탈 감지가
+  /// 이어지도록 한다(현상 완료 자동 감지는 이번 범위 밖).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(reevaluate());
+    }
+  }
+
+  /// 진행중/현상대기중 필름롤 유무를 다시 확인해 모드를 갱신한다.
   Future<void> reevaluate() async {
     // 탭 재진입 시 위치를 다시 잡는다. 다른 탭(마이)에서 QA용 Mock 지점을
-    // 바꾼 뒤 돌아온 경우에도 방문 게이트가 최신 좌표로 평가된다.
+    // 바꾼 뒤 돌아온 경우에도 방문 게이트가 최신 좌표로 평가되고, 진행
+    // 모드의 지역 이탈 감지도 최신 좌표를 받는다.
     unawaited(_loadCurrentPosition());
     final active = await FilmRollModule.instance.recoverLastActiveFilmRoll();
     if (!mounted) return;
     setState(() {
       _activeFilmRoll = active;
-      _mode = active == null ? _ExploreMode.exploring : _ExploreMode.progress;
+      _mode = switch (active?.status) {
+        null => _ExploreMode.exploring,
+        FilmRollStatus.developing => _ExploreMode.developing,
+        _ => _ExploreMode.progress,
+      };
     });
     if (active == null && _regionPlaces.isEmpty) {
       unawaited(_fetchPlaces());
@@ -345,7 +369,7 @@ class ExploreScreenState extends State<ExploreScreen> {
         backgroundColor: ChaerokColors.background,
         elevation: 0,
         title: Text(
-          _mode == _ExploreMode.progress
+          _mode == _ExploreMode.progress || _mode == _ExploreMode.developing
               ? (_activeFilmRoll?.title ?? '채록길')
               : '채록길',
           style: ChaerokTypography.titleMedium,
@@ -358,11 +382,15 @@ class ExploreScreenState extends State<ExploreScreen> {
           filmRoll: _activeFilmRoll!,
           currentPosition: _currentPosition,
           mapEnabled: _mapEnabled,
-          onCompleted: () => unawaited(reevaluate()),
+          onExited: () => unawaited(reevaluate()),
           onRequestPosition: _loadCurrentPosition,
           onPositionResolved: (position) {
             if (mounted) setState(() => _currentPosition = position);
           },
+        ),
+        _ExploreMode.developing => FilmRollDevelopingView(
+          key: ValueKey(_activeFilmRoll!.id),
+          filmRoll: _activeFilmRoll!,
         ),
         _ExploreMode.exploring => _buildExploring(),
       },

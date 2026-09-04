@@ -57,14 +57,26 @@ abstract class FilmRollRepository {
     required List<CourseCandidatePlace> places,
   });
 
-  /// 완료 조건(코스 선택 + 전체 장소 방문)을 검증하고 필름롤을 완료 처리한다.
-  /// 조건을 충족하지 못하면 [FilmRollNotCompletableException]을 던진다.
-  Future<void> completeFilmRoll(String filmRollId);
-
   /// 필름롤과 연관된 장소/사진 레코드(DB) 및 사진 원본 파일을 함께 삭제한다.
   Future<void> deleteFilmRoll(String filmRollId);
 
   /// 계정 스코프 도입 이전에 생성돼 계정이 비어있는 레거시 필름롤을
   /// [userId] 소유로 1회 확정한다. 이미 계정이 확정된 행은 건드리지 않는다.
   Future<void> claimLegacyData(int userId);
+
+  /// 지역 이탈 확정(`exitFilmRoll`) 응답이 현상 예약(`READY_TO_RENDER`)일 때
+  /// 로컬 필름롤을 [FilmRollStatus.developing]으로 전환하고 현상 완료 예정
+  /// 시각을 저장한다. 코스/방문 조건은 서버가 이미 판정했으므로 별도 게이트가 없다.
+  Future<void> markDeveloping({
+    required String clientFilmRollId,
+    required DateTime developAvailableAt,
+    String? serverStatus,
+  });
+
+  /// 지역 이탈 확정(`exitFilmRoll`) 응답이 조건 미충족(`EXPIRED`)일 때 로컬
+  /// 필름롤을 [FilmRollStatus.expired]로 전환한다.
+  Future<void> markExpired({
+    required String clientFilmRollId,
+    String? serverStatus,
+  });
 }

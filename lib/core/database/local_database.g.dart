@@ -120,6 +120,17 @@ class $FilmRollsTable extends FilmRolls
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _developAvailableAtMeta =
+      const VerificationMeta('developAvailableAt');
+  @override
+  late final GeneratedColumn<DateTime> developAvailableAt =
+      GeneratedColumn<DateTime>(
+        'develop_available_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _regionIdMeta = const VerificationMeta(
     'regionId',
   );
@@ -188,6 +199,7 @@ class $FilmRollsTable extends FilmRolls
     createdAt,
     updatedAt,
     completedAt,
+    developAvailableAt,
     regionId,
     filterId,
     filterStrength,
@@ -273,6 +285,15 @@ class $FilmRollsTable extends FilmRolls
         completedAt.isAcceptableOrUnknown(
           data['completed_at']!,
           _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('develop_available_at')) {
+      context.handle(
+        _developAvailableAtMeta,
+        developAvailableAt.isAcceptableOrUnknown(
+          data['develop_available_at']!,
+          _developAvailableAtMeta,
         ),
       );
     }
@@ -372,6 +393,10 @@ class $FilmRollsTable extends FilmRolls
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
       ),
+      developAvailableAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}develop_available_at'],
+      ),
       regionId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}region_id'],
@@ -418,6 +443,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
+  final DateTime? developAvailableAt;
   final int? regionId;
   final String? filterId;
   final double? filterStrength;
@@ -435,6 +461,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
+    this.developAvailableAt,
     this.regionId,
     this.filterId,
     this.filterStrength,
@@ -470,6 +497,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    if (!nullToAbsent || developAvailableAt != null) {
+      map['develop_available_at'] = Variable<DateTime>(developAvailableAt);
     }
     if (!nullToAbsent || regionId != null) {
       map['region_id'] = Variable<int>(regionId);
@@ -510,6 +540,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      developAvailableAt: developAvailableAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(developAvailableAt),
       regionId: regionId == null && nullToAbsent
           ? const Value.absent()
           : Value(regionId),
@@ -551,6 +584,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      developAvailableAt: serializer.fromJson<DateTime?>(
+        json['developAvailableAt'],
+      ),
       regionId: serializer.fromJson<int?>(json['regionId']),
       filterId: serializer.fromJson<String?>(json['filterId']),
       filterStrength: serializer.fromJson<double?>(json['filterStrength']),
@@ -577,6 +613,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'developAvailableAt': serializer.toJson<DateTime?>(developAvailableAt),
       'regionId': serializer.toJson<int?>(regionId),
       'filterId': serializer.toJson<String?>(filterId),
       'filterStrength': serializer.toJson<double?>(filterStrength),
@@ -597,6 +634,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> completedAt = const Value.absent(),
+    Value<DateTime?> developAvailableAt = const Value.absent(),
     Value<int?> regionId = const Value.absent(),
     Value<String?> filterId = const Value.absent(),
     Value<double?> filterStrength = const Value.absent(),
@@ -618,6 +656,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    developAvailableAt: developAvailableAt.present
+        ? developAvailableAt.value
+        : this.developAvailableAt,
     regionId: regionId.present ? regionId.value : this.regionId,
     filterId: filterId.present ? filterId.value : this.filterId,
     filterStrength: filterStrength.present
@@ -651,6 +692,9 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      developAvailableAt: data.developAvailableAt.present
+          ? data.developAvailableAt.value
+          : this.developAvailableAt,
       regionId: data.regionId.present ? data.regionId.value : this.regionId,
       filterId: data.filterId.present ? data.filterId.value : this.filterId,
       filterStrength: data.filterStrength.present
@@ -679,6 +723,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('completedAt: $completedAt, ')
+          ..write('developAvailableAt: $developAvailableAt, ')
           ..write('regionId: $regionId, ')
           ..write('filterId: $filterId, ')
           ..write('filterStrength: $filterStrength, ')
@@ -701,6 +746,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
     createdAt,
     updatedAt,
     completedAt,
+    developAvailableAt,
     regionId,
     filterId,
     filterStrength,
@@ -722,6 +768,7 @@ class FilmRollRow extends DataClass implements Insertable<FilmRollRow> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.completedAt == this.completedAt &&
+          other.developAvailableAt == this.developAvailableAt &&
           other.regionId == this.regionId &&
           other.filterId == this.filterId &&
           other.filterStrength == this.filterStrength &&
@@ -741,6 +788,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> completedAt;
+  final Value<DateTime?> developAvailableAt;
   final Value<int?> regionId;
   final Value<String?> filterId;
   final Value<double?> filterStrength;
@@ -759,6 +807,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.developAvailableAt = const Value.absent(),
     this.regionId = const Value.absent(),
     this.filterId = const Value.absent(),
     this.filterStrength = const Value.absent(),
@@ -778,6 +827,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.completedAt = const Value.absent(),
+    this.developAvailableAt = const Value.absent(),
     this.regionId = const Value.absent(),
     this.filterId = const Value.absent(),
     this.filterStrength = const Value.absent(),
@@ -803,6 +853,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? completedAt,
+    Expression<DateTime>? developAvailableAt,
     Expression<int>? regionId,
     Expression<String>? filterId,
     Expression<double>? filterStrength,
@@ -823,6 +874,8 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (completedAt != null) 'completed_at': completedAt,
+      if (developAvailableAt != null)
+        'develop_available_at': developAvailableAt,
       if (regionId != null) 'region_id': regionId,
       if (filterId != null) 'filter_id': filterId,
       if (filterStrength != null) 'filter_strength': filterStrength,
@@ -844,6 +897,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? completedAt,
+    Value<DateTime?>? developAvailableAt,
     Value<int?>? regionId,
     Value<String?>? filterId,
     Value<double?>? filterStrength,
@@ -863,6 +917,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
+      developAvailableAt: developAvailableAt ?? this.developAvailableAt,
       regionId: regionId ?? this.regionId,
       filterId: filterId ?? this.filterId,
       filterStrength: filterStrength ?? this.filterStrength,
@@ -914,6 +969,11 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
+    if (developAvailableAt.present) {
+      map['develop_available_at'] = Variable<DateTime>(
+        developAvailableAt.value,
+      );
+    }
     if (regionId.present) {
       map['region_id'] = Variable<int>(regionId.value);
     }
@@ -949,6 +1009,7 @@ class FilmRollsCompanion extends UpdateCompanion<FilmRollRow> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('completedAt: $completedAt, ')
+          ..write('developAvailableAt: $developAvailableAt, ')
           ..write('regionId: $regionId, ')
           ..write('filterId: $filterId, ')
           ..write('filterStrength: $filterStrength, ')
@@ -2436,6 +2497,7 @@ typedef $$FilmRollsTableCreateCompanionBuilder =
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> completedAt,
+      Value<DateTime?> developAvailableAt,
       Value<int?> regionId,
       Value<String?> filterId,
       Value<double?> filterStrength,
@@ -2456,6 +2518,7 @@ typedef $$FilmRollsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> completedAt,
+      Value<DateTime?> developAvailableAt,
       Value<int?> regionId,
       Value<String?> filterId,
       Value<double?> filterStrength,
@@ -2572,6 +2635,11 @@ class $$FilmRollsTableFilterComposer
 
   ColumnFilters<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get developAvailableAt => $composableBuilder(
+    column: $table.developAvailableAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2715,6 +2783,11 @@ class $$FilmRollsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get developAvailableAt => $composableBuilder(
+    column: $table.developAvailableAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get regionId => $composableBuilder(
     column: $table.regionId,
     builder: (column) => ColumnOrderings(column),
@@ -2791,6 +2864,11 @@ class $$FilmRollsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get developAvailableAt => $composableBuilder(
+    column: $table.developAvailableAt,
     builder: (column) => column,
   );
 
@@ -2905,6 +2983,7 @@ class $$FilmRollsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<DateTime?> developAvailableAt = const Value.absent(),
                 Value<int?> regionId = const Value.absent(),
                 Value<String?> filterId = const Value.absent(),
                 Value<double?> filterStrength = const Value.absent(),
@@ -2923,6 +3002,7 @@ class $$FilmRollsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 completedAt: completedAt,
+                developAvailableAt: developAvailableAt,
                 regionId: regionId,
                 filterId: filterId,
                 filterStrength: filterStrength,
@@ -2943,6 +3023,7 @@ class $$FilmRollsTableTableManager
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<DateTime?> developAvailableAt = const Value.absent(),
                 Value<int?> regionId = const Value.absent(),
                 Value<String?> filterId = const Value.absent(),
                 Value<double?> filterStrength = const Value.absent(),
@@ -2961,6 +3042,7 @@ class $$FilmRollsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 completedAt: completedAt,
+                developAvailableAt: developAvailableAt,
                 regionId: regionId,
                 filterId: filterId,
                 filterStrength: filterStrength,

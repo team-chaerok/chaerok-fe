@@ -9,7 +9,10 @@ import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/course_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
+import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
@@ -42,6 +45,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
   FilmRollState _state = const FilmRollState.initial();
   bool _isResolvingRegion = false;
   bool _isSyncing = false;
+  bool _isExiting = false;
 
   @override
   void initState() {
@@ -117,15 +121,79 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     await _controller.completeVisit(place.id);
   }
 
-  Future<void> _onCompleteTap() async {
-    final success = await _controller.completeFilmRoll();
-    if (!mounted) return;
-    final message = success ? '필름롤을 완료했어요!' : _controller.state.errorMessage;
-    if (message != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+  Future<void> _showExitConfirmDialog() async {
+    final isCompletable =
+        _state.filmRoll?.isCompletable(_state.places) ?? false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('지역을 벗어나 현상할까요?'),
+        content: Text(
+          isCompletable
+              ? '현상을 시작하면 이 필름롤은 더 이상 촬영할 수 없어요.'
+              : '아직 현상 조건(서로 다른 유형 $requiredVisitCategoryCount곳 방문)을 채우지 '
+                    '못했어요.\n지금 벗어나면 현상되지 않아요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(isCompletable ? '현상 시작하기' : '그래도 벗어나기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _startExit();
+  }
+
+  Future<void> _startExit() async {
+    setState(() => _isExiting = true);
+    try {
+      final result = await _controller.exitFilmRoll();
+      if (!mounted) return;
+      if (result.isDeveloping) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('현상을 시작했어요!')));
+      } else {
+        await _showExpiredDialog();
+        if (!mounted) return;
+      }
+      Navigator.of(context).pop();
+    } on ExitNotSyncedException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('아직 서버와 동기화되지 않았어요. 잠시 후 다시 시도해 주세요.')),
+      );
+    } catch (e, st) {
+      log('지역 이탈 확정 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('지역 이탈을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isExiting = false);
     }
+  }
+
+  Future<void> _showExpiredDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('필름롤이 종료됐어요'),
+        content: const Text('현상 조건을 충족하지 못해 이 필름롤은 종료됐어요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -177,11 +245,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
             _buildSyncErrorBanner(),
             const SizedBox(height: ChaerokSpacing.sm),
           ],
-          _buildProgressCard(
-            filmRoll.progress,
-            filmRoll.visitedPlaceCount,
-            filmRoll.totalPlaceCount,
-          ),
+          _buildProgressCard(filmRoll, _state.places),
           const SizedBox(height: ChaerokSpacing.md),
           if (!_state.hasSelectedCourse)
             ChaerokButton(
@@ -193,9 +257,10 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
             ..._state.places.map(_buildPlaceTile),
             const SizedBox(height: ChaerokSpacing.md),
             ChaerokButton(
-              text: '필름롤 완료하기',
-              isEnabled: filmRoll.isCompletable,
-              onPressed: _onCompleteTap,
+              text: '지역을 벗어나 현상하기',
+              isEnabled: filmRoll.isCompletable(_state.places),
+              isLoading: _isExiting,
+              onPressed: _isExiting ? null : _showExitConfirmDialog,
             ),
           ],
         ],
@@ -251,7 +316,12 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     }
   }
 
-  Widget _buildProgressCard(double progress, int visited, int total) {
+  Widget _buildProgressCard(FilmRoll filmRoll, List<FilmRollPlace> places) {
+    final visitedCategoryCount =
+        filmRoll.visitedCategoryCount ?? countDistinctVisitedCategories(places);
+    final requiredCategoryCount =
+        filmRoll.requiredCategoryCount ?? requiredVisitCategoryCount;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(ChaerokSpacing.lg),
@@ -263,12 +333,14 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('방문 진행률', style: ChaerokTypography.bodyMedium),
+          const Text('현상 조건', style: ChaerokTypography.bodyMedium),
           const SizedBox(height: ChaerokSpacing.xs),
           ClipRRect(
             borderRadius: BorderRadius.circular(ChaerokRadius.full),
             child: LinearProgressIndicator(
-              value: progress,
+              value: requiredCategoryCount == 0
+                  ? 0
+                  : visitedCategoryCount / requiredCategoryCount,
               minHeight: 8,
               backgroundColor: ChaerokColors.primaryLight,
               color: ChaerokColors.primary,
@@ -276,8 +348,15 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
           ),
           const SizedBox(height: ChaerokSpacing.xxs),
           Text(
-            '$visited / $total 곳 방문',
+            '서로 다른 관광 유형 $visitedCategoryCount/$requiredCategoryCount',
             style: ChaerokTypography.bodyMedium.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: ChaerokSpacing.xxs),
+          Text(
+            '방문 ${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount} 곳',
+            style: ChaerokTypography.caption.copyWith(
               color: ChaerokColors.textSecondary,
             ),
           ),

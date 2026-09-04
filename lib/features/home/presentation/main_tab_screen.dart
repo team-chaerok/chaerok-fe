@@ -7,6 +7,7 @@ import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/explore/presentation/explore_screen.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_collection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
@@ -64,6 +65,13 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
       if (recovered == null) {
         await _showNoActiveFilmRollSheet();
+        return;
+      }
+
+      if (recovered.status == FilmRollStatus.developing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('현상 중인 필름롤이에요. 완료되면 알려드릴게요.')),
+        );
         return;
       }
 

@@ -14,7 +14,10 @@ class _FakeSyncService implements FilmRollSyncService {
   final calls = <String>[];
 
   @override
-  Future<FilmRollSyncResult> syncFilmRoll(String clientFilmRollId) async {
+  Future<FilmRollSyncResult> syncFilmRoll(
+    String clientFilmRollId, {
+    bool skipRegionCheck = false,
+  }) async {
     calls.add(clientFilmRollId);
     return const FilmRollSyncResult();
   }

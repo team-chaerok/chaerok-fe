@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:chaerok/data/models/course_response.dart';
+import 'package:chaerok/data/models/visit_list_response.dart';
+import 'package:chaerok/data/remote/visits_api.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
-import 'package:chaerok/features/film_roll/domain/usecase/complete_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/complete_visit_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_result.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
@@ -26,8 +29,9 @@ class FilmRollController {
     FilmRollPlaceRepository? filmRollPlaceRepository,
     SelectCourseUseCase? selectCourseUseCase,
     CompleteVisitUseCase? completeVisitUseCase,
-    CompleteFilmRollUseCase? completeFilmRollUseCase,
+    ExitFilmRollUseCase? exitFilmRollUseCase,
     FilmRollSyncService? syncService,
+    Future<VisitListResponse> Function(int filmRollId)? getVisits,
   }) : _onStateChanged = onStateChanged,
        _filmRollRepository =
            filmRollRepository ?? FilmRollModule.instance.filmRollRepository,
@@ -38,10 +42,11 @@ class FilmRollController {
            selectCourseUseCase ?? FilmRollModule.instance.selectCourse,
        _completeVisitUseCase =
            completeVisitUseCase ?? FilmRollModule.instance.completeVisit,
-       _completeFilmRollUseCase =
-           completeFilmRollUseCase ?? FilmRollModule.instance.completeFilmRoll,
+       _exitFilmRollUseCase =
+           exitFilmRollUseCase ?? FilmRollModule.instance.exitFilmRoll,
        _syncService =
-           syncService ?? FilmRollModule.instance.filmRollSyncService;
+           syncService ?? FilmRollModule.instance.filmRollSyncService,
+       _getVisits = getVisits ?? VisitsApi.getVisits;
 
   final String filmRollId;
   final void Function(FilmRollState state) _onStateChanged;
@@ -49,8 +54,9 @@ class FilmRollController {
   final FilmRollPlaceRepository _filmRollPlaceRepository;
   final SelectCourseUseCase _selectCourseUseCase;
   final CompleteVisitUseCase _completeVisitUseCase;
-  final CompleteFilmRollUseCase _completeFilmRollUseCase;
+  final ExitFilmRollUseCase _exitFilmRollUseCase;
   final FilmRollSyncService _syncService;
+  final Future<VisitListResponse> Function(int filmRollId) _getVisits;
 
   FilmRollState _state = const FilmRollState.initial();
 
@@ -98,6 +104,36 @@ class FilmRollController {
     await _reload();
     if (_state.status == FilmRollLoadStatus.loaded) {
       _triggerSync();
+      unawaited(loadVisits());
+    }
+  }
+
+  /// 현상 조건(`VisitsApi.getVisits`)을 조회해 [state.filmRoll]에 반영한다.
+  /// 서버 필름롤이 아직 없으면(미동기화) 아무것도 하지 않는다.
+  Future<void> loadVisits() async {
+    final serverFilmRollId = _state.filmRoll?.serverFilmRollId;
+    if (serverFilmRollId == null || _state.isLoadingVisits) return;
+
+    _emit(_state.copyWith(isLoadingVisits: true, visitsLoadFailed: false));
+    try {
+      final visits = await _getVisits(serverFilmRollId);
+      final filmRoll = _state.filmRoll;
+      if (filmRoll != null) {
+        _emit(
+          _state.copyWith(
+            filmRoll: filmRoll.copyWith(
+              visitRequirementMet: visits.visitRequirementMet,
+              visitedCategoryCount: visits.visitedCategoryCount,
+              requiredCategoryCount: visits.requiredCategoryCount,
+            ),
+          ),
+        );
+      }
+    } catch (e, st) {
+      log('현상 조건 조회 실패', name: _tag, error: e, stackTrace: st);
+      _emit(_state.copyWith(visitsLoadFailed: true));
+    } finally {
+      _emit(_state.copyWith(isLoadingVisits: false));
     }
   }
 
@@ -176,29 +212,17 @@ class FilmRollController {
     }
   }
 
-  Future<bool> completeFilmRoll() async {
-    try {
-      await _completeFilmRollUseCase(filmRollId);
-      await load();
-      return true;
-    } on FilmRollNotCompletableException {
-      _emit(
-        _state.copyWith(
-          status: FilmRollLoadStatus.loaded,
-          errorMessage: '완료 조건(코스 선택 + 전체 방문)을 충족하지 못했습니다.',
-        ),
-      );
-      return false;
-    } catch (e, st) {
-      log('필름롤 완료 실패', name: _tag, error: e, stackTrace: st);
-      _emit(
-        _state.copyWith(
-          status: FilmRollLoadStatus.loaded,
-          errorMessage: e.toString(),
-        ),
-      );
-      return false;
+  /// 지역 이탈을 확정해 현상을 시작한다([ExitFilmRollUseCase]). 완료 후 최신
+  /// 상태를 다시 불러온다. [ExitNotSyncedException] 등 예외는 화면이 처리하도록
+  /// 그대로 던진다(다이얼로그/스낵바 등 UI 대응이 화면마다 다르기 때문).
+  Future<ExitFilmRollResult> exitFilmRoll() async {
+    final filmRoll = _state.filmRoll;
+    if (filmRoll == null) {
+      throw StateError('필름롤이 로드되지 않아 지역 이탈을 확정할 수 없습니다.');
     }
+    final result = await _exitFilmRollUseCase(filmRoll);
+    await load();
+    return result;
   }
 
   void _emit(FilmRollState state) {

@@ -119,7 +119,6 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   }
 
   Widget _buildFilmRollCard(FilmRoll filmRoll) {
-    final isCompleted = filmRoll.status == FilmRollStatus.completed;
     return InkWell(
       onTap: () => _onFilmRollTap(filmRoll),
       borderRadius: BorderRadius.circular(ChaerokRadius.md),
@@ -140,9 +139,7 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
                   Text(filmRoll.title, style: ChaerokTypography.titleMedium),
                   const SizedBox(height: ChaerokSpacing.xxs),
                   Text(
-                    isCompleted
-                        ? '완료 · ${filmRoll.visitedPlaceCount}곳 방문'
-                        : '${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount}곳 방문',
+                    _statusLabel(filmRoll),
                     style: ChaerokTypography.bodyMedium.copyWith(
                       color: ChaerokColors.textSecondary,
                     ),
@@ -150,15 +147,38 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
                 ],
               ),
             ),
-            Icon(
-              isCompleted ? Icons.check_circle : Icons.chevron_right,
-              color: isCompleted
-                  ? ChaerokColors.primary
-                  : ChaerokColors.textSecondary,
-            ),
+            Icon(_statusIcon(filmRoll), color: _statusIconColor(filmRoll)),
           ],
         ),
       ),
     );
+  }
+
+  String _statusLabel(FilmRoll filmRoll) {
+    return switch (filmRoll.status) {
+      FilmRollStatus.completed => '완료 · ${filmRoll.visitedPlaceCount}곳 방문',
+      FilmRollStatus.developing => '현상 중 · 완료까지 대기 중',
+      FilmRollStatus.expired => '만료 · 현상 조건 미충족',
+      FilmRollStatus.inProgress =>
+        '${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount}곳 방문',
+    };
+  }
+
+  IconData _statusIcon(FilmRoll filmRoll) {
+    return switch (filmRoll.status) {
+      FilmRollStatus.completed => Icons.check_circle,
+      FilmRollStatus.developing => Icons.hourglass_bottom,
+      FilmRollStatus.expired => Icons.cancel_outlined,
+      FilmRollStatus.inProgress => Icons.chevron_right,
+    };
+  }
+
+  Color _statusIconColor(FilmRoll filmRoll) {
+    return switch (filmRoll.status) {
+      FilmRollStatus.completed ||
+      FilmRollStatus.developing => ChaerokColors.primary,
+      FilmRollStatus.expired ||
+      FilmRollStatus.inProgress => ChaerokColors.textSecondary,
+    };
   }
 }

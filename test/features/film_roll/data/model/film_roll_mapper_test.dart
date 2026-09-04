@@ -46,6 +46,44 @@ void main() {
     expect(entity.serverStatus, isNull);
   });
 
+  test('FilmRollMapper.toEntity가 developing 상태와 developAvailableAt을 매핑한다', () {
+    final developAvailableAt = DateTime(2026, 9, 5, 15);
+    final row = FilmRollRow(
+      id: 'r3',
+      regionCode: RegionCode.seosan,
+      regionName: '서산시',
+      title: '서산 필름롤',
+      status: FilmRollStatus.developing,
+      createdAt: DateTime(2026, 9, 5),
+      updatedAt: DateTime(2026, 9, 5),
+      developAvailableAt: developAvailableAt,
+    );
+
+    final entity = row.toEntity(totalPlaceCount: 3, visitedPlaceCount: 3);
+
+    expect(entity.status, FilmRollStatus.developing);
+    expect(entity.developAvailableAt, developAvailableAt);
+    expect(entity.isDeveloping, isTrue);
+  });
+
+  test('FilmRollMapper.toEntity가 expired 상태를 매핑한다', () {
+    final row = FilmRollRow(
+      id: 'r4',
+      regionCode: RegionCode.yesan,
+      regionName: '예산군',
+      title: '예산 필름롤',
+      status: FilmRollStatus.expired,
+      createdAt: DateTime(2026, 9, 5),
+      updatedAt: DateTime(2026, 9, 5),
+    );
+
+    final entity = row.toEntity(totalPlaceCount: 1, visitedPlaceCount: 1);
+
+    expect(entity.status, FilmRollStatus.expired);
+    expect(entity.developAvailableAt, isNull);
+    expect(entity.isDeveloping, isFalse);
+  });
+
   test('FilmRollPlaceMapper.toEntity가 visitSyncedAt을 매핑한다', () {
     final syncedAt = DateTime(2026, 8, 30, 12);
     final row = FilmRollPlaceRow(

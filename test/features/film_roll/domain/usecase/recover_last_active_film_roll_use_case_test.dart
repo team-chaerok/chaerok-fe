@@ -10,7 +10,7 @@ import 'package:chaerok/features/film_roll/data/repository/film_roll_repository_
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
 import 'package:chaerok/shared/region/region_code.dart';
-import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -73,6 +73,106 @@ void main() {
     final preferences = AppPreferences.instance;
     expect(await preferences.getLastActiveFilmRollId(), 'roll-1');
 
+    final recoverUseCase = RecoverLastActiveFilmRollUseCase(
+      filmRollRepository: repository,
+      appPreferences: preferences,
+    );
+    final recovered = await recoverUseCase.call();
+
+    expect(recovered, isNull);
+    expect(await preferences.getLastActiveFilmRollId(), isNull);
+
+    await database.close();
+    await tempDir.delete(recursive: true);
+  });
+
+  test('developing 상태의 필름롤은 마지막 활성으로 계속 복구된다(현상 대기 화면 유지)', () async {
+    SharedPreferences.setMockInitialValues({
+      'last_active_film_roll_id': 'roll-2',
+      'current_user_id': 1,
+    });
+    final tempDir = await Directory.systemTemp.createTemp(
+      'recover_use_case_test',
+    );
+    PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir);
+
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final now = DateTime.now();
+    await database
+        .into(database.filmRolls)
+        .insert(
+          FilmRollsCompanion.insert(
+            id: 'roll-2',
+            userId: const Value(1),
+            regionCode: RegionCode.seosan,
+            regionName: '서산시',
+            title: '서산',
+            status: FilmRollStatus.developing,
+            createdAt: now,
+            updatedAt: now,
+            developAvailableAt: Value(now.add(const Duration(hours: 1))),
+          ),
+        );
+
+    final repository = FilmRollRepositoryImpl(
+      database: database,
+      filmRollDataSource: FilmRollLocalDataSource(database),
+      placeDataSource: FilmRollPlaceLocalDataSource(database),
+      photoDataSource: PhotoLocalDataSource(database),
+      photoStorage: LocalPhotoStorage.instance,
+    );
+
+    final preferences = AppPreferences.instance;
+    final recoverUseCase = RecoverLastActiveFilmRollUseCase(
+      filmRollRepository: repository,
+      appPreferences: preferences,
+    );
+    final recovered = await recoverUseCase.call();
+
+    expect(recovered, isNotNull);
+    expect(recovered!.status, FilmRollStatus.developing);
+    expect(await preferences.getLastActiveFilmRollId(), 'roll-2');
+
+    await database.close();
+    await tempDir.delete(recursive: true);
+  });
+
+  test('expired 상태의 필름롤은 마지막 활성 ID에서 정리되고 null이 반환된다', () async {
+    SharedPreferences.setMockInitialValues({
+      'last_active_film_roll_id': 'roll-3',
+      'current_user_id': 1,
+    });
+    final tempDir = await Directory.systemTemp.createTemp(
+      'recover_use_case_test',
+    );
+    PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir);
+
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final now = DateTime.now();
+    await database
+        .into(database.filmRolls)
+        .insert(
+          FilmRollsCompanion.insert(
+            id: 'roll-3',
+            userId: const Value(1),
+            regionCode: RegionCode.yesan,
+            regionName: '예산군',
+            title: '예산',
+            status: FilmRollStatus.expired,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+    final repository = FilmRollRepositoryImpl(
+      database: database,
+      filmRollDataSource: FilmRollLocalDataSource(database),
+      placeDataSource: FilmRollPlaceLocalDataSource(database),
+      photoDataSource: PhotoLocalDataSource(database),
+      photoStorage: LocalPhotoStorage.instance,
+    );
+
+    final preferences = AppPreferences.instance;
     final recoverUseCase = RecoverLastActiveFilmRollUseCase(
       filmRollRepository: repository,
       appPreferences: preferences,

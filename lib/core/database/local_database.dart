@@ -24,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   static AppDatabase get instance => _instance ??= AppDatabase._();
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -61,6 +61,12 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(filmRolls, filmRolls.serverFilmRollId);
           await m.addColumn(filmRolls, filmRolls.serverStatus);
           await m.addColumn(filmRollPlaces, filmRollPlaces.visitSyncedAt);
+        }
+        // v5: 지역 이탈 확정 → 현상 대기 → 현상 완료 라이프사이클 도입.
+        // FilmRollStatus.developing/expired는 문자열 컬럼값이라 스키마 변경이
+        // 아니지만, 현상 완료 예정 시각을 보관할 컬럼은 새로 필요하다.
+        if (from < 5) {
+          await m.addColumn(filmRolls, filmRolls.developAvailableAt);
         }
       },
       // FilmRolls 삭제 시 FilmRollPlaces/Photos가 cascade로 함께 삭제되도록

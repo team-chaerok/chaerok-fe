@@ -35,7 +35,10 @@ class _FakeSyncService implements FilmRollSyncService {
   Completer<void>? gate;
 
   @override
-  Future<FilmRollSyncResult> syncFilmRoll(String clientFilmRollId) async {
+  Future<FilmRollSyncResult> syncFilmRoll(
+    String clientFilmRollId, {
+    bool skipRegionCheck = false,
+  }) async {
     calls++;
     if (gate != null) await gate!.future;
     return next;

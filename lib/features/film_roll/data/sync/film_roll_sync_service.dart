@@ -65,7 +65,15 @@ class FilmRollSyncService {
   /// 현재 위치가 속한 지역을 반환한다(동기화는 이 지역과 필름롤 지역이 일치할 때만).
   final RegionCode? Function() _currentRegion;
 
-  Future<FilmRollSyncResult> syncFilmRoll(String clientFilmRollId) async {
+  /// [skipRegionCheck]가 true면 아래 지역 일치 검사를 건너뛴다. 지역 이탈을
+  /// 확정(`exitFilmRoll`)하려는데 서버 필름롤이 아직 없는 경우처럼, 이미
+  /// 필름롤 지역을 벗어난 상태에서도 서버 생성/미전송 방문 반영이 필요한
+  /// 호출부(`ExitFilmRollUseCase`)를 위한 탈출구다. 기본값은 false로, 기존
+  /// 호출부(`EnterRegionUseCase`, `FilmRollController`)는 영향받지 않는다.
+  Future<FilmRollSyncResult> syncFilmRoll(
+    String clientFilmRollId, {
+    bool skipRegionCheck = false,
+  }) async {
     final filmRoll = await _filmRollRepository.findById(clientFilmRollId);
     // findById는 현재 로그인 계정으로 스코핑돼 있으므로, null이면 없는
     // 필름롤이거나 다른 계정 소유다. 어느 쪽이든 동기화하지 않는다.
@@ -77,7 +85,7 @@ class FilmRollSyncService {
     // 현재 위치가 이 필름롤의 지역과 일치할 때만 동기화한다. 필름 컬렉션에서
     // 다른 지역 필름롤을 열어봐도 서버 생성/방문 요청이 나가지 않도록 한다.
     // 위치 인증 이력이 없으면(sessionCache null) 확인 불가로 보고 보류한다.
-    if (_currentRegion() != filmRoll.regionCode) {
+    if (!skipRegionCheck && _currentRegion() != filmRoll.regionCode) {
       return const FilmRollSyncResult();
     }
 

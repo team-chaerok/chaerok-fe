@@ -10,11 +10,11 @@ import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
-import 'package:chaerok/features/film_roll/domain/usecase/complete_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/complete_visit_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_photo_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/enter_region_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_photo_count_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
@@ -53,12 +53,15 @@ class FilmRollModule {
     savePhoto = SavePhotoUseCase(photoRepository);
     deletePhoto = DeletePhotoUseCase(photoRepository);
     getFilmRollPhotoCount = GetFilmRollPhotoCountUseCase(photoRepository);
-    completeFilmRoll = CompleteFilmRollUseCase(filmRollRepository);
     recoverLastActiveFilmRoll = RecoverLastActiveFilmRollUseCase(
       filmRollRepository: filmRollRepository,
     );
     deleteFilmRoll = DeleteFilmRollUseCase(
       filmRollRepository: filmRollRepository,
+    );
+    exitFilmRoll = ExitFilmRollUseCase(
+      filmRollRepository: filmRollRepository,
+      syncService: filmRollSyncService,
     );
   }
 
@@ -79,7 +82,7 @@ class FilmRollModule {
   late final SavePhotoUseCase savePhoto;
   late final DeletePhotoUseCase deletePhoto;
   late final GetFilmRollPhotoCountUseCase getFilmRollPhotoCount;
-  late final CompleteFilmRollUseCase completeFilmRoll;
   late final RecoverLastActiveFilmRollUseCase recoverLastActiveFilmRoll;
   late final DeleteFilmRollUseCase deleteFilmRoll;
+  late final ExitFilmRollUseCase exitFilmRoll;
 }

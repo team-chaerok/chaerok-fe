@@ -194,34 +194,6 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
   }
 
   @override
-  Future<void> completeFilmRoll(String filmRollId) {
-    return _db.transaction(() async {
-      final row = await _filmRollDs.findById(filmRollId);
-      if (row == null) {
-        throw StateError('필름롤을 찾을 수 없습니다: $filmRollId');
-      }
-
-      final total = await _placeDs.countByFilmRoll(filmRollId);
-      final visited = await _placeDs.countVisitedByFilmRoll(filmRollId);
-      final isCompletable =
-          row.selectedCourseId != null && total > 0 && visited >= total;
-      if (!isCompletable) {
-        throw const FilmRollNotCompletableException();
-      }
-
-      final now = DateTime.now();
-      await _filmRollDs.update(
-        filmRollId,
-        FilmRollsCompanion(
-          status: const Value(FilmRollStatus.completed),
-          completedAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
-    });
-  }
-
-  @override
   Future<void> deleteFilmRoll(String filmRollId) async {
     // _filmRollDs.deleteById도 계정으로 스코핑돼 다른 계정 소유 행은 지우지
     // 않지만, 사진 원본 파일 삭제는 Drift를 거치지 않는 별도의 파일 시스템
@@ -278,6 +250,42 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
       clientFilmRollId,
       FilmRollsCompanion(
         serverStatus: Value(serverStatus),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Future<void> markDeveloping({
+    required String clientFilmRollId,
+    required DateTime developAvailableAt,
+    String? serverStatus,
+  }) {
+    return _filmRollDs.update(
+      clientFilmRollId,
+      FilmRollsCompanion(
+        status: const Value(FilmRollStatus.developing),
+        developAvailableAt: Value(developAvailableAt),
+        serverStatus: serverStatus == null
+            ? const Value.absent()
+            : Value(serverStatus),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Future<void> markExpired({
+    required String clientFilmRollId,
+    String? serverStatus,
+  }) {
+    return _filmRollDs.update(
+      clientFilmRollId,
+      FilmRollsCompanion(
+        status: const Value(FilmRollStatus.expired),
+        serverStatus: serverStatus == null
+            ? const Value.absent()
+            : Value(serverStatus),
         updatedAt: Value(DateTime.now()),
       ),
     );
