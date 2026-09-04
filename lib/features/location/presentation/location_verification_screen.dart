@@ -11,13 +11,16 @@ import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
+import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
 import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
+import 'package:chaerok/features/location/presentation/widgets/location_verification_idle_view.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const _serviceProvinceName = '충청남도';
@@ -29,6 +32,8 @@ const _debugFallbackProvinceName = '충청남도';
 const _debugFallbackCityCountyName = '공주시';
 
 enum _Step {
+  /// 인증 전 기본 뷰(지도 미리보기 + 안내 + FAQ + CTA).
+  idle,
   checking,
   permissionDenied,
   permissionPermanentlyDenied,
@@ -53,13 +58,56 @@ class _LocationVerificationScreenState
     extends State<LocationVerificationScreen> {
   static const _tag = 'LocationVerificationScreen';
 
-  _Step _step = _Step.checking;
+  _Step _step = _Step.idle;
   bool _isLocationServiceEnabled = true;
+
+  /// 카카오맵 네이티브 뷰는 첫 프레임 이후에 붙인다(탭 진입 전 지연 로드).
+  bool _mapEnabled = false;
+
+  /// 인증 전 지도 미리보기에 표시할 현재 좌표(best-effort). 권한이 없으면 null.
+  Position? _previewPosition;
+  bool _isReloadingPreview = false;
+
+  /// 재조준 시 카메라를 다시 현재 위치로 옮기기 위한 포커스 마커. 매 재조회마다
+  /// 새 id를 부여해 [ExploreMapView]가 카메라 이동을 다시 수행하도록 한다.
+  ExploreMapMarker? _previewFocus;
+  int _previewFocusTick = 0;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_run());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _mapEnabled = true);
+    });
+    unawaited(_loadPreviewPosition());
+  }
+
+  /// 인증 전 지도 미리보기에 쓸 현재 좌표를 조회한다. 권한 다이얼로그를 띄우지
+  /// 않고, 실패해도 오류 화면 없이 지도만 비워둔다(인증은 CTA에서 시작).
+  Future<void> _loadPreviewPosition() async {
+    if (_isReloadingPreview) return;
+    setState(() => _isReloadingPreview = true);
+    try {
+      final locationProvider = await LocationProviderFactory.create();
+      final position = await locationProvider.getCurrentPosition();
+      if (!mounted) return;
+      if (position != null) {
+        setState(() {
+          _previewPosition = position;
+          _previewFocus = ExploreMapMarker(
+            id: 'preview-${++_previewFocusTick}',
+            latitude: position.latitude,
+            longitude: position.longitude,
+            label: '',
+            state: ExploreMarkerState.currentLocation,
+          );
+        });
+      }
+    } catch (e, st) {
+      log('위치 미리보기 좌표 조회 실패', name: _tag, error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _isReloadingPreview = false);
+    }
   }
 
   Future<void> _run() async {
@@ -190,15 +238,58 @@ class _LocationVerificationScreenState
         elevation: 0,
         title: const Text('위치 인증', style: ChaerokTypography.titleMedium),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(ChaerokSpacing.xxl),
-        child: _buildContent(),
-      ),
+      body: _step == _Step.idle
+          ? LocationVerificationIdleView(
+              mapPreview: _buildMapPreview(),
+              isReloading: _isReloadingPreview,
+              onVerifyTap: () => unawaited(_run()),
+              onReloadTap: () => unawaited(_loadPreviewPosition()),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(ChaerokSpacing.xxl),
+              child: _buildContent(),
+            ),
+    );
+  }
+
+  /// 인증 전 상단 지도 미리보기: 현재 좌표에 고정된 원형 도트 마커 + 우하단
+  /// 재조준 버튼. 마커는 지도 좌표에 묶여 있어, 지도를 움직여도 실제 위치를
+  /// 계속 가리킨다.
+  Widget _buildMapPreview() {
+    final position = _previewPosition;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ExploreMapView(
+            markers: position == null
+                ? const []
+                : [
+                    ExploreMapMarker(
+                      id: 'current-location',
+                      latitude: position.latitude,
+                      longitude: position.longitude,
+                      label: '',
+                      state: ExploreMarkerState.currentLocation,
+                    ),
+                  ],
+            focus: _previewFocus,
+            enabled: _mapEnabled,
+          ),
+        ),
+        Positioned(
+          right: ChaerokSpacing.md,
+          bottom: ChaerokSpacing.md,
+          child: _RecenterButton(
+            onTap: () => unawaited(_loadPreviewPosition()),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildContent() {
     return switch (_step) {
+      _Step.idle => const SizedBox.shrink(),
       _Step.checking => const Center(child: ChaerokLoadingIndicator()),
       _Step.permissionDenied => _buildInfoCard(
         title: '위치 권한이 필요해요',
@@ -291,6 +382,35 @@ class _LocationVerificationScreenState
           ),
         ],
       ],
+    );
+  }
+}
+
+/// 지도 미리보기 우하단의 "현재 위치로 이동(재조준)" 버튼.
+class _RecenterButton extends StatelessWidget {
+  const _RecenterButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ChaerokColors.background,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: const SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(
+            Icons.my_location_rounded,
+            color: ChaerokColors.primaryDark,
+            size: 22,
+          ),
+        ),
+      ),
     );
   }
 }
