@@ -66,10 +66,11 @@ class _FakeFilmRollRepository implements FilmRollRepository {
 }
 
 class _FakeSyncService implements FilmRollSyncService {
-  _FakeSyncService({this.onSync});
+  _FakeSyncService({this.onSync, this.result = const FilmRollSyncResult()});
 
   final calls = <String>[];
   final void Function()? onSync;
+  final FilmRollSyncResult result;
 
   @override
   Future<FilmRollSyncResult> syncFilmRoll(
@@ -78,7 +79,7 @@ class _FakeSyncService implements FilmRollSyncService {
   }) async {
     calls.add(clientFilmRollId);
     onSync?.call();
-    return const FilmRollSyncResult();
+    return result;
   }
 }
 
@@ -189,4 +190,78 @@ void main() {
       throwsA(isA<ExitNotSyncedException>()),
     );
   });
+
+  test('serverFilmRollId가 이미 있어도 exit 전에 미전송 방문을 동기화한다', () async {
+    final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
+    final sync = _FakeSyncService(
+      result: const FilmRollSyncResult(visitsPushed: 2),
+    );
+    final useCase = ExitFilmRollUseCase(
+      filmRollRepository: repo,
+      syncService: sync,
+      exitFilmRoll: (id) async => FilmRollExitResponse(
+        filmRollId: id,
+        status: 'READY_TO_RENDER',
+        exitedAt: DateTime(2026, 9, 5, 15),
+        developAvailableAt: DateTime(2026, 9, 5, 16),
+        developAvailable: true,
+      ),
+    );
+
+    final result = await useCase.call(repo.filmRoll);
+
+    // serverFilmRollId가 이미 있었어도 exit 전에 동기화(방문 flush)가 호출돼야 한다.
+    expect(sync.calls, ['fr-1']);
+    expect(result.isDeveloping, isTrue);
+  });
+
+  test(
+    '동기화가 실패(hasError)하면 exit를 호출하지 않고 ExitNotSyncedException을 던진다',
+    () async {
+      final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
+      final sync = _FakeSyncService(
+        result: FilmRollSyncResult(error: StateError('네트워크 오류')),
+      );
+      final useCase = ExitFilmRollUseCase(
+        filmRollRepository: repo,
+        syncService: sync,
+        exitFilmRoll: (_) async =>
+            throw StateError('호출되면 안 됨 — 동기화 실패 시 exit 보류'),
+      );
+
+      await expectLater(
+        useCase.call(repo.filmRoll),
+        throwsA(isA<ExitNotSyncedException>()),
+      );
+      expect(repo.markDevelopingCalls, isEmpty);
+      expect(repo.markExpiredCalls, isEmpty);
+    },
+  );
+
+  test(
+    'visitsSkipped만 있고 hasError는 없으면(서버 placeId 없는 방문) exit를 막지 않는다',
+    () async {
+      // serverPlaceId가 없는 방문은 재시도해도 동기화될 수 없는 구조적 상태라,
+      // 이 경우까지 exit을 막으면 정상 완료 가능한 필름롤이 영구히 갇힌다.
+      final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
+      final sync = _FakeSyncService(
+        result: const FilmRollSyncResult(visitsSkipped: 1),
+      );
+      final useCase = ExitFilmRollUseCase(
+        filmRollRepository: repo,
+        syncService: sync,
+        exitFilmRoll: (id) async => FilmRollExitResponse(
+          filmRollId: id,
+          status: 'READY_TO_RENDER',
+          exitedAt: DateTime(2026, 9, 5, 15),
+          developAvailableAt: DateTime(2026, 9, 5, 16),
+          developAvailable: true,
+        ),
+      );
+
+      final result = await useCase.call(repo.filmRoll);
+
+      expect(result.isDeveloping, isTrue);
+    },
+  );
 }
