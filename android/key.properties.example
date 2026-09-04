@@ -1,0 +1,9 @@
+# 이 파일을 복사해 `android/key.properties`를 만들고 실제 값으로 채운다.
+#   cp android/key.properties.example android/key.properties
+# key.properties 와 *.jks 는 .gitignore 처리되어 커밋되지 않는다. 절대 커밋/공유 금지.
+storePassword=<키스토어 비밀번호>
+keyPassword=<키(alias) 비밀번호>
+keyAlias=upload
+# 키스토어 파일 경로. android/ 디렉터리 기준 상대경로 또는 절대경로.
+# 예) android/upload-keystore.jks 에 두면 아래처럼:
+storeFile=upload-keystore.jks

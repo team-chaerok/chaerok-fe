@@ -29,15 +29,26 @@ class MainTabScreen extends StatefulWidget {
 class _MainTabScreenState extends State<MainTabScreen> {
   static const _tag = 'MainTabScreen';
 
+  /// 채록길 탭 인덱스. 이 탭으로 이동하거나 카메라 액션이 끝나면
+  /// 진행중 필름롤 상태가 바뀌었을 수 있으므로 모드를 재평가한다.
+  static const _exploreTabIndex = 1;
+
+  final GlobalKey<ExploreScreenState> _exploreKey =
+      GlobalKey<ExploreScreenState>();
+
   int _selectedIndex = 0;
   bool _isResolvingCameraEntry = false;
 
   void _onTabSelected(int index) {
     setState(() => _selectedIndex = index);
+    if (index == _exploreTabIndex) {
+      unawaited(_exploreKey.currentState?.reevaluate() ?? Future.value());
+    }
   }
 
   void _onExploreRequested() {
-    setState(() => _selectedIndex = 1);
+    setState(() => _selectedIndex = _exploreTabIndex);
+    unawaited(_exploreKey.currentState?.reevaluate() ?? Future.value());
   }
 
   /// 카메라 액션: 진행중 필름롤이 있으면 다음 미방문 장소 촬영으로 바로 진입하고,
@@ -105,6 +116,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
       ).showSnackBar(const SnackBar(content: Text('카메라를 여는 중 문제가 발생했어요.')));
     } finally {
       if (mounted) setState(() => _isResolvingCameraEntry = false);
+      unawaited(_exploreKey.currentState?.reevaluate() ?? Future.value());
     }
   }
 
@@ -170,11 +182,11 @@ class _MainTabScreenState extends State<MainTabScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [
-          HomeDashboardScreen(),
-          ExploreScreen(),
-          FilmRollCollectionScreen(),
-          MyScreen(),
+        children: [
+          const HomeDashboardScreen(),
+          ExploreScreen(key: _exploreKey),
+          const FilmRollCollectionScreen(),
+          const MyScreen(),
         ],
       ),
       bottomNavigationBar: HomeBottomNavigation(
