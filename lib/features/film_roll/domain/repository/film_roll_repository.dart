@@ -67,4 +67,20 @@ abstract class FilmRollRepository {
   /// 계정 스코프 도입 이전에 생성돼 계정이 비어있는 레거시 필름롤을
   /// [userId] 소유로 1회 확정한다. 이미 계정이 확정된 행은 건드리지 않는다.
   Future<void> claimLegacyData(int userId);
+
+  /// 지역 이탈 확정(`exitFilmRoll`) 응답이 현상 예약(`READY_TO_RENDER`)일 때
+  /// 로컬 필름롤을 [FilmRollStatus.developing]으로 전환하고 현상 완료 예정
+  /// 시각을 저장한다. 코스/방문 조건은 서버가 이미 판정했으므로 별도 게이트가 없다.
+  Future<void> markDeveloping({
+    required String clientFilmRollId,
+    required DateTime developAvailableAt,
+    String? serverStatus,
+  });
+
+  /// 지역 이탈 확정(`exitFilmRoll`) 응답이 조건 미충족(`EXPIRED`)일 때 로컬
+  /// 필름롤을 [FilmRollStatus.expired]로 전환한다.
+  Future<void> markExpired({
+    required String clientFilmRollId,
+    String? serverStatus,
+  });
 }

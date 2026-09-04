@@ -41,3 +41,13 @@ class InvalidCoursePlaceException implements Exception {
       'InvalidCoursePlaceException: "$placeName" 장소의 좌표 정보가 유효하지 않아 '
       '코스를 확정할 수 없습니다${reason == null ? '' : ' ($reason)'}.';
 }
+
+/// 지역 이탈을 확정(`exitFilmRoll`)하려는데 서버 필름롤이 아직 없고, 이 시점에
+/// 동기화를 시도해도 서버 필름롤을 확보하지 못했을 때 발생하는 예외.
+class ExitNotSyncedException implements Exception {
+  const ExitNotSyncedException();
+
+  @override
+  String toString() =>
+      'ExitNotSyncedException: 서버와 동기화되지 않아 지역 이탈을 확정할 수 없습니다.';
+}

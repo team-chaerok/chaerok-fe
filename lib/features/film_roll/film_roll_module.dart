@@ -15,6 +15,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/complete_visit_use_cas
 import 'package:chaerok/features/film_roll/domain/usecase/delete_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_photo_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/enter_region_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_photo_count_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
@@ -60,6 +61,10 @@ class FilmRollModule {
     deleteFilmRoll = DeleteFilmRollUseCase(
       filmRollRepository: filmRollRepository,
     );
+    exitFilmRoll = ExitFilmRollUseCase(
+      filmRollRepository: filmRollRepository,
+      syncService: filmRollSyncService,
+    );
   }
 
   static FilmRollModule? _instance;
@@ -82,4 +87,5 @@ class FilmRollModule {
   late final CompleteFilmRollUseCase completeFilmRoll;
   late final RecoverLastActiveFilmRollUseCase recoverLastActiveFilmRoll;
   late final DeleteFilmRollUseCase deleteFilmRoll;
+  late final ExitFilmRollUseCase exitFilmRoll;
 }

@@ -3,8 +3,8 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
 
-/// 앱 재시작 시 마지막으로 진행 중이던 필름롤을 복구한다.
-/// 저장된 ID가 없거나, 해당 필름롤이 삭제/완료되었다면 저장값을 정리하고 null을 반환한다.
+/// 앱 재시작 시 마지막으로 진행 중이거나 현상 대기 중이던 필름롤을 복구한다.
+/// 저장된 ID가 없거나, 해당 필름롤이 삭제/완료/만료되었다면 저장값을 정리하고 null을 반환한다.
 class RecoverLastActiveFilmRollUseCase {
   const RecoverLastActiveFilmRollUseCase({
     required FilmRollRepository filmRollRepository,
@@ -21,7 +21,10 @@ class RecoverLastActiveFilmRollUseCase {
     if (lastActiveFilmRollId == null) return null;
 
     final filmRoll = await _filmRollRepository.findById(lastActiveFilmRollId);
-    if (filmRoll == null || filmRoll.status != FilmRollStatus.inProgress) {
+    final isActive =
+        filmRoll?.status == FilmRollStatus.inProgress ||
+        filmRoll?.status == FilmRollStatus.developing;
+    if (filmRoll == null || !isActive) {
       await preferences.setLastActiveFilmRollId(null);
       return null;
     }

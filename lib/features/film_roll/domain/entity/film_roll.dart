@@ -21,6 +21,7 @@ class FilmRoll {
     this.regionId,
     this.serverFilmRollId,
     this.serverStatus,
+    this.developAvailableAt,
   });
 
   /// 필름롤당 촬영 가능한 고정 노출수(실제 필름 카메라의 24매 필름 컨셉).
@@ -38,6 +39,10 @@ class FilmRoll {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
+
+  /// 지역 이탈 확정([FilmRollStatus.developing]) 시 서버가 알려준 현상 완료
+  /// 예정 시각. developing 상태에서만 값이 있다.
+  final DateTime? developAvailableAt;
 
   /// 백엔드 지역 ID(`RegionsApi.resolveRegion`이 반환). 서버 필름롤 생성에 필요.
   final int? regionId;
@@ -58,6 +63,9 @@ class FilmRoll {
       totalPlaceCount > 0 &&
       visitedPlaceCount >= totalPlaceCount;
 
+  /// 지역 이탈이 확정되어 현상 완료를 기다리는 중인지 여부.
+  bool get isDeveloping => status == FilmRollStatus.developing;
+
   FilmRoll copyWith({
     String? selectedCourseId,
     String? selectedCourseTitle,
@@ -69,6 +77,7 @@ class FilmRoll {
     int? regionId,
     int? serverFilmRollId,
     String? serverStatus,
+    DateTime? developAvailableAt,
   }) {
     return FilmRoll(
       id: id,
@@ -86,6 +95,7 @@ class FilmRoll {
       regionId: regionId ?? this.regionId,
       serverFilmRollId: serverFilmRollId ?? this.serverFilmRollId,
       serverStatus: serverStatus ?? this.serverStatus,
+      developAvailableAt: developAvailableAt ?? this.developAvailableAt,
     );
   }
 }
