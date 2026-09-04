@@ -74,6 +74,9 @@ dev_dependencies:
   permission_handler_platform_interface: ^4.3.0
   drift_dev: ^2.20.3
   build_runner: ^2.4.13
+  # drift가 내부적으로 쓰는 패키지지만, 마이그레이션 테스트에서 v4 스키마
+  # 픽스처를 직접 만들기 위해 raw sqlite3 핸들이 필요해 명시 의존성으로 추가.
+  sqlite3: ^2.9.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
