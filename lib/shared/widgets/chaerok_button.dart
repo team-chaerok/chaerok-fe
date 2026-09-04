@@ -13,6 +13,7 @@ class ChaerokButton extends StatelessWidget {
     this.isFullWidth = true,
     this.isEnabled = true,
     this.isLoading = false,
+    this.backgroundColor = ChaerokColors.primary,
   });
 
   final String text;
@@ -20,6 +21,9 @@ class ChaerokButton extends StatelessWidget {
   final bool isFullWidth;
   final bool isEnabled;
   final bool isLoading;
+
+  /// 버튼 배경색. 기본값은 브랜드 primary이며, 강조 CTA에는 primaryDark 등을 지정한다.
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -29,10 +33,10 @@ class ChaerokButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isEnabled && !isLoading ? onPressed : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: ChaerokColors.primary,
+          backgroundColor: backgroundColor,
           foregroundColor: Colors.white,
           disabledBackgroundColor: isLoading
-              ? ChaerokColors.primary
+              ? backgroundColor
               : ChaerokColors.border,
           disabledForegroundColor: isLoading
               ? Colors.white

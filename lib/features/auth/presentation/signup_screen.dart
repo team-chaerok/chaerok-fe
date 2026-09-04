@@ -9,7 +9,7 @@ import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/signup_request.dart';
 import 'package:chaerok/data/remote/auth_api.dart';
 import 'package:chaerok/features/auth/data/current_account_sync.dart';
-import 'package:chaerok/features/home/presentation/main_tab_screen.dart';
+import 'package:chaerok/features/auth/presentation/signup_navigation.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:dio/dio.dart';
@@ -89,10 +89,7 @@ class _SignupScreenState extends State<SignupScreen> {
         log('위치 권한 요청 실패 - ${_toErrorMessage(e)}', name: _tag, stackTrace: st);
       }
       if (!mounted) return;
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainTabScreen()),
-      );
+      await SignupNavigation.toMainViaLocationVerification(context);
     } catch (e, st) {
       log('회원가입 실패 - ${_toErrorMessage(e)}', name: _tag, stackTrace: st);
       if (mounted) setState(() => _errorMessage = _toErrorMessage(e));

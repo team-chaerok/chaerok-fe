@@ -24,6 +24,10 @@ enum ExploreMarkerState {
 
   /// 진행: 현재 위치 기준 방문 인증 가능.
   verifiable,
+
+  /// "현재 내 위치"를 나타내는 원형 도트(아이콘 없음). 위치 인증 미리보기 등에서
+  /// 지도 좌표에 고정되어, 지도를 움직여도 실제 위치를 계속 가리킨다.
+  currentLocation,
 }
 
 /// 지도에 찍을 마커 한 건.
@@ -212,6 +216,36 @@ class _MarkerBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (state == ExploreMarkerState.currentLocation) {
+      // KImage.fromWidget 캔버스(_markerSize)에 꽉 채우면 그림자가 잘리므로,
+      // 도트를 캔버스보다 작게 두고 가장자리에 블러 여유를 남긴다.
+      return Center(
+        child: Container(
+          width: 20,
+          height: 20,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 2,
+              ),
+            ],
+          ),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              color: ChaerokColors.error,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      );
+    }
+
     final (color, icon) = switch (state) {
       ExploreMarkerState.normal => (ChaerokColors.primary, Icons.place),
       ExploreMarkerState.recommended => (
@@ -231,6 +265,7 @@ class _MarkerBadge extends StatelessWidget {
         ChaerokColors.error,
         Icons.my_location_rounded,
       ),
+      ExploreMarkerState.currentLocation => (ChaerokColors.error, Icons.circle),
     };
 
     return Container(
