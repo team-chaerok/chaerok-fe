@@ -14,6 +14,7 @@ class UserResponse {
     required this.nickname,
     required this.email,
     required this.role,
+    this.isTester = false,
   });
 
   factory UserResponse.fromJson(Map<String, dynamic> json) {
@@ -23,6 +24,7 @@ class UserResponse {
       nickname: json['nickname'] as String,
       email: json['email'] as String?,
       role: UserRole.fromJson(json['role'] as String),
+      isTester: json['isTester'] as bool? ?? false,
     );
   }
 
@@ -31,4 +33,8 @@ class UserResponse {
   final String nickname;
   final String? email;
   final UserRole role;
+
+  /// Play 심사 등에서 실제 이동 없이 인증 흐름을 재현하기 위해 mock 위치를
+  /// 허용할지 판단하는 서버 플래그. 서버 응답에 필드가 없으면 false.
+  final bool isTester;
 }

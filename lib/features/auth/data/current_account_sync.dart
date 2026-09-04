@@ -55,6 +55,7 @@ class CurrentAccountSync {
       final user = await fetchCurrentUserOrDefault();
       await repository.claimLegacyData(user.id);
       await preferences.setCurrentUserId(user.id);
+      await preferences.setTester(user.isTester);
     } catch (e, st) {
       log('현재 계정 동기화 실패', name: _tag, error: e, stackTrace: st);
     }
