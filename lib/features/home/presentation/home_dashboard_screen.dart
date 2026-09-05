@@ -99,10 +99,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       return;
     }
 
-    final result = await Navigator.of(context).push<LocationVerificationResult>(
-      MaterialPageRoute(builder: (_) => const LocationVerificationScreen()),
-    );
-    if (!mounted || result == null) return;
+    final outcome = await Navigator.of(context)
+        .push<LocationVerificationOutcome>(
+          MaterialPageRoute(builder: (_) => const LocationVerificationScreen()),
+        );
+    if (!mounted || outcome is! LocationVerified) return;
+    final result = outcome.result;
     setState(() => _locationResult = result);
     unawaited(_onLocationVerified(result));
   }

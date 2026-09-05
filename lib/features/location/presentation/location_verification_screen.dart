@@ -45,9 +45,16 @@ enum _Step {
 
 /// 위치 권한 확인 → 좌표 획득 → 행정구역 판별 → 서비스 지역 검증 → 관광지 조회를
 /// 하나의 흐름으로 오케스트레이션하는 실제 위치 인증 화면.
-/// 성공 시 [LocationVerificationResult]를 반환하며 `Navigator.pop`으로 닫힌다.
+/// 종료 시 [LocationVerificationOutcome]를 반환하며 `Navigator.pop`으로 닫힌다.
 class LocationVerificationScreen extends StatefulWidget {
-  const LocationVerificationScreen({super.key});
+  const LocationVerificationScreen({
+    super.key,
+    @visibleForTesting this.debugInitialOutOfServiceArea = false,
+  });
+
+  /// 테스트에서 outOfServiceArea 스텝을 바로 렌더하기 위한 플래그.
+  @visibleForTesting
+  final bool debugInitialOutOfServiceArea;
 
   @override
   State<LocationVerificationScreen> createState() =>
@@ -76,6 +83,10 @@ class _LocationVerificationScreenState
   @override
   void initState() {
     super.initState();
+    if (widget.debugInitialOutOfServiceArea) {
+      LocationVerificationResult.outOfServiceSessionCache = true;
+      _step = _Step.outOfServiceArea;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _mapEnabled = true);
     });
@@ -117,7 +128,7 @@ class _LocationVerificationScreenState
     if (cached != null) {
       log('세션 캐시된 위치 인증 결과 재사용', name: _tag);
       if (!mounted) return;
-      Navigator.of(context).pop(cached);
+      Navigator.of(context).pop(LocationVerified(cached));
       return;
     }
 
@@ -171,6 +182,7 @@ class _LocationVerificationScreenState
         administrativeRegion.provinceName != _serviceProvinceName;
     final useDebugFallbackRegion = kDebugMode && isOutOfServiceArea;
     if (isOutOfServiceArea && !useDebugFallbackRegion) {
+      LocationVerificationResult.outOfServiceSessionCache = true;
       setState(() => _step = _Step.outOfServiceArea);
       return;
     }
@@ -203,6 +215,7 @@ class _LocationVerificationScreenState
     if (!mounted) return;
 
     if (!region.serviceArea) {
+      LocationVerificationResult.outOfServiceSessionCache = true;
       setState(() => _step = _Step.outOfServiceArea);
       return;
     }
@@ -217,7 +230,7 @@ class _LocationVerificationScreenState
         places: places,
       );
       LocationVerificationResult.sessionCache = result;
-      Navigator.of(context).pop(result);
+      Navigator.of(context).pop(LocationVerified(result));
     } catch (e, st) {
       log('관광지 조회 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
@@ -318,10 +331,11 @@ class _LocationVerificationScreenState
       _Step.outOfServiceArea => _buildInfoCard(
         title: '서비스 지역이 아니에요',
         description:
-            '채록은 현재 충청남도 지역에서만 이용할 수 있어요.\n'
-            '충청남도 전용 기능은 이용이 제한됩니다.',
-        buttonText: '메인으로 돌아가기',
-        onPressed: () => Navigator.of(context).pop(),
+            '채록의 필름롤은 현재 충청남도 지역에서만 시작할 수 있어요.\n'
+            '대신 공주·부여·서산·예산을 지역별로 둘러볼 수 있어요.',
+        buttonText: '지역별로 둘러보기',
+        onPressed: () =>
+            Navigator.of(context).pop(const LocationOutOfService()),
       ),
       _Step.regionVerificationFailed => _buildInfoCard(
         title: '지역 정보를 확인하지 못했어요',
