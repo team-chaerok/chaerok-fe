@@ -1,9 +1,11 @@
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_detail_panel.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_place_strip.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
 import 'package:chaerok/shared/region/region_code.dart';
+import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -110,5 +112,73 @@ void main() {
     expect(find.text('수덕사'), findsOneWidget);
     await tester.tap(find.text('전체보기'));
     expect(seeAll, isTrue);
+  });
+
+  group('RegionDetailPanel', () {
+    Widget host({
+      required RegionLoadStatus status,
+      List<PlaceListResponse> places = const [],
+      VoidCallback? onRetry,
+      ValueChanged<RegionCode>? onExplore,
+    }) {
+      return MaterialApp(
+        home: Scaffold(
+          body: RegionDetailPanel(
+            region: RegionCode.yesan,
+            status: status,
+            places: places,
+            onRetry: onRetry ?? () {},
+            onExploreRegionRequested: onExplore ?? (_) {},
+          ),
+        ),
+      );
+    }
+
+    testWidgets('loading이면 인디케이터', (tester) async {
+      await tester.pumpWidget(host(status: RegionLoadStatus.loading));
+      expect(find.byType(ChaerokLoadingIndicator), findsOneWidget);
+    });
+
+    testWidgets('error이면 다시 시도 버튼, 탭 시 onRetry', (tester) async {
+      var retried = false;
+      await tester.pumpWidget(
+        host(status: RegionLoadStatus.error, onRetry: () => retried = true),
+      );
+      await tester.tap(find.text('다시 시도'));
+      expect(retried, isTrue);
+    });
+
+    testWidgets('ready + 빈 목록이면 안내 문구', (tester) async {
+      await tester.pumpWidget(host(status: RegionLoadStatus.ready));
+      expect(find.text('이 지역의 장소 정보가 없어요'), findsOneWidget);
+    });
+
+    testWidgets('ready + 목록이면 소개/해시태그/배너 렌더', (tester) async {
+      await tester.pumpWidget(
+        host(
+          status: RegionLoadStatus.ready,
+          places: [_place('수덕사', image: 'http://x/a.jpg')],
+        ),
+      );
+      expect(find.text('예산'), findsOneWidget); // 정림사지체 타이틀
+      expect(find.text('Y E S A N'), findsOneWidget);
+      expect(find.text('# 수덕사'), findsOneWidget);
+      expect(find.text('# 예당호'), findsOneWidget);
+      expect(find.text('# 예산시장'), findsOneWidget);
+      expect(find.text('예산 추천 채록길'), findsOneWidget);
+    });
+
+    testWidgets('배너 탭 시 onExploreRegionRequested(region)', (tester) async {
+      RegionCode? got;
+      await tester.pumpWidget(
+        host(
+          status: RegionLoadStatus.ready,
+          places: [_place('수덕사', image: 'http://x/a.jpg')],
+          onExplore: (r) => got = r,
+        ),
+      );
+      await tester.tap(find.byType(RecommendedCourseBanner));
+      expect(got, RegionCode.yesan);
+    });
   });
 }
