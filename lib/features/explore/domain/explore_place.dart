@@ -4,6 +4,10 @@ import 'package:chaerok/data/models/place_search_response.dart';
 import 'package:chaerok/features/explore/data/bookmark_store.dart';
 
 const _kakaoSource = 'KAKAO';
+
+/// `/api/places/search`가 실제로 내려주는 Kakao 소스 값(Swagger 예시의 `KAKAO`와
+/// 다름 — 실기기 로그로 확인). 어느 값이 오든 Kakao 장소로 인식하도록 둘 다 받는다.
+const _kakaoLocalSource = 'KAKAO_LOCAL';
 const _tourApiSource = 'TOUR_API';
 
 /// 탐색 모드가 소비하는 장소 표시/식별 모델.
@@ -134,8 +138,8 @@ class ExplorePlace {
 
   /// 장소를 진입 경로와 무관하게 동일하게 식별하는 키.
   ///
-  /// 지역 목록(`PlaceListResponse.id`는 nullable)과 검색(`PlaceSearchResponse.id`는
-  /// 필수)에서 같은 장소가 서로 다른 필드 조합으로 올 수 있다. 두 응답 모두
+  /// 지역 목록과 검색 모두 `id`가 nullable이다(검색 결과는 DB에 저장되지 않아 항상
+  /// null). 같은 장소가 서로 다른 필드 조합으로 올 수 있다. 두 응답 모두
   /// TourAPI/Kakao 장소면 외부 ID(`tourContentId`/`kakaoPlaceId`)를 함께 내려주므로,
   /// **외부 ID를 최우선**으로 써서 `serverId` 유무에 따라 키가 갈라지지 않게 한다.
   /// 외부 ID가 없는 순수 DB 장소만 `serverId`(두 응답 모두 보유)로 식별한다.
@@ -166,7 +170,7 @@ class ExplorePlace {
     required String? kakaoPlaceId,
   }) {
     return switch (source) {
-      _kakaoSource => kakaoPlaceId,
+      _kakaoSource || _kakaoLocalSource => kakaoPlaceId,
       _tourApiSource => tourContentId,
       _ => null,
     };
