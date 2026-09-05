@@ -35,7 +35,7 @@ void main() {
         final result = ExplorePlace.fromSearchResponse(place);
 
         expect(result.externalPlaceId, 'kakao-1');
-        expect(result.identityKey, 'external:KAKAO_LOCAL:kakao-1');
+        expect(result.identityKey, 'external:KAKAO:kakao-1');
       },
     );
 
@@ -49,6 +49,17 @@ void main() {
         expect(result.externalPlaceId, 'kakao-1');
       },
     );
+
+    test('같은 kakaoPlaceId면 source가 KAKAO든 KAKAO_LOCAL이든 identityKey가 같다', () {
+      final viaKakao = ExplorePlace.fromSearchResponse(
+        _searchResponse(kakaoPlaceId: 'kakao-1', source: 'KAKAO'),
+      );
+      final viaKakaoLocal = ExplorePlace.fromSearchResponse(
+        _searchResponse(kakaoPlaceId: 'kakao-1', source: 'KAKAO_LOCAL'),
+      );
+
+      expect(viaKakao.identityKey, viaKakaoLocal.identityKey);
+    });
 
     test('source가 TOUR_API면 tourContentId를 externalPlaceId로 인식한다', () {
       final place = _searchResponse(

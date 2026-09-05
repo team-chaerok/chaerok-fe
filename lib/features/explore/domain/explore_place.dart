@@ -156,11 +156,14 @@ class ExplorePlace {
       tourContentId: tourContentId,
       kakaoPlaceId: kakaoPlaceId,
     );
+    // 키에는 원본 source가 아니라 정규화된 값을 쓴다 — 같은 kakaoPlaceId라도
+    // 'KAKAO'/'KAKAO_LOCAL' 중 어느 값으로 오느냐에 따라 키가 갈라지면 안 된다.
+    final canonicalSource = _canonicalSource(source);
     if (externalId != null && externalId.isNotEmpty) {
-      return 'external:$source:$externalId';
+      return 'external:$canonicalSource:$externalId';
     }
     if (serverId != null) return 'place:$serverId';
-    return 'title:$source:$title:$address';
+    return 'title:$canonicalSource:$title:$address';
   }
 
   /// 소스별 외부 장소 ID(TourAPI는 `tourContentId`, Kakao는 `kakaoPlaceId`)를 고른다.
@@ -174,5 +177,12 @@ class ExplorePlace {
       _tourApiSource => tourContentId,
       _ => null,
     };
+  }
+
+  /// [_kakaoLocalSource]를 [_kakaoSource]로 흡수한다. [source] 필드 자체는
+  /// 서버에 그대로 되돌려줘야 해(예: 커스텀 코스 생성) 원본 값을 유지하고,
+  /// 식별 목적으로만 이 정규화된 값을 쓴다.
+  static String _canonicalSource(String source) {
+    return source == _kakaoLocalSource ? _kakaoSource : source;
   }
 }
