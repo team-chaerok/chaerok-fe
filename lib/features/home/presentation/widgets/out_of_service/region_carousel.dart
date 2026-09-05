@@ -49,10 +49,14 @@ class _RegionCarouselState extends State<RegionCarousel> {
         ).any((e) => e);
     if (changed) {
       _index = 0;
-      if (_controller.hasClients) {
-        _controller.jumpToPage(0);
-      }
-      setState(() {});
+      // jumpToPage는 업데이트 단계에서 바로 호출하지 않고 다음 프레임으로 미룬다
+      // (PageView가 새 itemCount로 재빌드된 뒤 컨트롤러를 움직여야 안전).
+      // didUpdateWidget 이후 프레임워크가 어차피 리빌드하므로 setState는 불필요.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _controller.hasClients) {
+          _controller.jumpToPage(0);
+        }
+      });
     }
   }
 

@@ -164,6 +164,11 @@ class ExploreScreenState extends State<ExploreScreen>
 
   /// 홈(충남 외 지역 둘러보기)에서 특정 지역으로 채록길 탭에 진입할 때
   /// MainTabScreen이 GlobalKey로 호출한다.
+  ///
+  /// 지역 선택은 탐색 모드([_ExploreMode.exploring])의 지역 칩에만 반영된다.
+  /// 진행중/현상 대기중 필름롤이 있는 상태로 진입하면 진행/현상 뷰가 보이고
+  /// 지역 칩 자체가 없으므로, 이 요청은 화면상 아무 효과가 없다(요청을 쌓아
+  /// 두는 stash 로직은 없다).
   void selectRegion(RegionCode region) {
     if (!mounted || region == _selectedRegion) return;
     unawaited(_onRegionSelected(region));

@@ -30,7 +30,7 @@ class RegionFilmStrip extends StatelessWidget {
           Transform.translate(
             offset: Offset(0, index == 0 ? 0 : -_overlap * index),
             child: _FilmRollHeader(
-              label: region.filmRollTitle,
+              label: region.filmStripLabel,
               isSelected: region == selected,
               onTap: () => onSelect(region),
             ),
@@ -56,7 +56,7 @@ class _FilmRollHeader extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 34,
+        height: 34, // Figma 근사. 토큰 없음.
         padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
         decoration: BoxDecoration(
           color: isSelected
@@ -78,7 +78,7 @@ class _FilmRollHeader extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
                   fontWeight: FontWeight.w500,
-                  fontSize: 16,
+                  fontSize: 16, // Figma 근사. 토큰 없음.
                   color: isSelected ? Colors.white : Colors.white70,
                 ),
               ),
@@ -106,7 +106,7 @@ class _SprocketHoles extends StatelessWidget {
           height: 6,
           decoration: BoxDecoration(
             color: ChaerokColors.background,
-            borderRadius: BorderRadius.circular(1),
+            borderRadius: BorderRadius.circular(1), // Figma 근사. 토큰 없음.
           ),
         ),
       ),

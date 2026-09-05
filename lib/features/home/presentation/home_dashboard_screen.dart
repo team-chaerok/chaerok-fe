@@ -122,7 +122,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       case LocationOutOfService():
         setState(() => _isOutOfService = true);
       case null:
-        break;
+        // 사용자가 "지역별로 둘러보기" CTA 대신 AppBar/시스템 뒤로가기로 게이트를
+        // 빠져나오면 outcome은 null이다. 이때도 게이트가 "서비스 지역 외" 카드를
+        // 렌더하며 outOfServiceSessionCache를 세팅했을 수 있으므로, 캐시를 다시
+        // 읽어 빈 대시보드에 갇히지 않고 충남 외 지역 홈으로 복구한다.
+        if (LocationVerificationResult.outOfServiceSessionCache) {
+          setState(() => _isOutOfService = true);
+        }
     }
   }
 

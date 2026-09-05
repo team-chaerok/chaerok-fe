@@ -193,7 +193,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
         children: [
           HomeDashboardScreen(
             onExploreRegionRequested: (region) {
-              setState(() => _selectedIndex = _exploreTabIndex);
+              _onExploreRequested();
               _exploreKey.currentState?.selectRegion(region);
             },
           ),
