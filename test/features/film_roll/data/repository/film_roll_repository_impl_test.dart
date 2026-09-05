@@ -259,6 +259,46 @@ void main() {
     expect(updated!.selectedCourseTitle, '코스 B');
   });
 
+  test('hasVisitOrPhotoRecords는 방문 기록이 없으면 false를 반환한다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+      regionId: 1,
+    );
+    await filmRollRepository.selectCourse(
+      filmRollId: filmRoll.id,
+      courseId: 'course-a',
+      courseTitle: '코스 A',
+      places: const [_testPlace],
+    );
+
+    expect(
+      await filmRollRepository.hasVisitOrPhotoRecords(filmRoll.id),
+      isFalse,
+    );
+  });
+
+  test('hasVisitOrPhotoRecords는 방문 기록이 있으면 true를 반환한다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+      regionId: 1,
+    );
+    await filmRollRepository.selectCourse(
+      filmRollId: filmRoll.id,
+      courseId: 'course-a',
+      courseTitle: '코스 A',
+      places: const [_testPlace],
+    );
+    final places = await placeRepository.findByFilmRoll(filmRoll.id);
+    await placeRepository.markVisited(places.first.id);
+
+    expect(
+      await filmRollRepository.hasVisitOrPhotoRecords(filmRoll.id),
+      isTrue,
+    );
+  });
+
   test('deleteFilmRoll은 다른 계정 소유의 필름롤을 삭제하지 않는다', () async {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.gongju,

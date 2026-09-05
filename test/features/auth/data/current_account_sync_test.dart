@@ -73,6 +73,10 @@ class _FakeFilmRollRepository implements FilmRollRepository {
 
   @override
   Stream<FilmRoll?> watchById(String filmRollId) => throw UnimplementedError();
+
+  @override
+  Future<bool> hasVisitOrPhotoRecords(String filmRollId) =>
+      throw UnimplementedError();
 }
 
 const _testUser = UserResponse(
