@@ -160,6 +160,10 @@ class _CapturedPhotoRow extends StatelessWidget {
               width: _photoItemWidth,
               height: _photoItemHeight,
               fit: BoxFit.cover,
+              // 앱 재설치·컨테이너 경로 변경 등으로 실제 파일이 사라졌을 때
+              // 붉은 예외 박스 대신 회색 슬롯 플레이스홀더를 노출한다.
+              errorBuilder: (context, error, stackTrace) =>
+                  const _CapturedPhotoPlaceholderSlot(),
             ),
           );
         },
@@ -182,16 +186,25 @@ class _CapturedPhotoPlaceholderRow extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: _slotCount,
         separatorBuilder: (_, _) => const SizedBox(width: _photoItemGap),
-        itemBuilder: (context, index) {
-          return Container(
-            width: _photoItemWidth,
-            height: _photoItemHeight,
-            decoration: BoxDecoration(
-              color: ChaerokColors.textDisabled,
-              borderRadius: BorderRadius.circular(_photoItemRadius),
-            ),
-          );
-        },
+        itemBuilder: (context, index) => const _CapturedPhotoPlaceholderSlot(),
+      ),
+    );
+  }
+}
+
+/// 사진 슬롯 한 칸 크기의 회색 placeholder. 인증 전 슬롯과, 파일이 사라진
+/// 썸네일 자리에 공통으로 쓴다.
+class _CapturedPhotoPlaceholderSlot extends StatelessWidget {
+  const _CapturedPhotoPlaceholderSlot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _photoItemWidth,
+      height: _photoItemHeight,
+      decoration: BoxDecoration(
+        color: ChaerokColors.textDisabled,
+        borderRadius: BorderRadius.circular(_photoItemRadius),
       ),
     );
   }

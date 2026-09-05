@@ -50,15 +50,20 @@ FilmRollResponse _fakeResponse({int id = 900, String status = 'CAPTURING'}) =>
       updatedAt: DateTime(2026, 8, 30),
     );
 
-DioException _dioError(int statusCode, {String message = '오류', String? code}) =>
-    DioException(
-      requestOptions: RequestOptions(path: '/api/film-rolls'),
-      error: ApiError(
-        statusCode: statusCode,
-        message: message,
-        errorCode: code,
-      ),
-    );
+DioException _dioError(
+  int statusCode, {
+  String message = '오류',
+  String? code,
+  List<String> fields = const [],
+}) => DioException(
+  requestOptions: RequestOptions(path: '/api/film-rolls'),
+  error: ApiError(
+    statusCode: statusCode,
+    message: message,
+    errorCode: code,
+    fields: fields,
+  ),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -313,6 +318,32 @@ void main() {
       final after = await placeRepository.findByFilmRoll(fr.id);
       expect(after.firstWhere((p) => p.name == 'A').visitSyncedAt, isNotNull);
     });
+
+    test(
+      '방문 인증이 photoId 필수(400)로 거부되면 오류가 아니라 skip으로 처리하고 미동기화로 남긴다',
+      () async {
+        final fr = await seedLinkedWithPlaces();
+        final places = await placeRepository.findByFilmRoll(fr.id);
+        await placeRepository.markVisited(
+          places.firstWhere((p) => p.name == 'A').id,
+        ); // serverPlaceId=1
+
+        final result = await service(
+          createVisit: (_, __) async => throw _dioError(
+            400,
+            message: '요청값이 올바르지 않습니다.',
+            code: 'COMMON_001',
+            fields: ['photoId'],
+          ),
+        ).syncFilmRoll(fr.id);
+
+        expect(result.visitsPushed, 0);
+        expect(result.visitsSkipped, 1);
+        expect(result.hasError, isFalse);
+        final after = await placeRepository.findByFilmRoll(fr.id);
+        expect(after.firstWhere((p) => p.name == 'A').visitSyncedAt, isNull);
+      },
+    );
 
     test('방문 전송 중 5xx는 해당 장소만 미동기화로 남기고 계속 진행', () async {
       final fr = await seedLinkedWithPlaces();

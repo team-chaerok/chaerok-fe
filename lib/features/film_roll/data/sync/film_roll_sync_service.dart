@@ -136,6 +136,13 @@ class FilmRollSyncService {
         if (_isAlreadyVisited(e)) {
           await _placeRepository.markVisitSynced(place.id, at: DateTime.now());
           visitsPushed++;
+        } else if (_isPhotoUploadPending(e)) {
+          // 백엔드가 방문 인증에 photoId(업로드된 서버 사진 ID)를 요구하지만,
+          // 프론트에는 아직 사진 업로드 API가 없어 서버 photoId를 만들 수 없다
+          // (spec 2026-08-30-filmroll-backend-sync-design.md §7.6, 명세 대기).
+          // 오류로 취급하지 않고 미동기화(visitSyncedAt=null)로 남겨, 업로드
+          // 단계가 연동되면 다음 동기화에서 자동으로 따라잡게 한다.
+          visitsSkipped++;
         } else {
           error ??= e;
         }
@@ -203,6 +210,15 @@ class FilmRollSyncService {
       return code >= 400 && code < 500;
     }
     return false;
+  }
+
+  /// 방문 인증(`POST /visits`)이 아직 프론트가 대응하지 못한 `photoId` 필수
+  /// 요건 때문에 400으로 거부된 경우인지 판별한다. 이땐 오류가 아니라
+  /// "사진 업로드 API 연동 대기"로 보고 미동기화 상태로 남긴다.
+  bool _isPhotoUploadPending(Object e) {
+    if (e is! DioException || e.error is! ApiError) return false;
+    final err = e.error as ApiError;
+    return err.statusCode == 400 && err.fields.contains('photoId');
   }
 
   /// 오픈 질문 3 확정 전까지: 409이거나, 4xx이면서 메시지/코드에 중복 뉘앙스가

@@ -39,6 +39,8 @@ class PhotoRepositoryImpl implements PhotoRepository {
 
     final now = DateTime.now();
     try {
+      // DB에는 문서 디렉터리 기준 상대 경로만 저장한다. 절대 경로는 iOS 앱
+      // 컨테이너 UUID가 재설치·백업 복원 시 바뀌어 이후 파일을 못 찾는다.
       await _photoDs.insert(
         PhotosCompanion.insert(
           id: photoId,
@@ -65,8 +67,8 @@ class PhotoRepositoryImpl implements PhotoRepository {
       id: photoId,
       filmRollId: filmRollId,
       filmRollPlaceId: filmRollPlaceId,
-      originalPath: paths.originalPath,
-      thumbnailPath: paths.thumbnailPath,
+      originalPath: await _photoStorage.resolve(paths.originalPath),
+      thumbnailPath: await _photoStorage.resolve(paths.thumbnailPath),
       latitude: latitude,
       longitude: longitude,
       takenAt: now,
@@ -89,7 +91,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
   @override
   Future<List<FilmRollPhoto>> findByPlace(String filmRollPlaceId) async {
     final rows = await _photoDs.findByPlace(filmRollPlaceId);
-    return rows.map((row) => row.toEntity()).toList();
+    return _resolvePaths(rows);
   }
 
   @override
@@ -98,7 +100,21 @@ class PhotoRepositoryImpl implements PhotoRepository {
     int? limit,
   }) async {
     final rows = await _photoDs.findByFilmRoll(filmRollId, limit: limit);
-    return rows.map((row) => row.toEntity()).toList();
+    return _resolvePaths(rows);
+  }
+
+  /// Drift 행을 엔티티로 매핑하면서, DB에 저장된 상대 경로(또는 구버전 절대
+  /// 경로)를 실제 접근 가능한 절대 경로로 복원한다.
+  Future<List<FilmRollPhoto>> _resolvePaths(List<Photo> rows) {
+    return Future.wait(
+      rows.map((row) async {
+        final entity = row.toEntity();
+        return entity.copyWith(
+          originalPath: await _photoStorage.resolve(entity.originalPath),
+          thumbnailPath: await _photoStorage.resolve(entity.thumbnailPath),
+        );
+      }),
+    );
   }
 
   @override

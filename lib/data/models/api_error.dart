@@ -14,19 +14,32 @@ class ApiError implements Exception {
     required this.statusCode,
     required this.message,
     this.errorCode,
+    this.fields = const [],
   });
 
   factory ApiError.fromJson(Map<String, dynamic> json, int statusCode) {
+    final rawErrors = json['errors'];
+    final fields = <String>[
+      if (rawErrors is List)
+        for (final e in rawErrors)
+          if (e is Map<String, dynamic> && e['field'] is String)
+            e['field'] as String,
+    ];
     return ApiError(
       statusCode: statusCode,
       message: json['message'] as String? ?? '알 수 없는 오류가 발생했습니다.',
-      errorCode: json['errorCode'] as String?,
+      // 서버는 상단 에러 코드를 `errorCode` 또는 `code`로 내려준다.
+      errorCode: json['errorCode'] as String? ?? json['code'] as String?,
+      fields: fields,
     );
   }
 
   final int statusCode;
   final String message;
   final String? errorCode;
+
+  /// 검증 실패(`errors: [{field, message}]`) 시 문제가 된 요청 필드 이름 목록.
+  final List<String> fields;
 
   @override
   String toString() => 'ApiError($statusCode): $message';
