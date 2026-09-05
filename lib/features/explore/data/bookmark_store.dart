@@ -14,8 +14,12 @@ class BookmarkedPlace {
     required this.identityKey,
     required this.title,
     required this.categoryLabel,
+    required this.categoryGroupWire,
+    required this.source,
     required this.latitude,
     required this.longitude,
+    this.serverId,
+    this.externalPlaceId,
     this.imageUrl,
   });
 
@@ -24,19 +28,30 @@ class BookmarkedPlace {
       identityKey: place.identityKey,
       title: place.title,
       categoryLabel: place.categoryDetailLabel,
+      categoryGroupWire: place.categoryGroupWire,
+      source: place.source,
       latitude: place.latitude,
       longitude: place.longitude,
+      serverId: place.serverId,
+      externalPlaceId: place.externalPlaceId,
       imageUrl: place.imageUrl,
     );
   }
 
+  /// [categoryGroupWire]/[source]는 커스텀 코스 생성(`CoursePlaceSaveRequest`)에
+  /// 필요해 나중에 추가된 필드다. 그 전에 저장된 북마크에는 없으므로 빈 문자열로
+  /// 채운다 — 해당 북마크는 "코스 만들기" 진입 시 소스 정보 부족으로 제외된다.
   factory BookmarkedPlace.fromJson(Map<String, dynamic> json) {
     return BookmarkedPlace(
       identityKey: json['identityKey'] as String,
       title: json['title'] as String,
       categoryLabel: json['categoryLabel'] as String,
+      categoryGroupWire: json['categoryGroupWire'] as String? ?? '',
+      source: json['source'] as String? ?? '',
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
+      serverId: json['serverId'] as int?,
+      externalPlaceId: json['externalPlaceId'] as String?,
       imageUrl: json['imageUrl'] as String?,
     );
   }
@@ -44,16 +59,28 @@ class BookmarkedPlace {
   final String identityKey;
   final String title;
   final String categoryLabel;
+  final String categoryGroupWire;
+  final String source;
   final double latitude;
   final double longitude;
+  final int? serverId;
+  final String? externalPlaceId;
   final String? imageUrl;
+
+  /// 커스텀 코스 생성에 쓸 수 있는지: 필드 보강 이전에 저장된 북마크는
+  /// [source]가 비어 있어 서버 전송 필드를 채울 수 없다.
+  bool get canBuildCourse => source.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
     'identityKey': identityKey,
     'title': title,
     'categoryLabel': categoryLabel,
+    'categoryGroupWire': categoryGroupWire,
+    'source': source,
     'latitude': latitude,
     'longitude': longitude,
+    'serverId': serverId,
+    'externalPlaceId': externalPlaceId,
     'imageUrl': imageUrl,
   };
 }

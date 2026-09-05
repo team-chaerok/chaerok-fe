@@ -20,6 +20,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_fi
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/select_custom_course_use_case.dart';
 
 /// 필름롤 기능의 리포지토리/유스케이스 인스턴스를 조립하는 단순 조립 지점.
 /// 프로젝트에 별도 DI 프레임워크가 없으므로, 기존 `TokenStorage.instance`/
@@ -50,6 +51,7 @@ class FilmRollModule {
       syncService: filmRollSyncService,
     );
     selectCourse = SelectCourseUseCase(filmRollRepository);
+    selectCustomCourse = SelectCustomCourseUseCase(filmRollRepository);
     completeVisit = CompleteVisitUseCase(filmRollPlaceRepository);
     savePhoto = SavePhotoUseCase(photoRepository);
     deletePhoto = DeletePhotoUseCase(photoRepository);
@@ -83,6 +85,7 @@ class FilmRollModule {
 
   late final EnterRegionUseCase enterRegion;
   late final SelectCourseUseCase selectCourse;
+  late final SelectCustomCourseUseCase selectCustomCourse;
   late final CompleteVisitUseCase completeVisit;
   late final SavePhotoUseCase savePhoto;
   late final DeletePhotoUseCase deletePhoto;

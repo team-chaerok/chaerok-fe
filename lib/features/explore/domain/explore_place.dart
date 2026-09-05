@@ -1,6 +1,7 @@
 import 'package:chaerok/data/models/place_category.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/place_search_response.dart';
+import 'package:chaerok/features/explore/data/bookmark_store.dart';
 
 const _kakaoSource = 'KAKAO';
 const _tourApiSource = 'TOUR_API';
@@ -19,11 +20,13 @@ class ExplorePlace {
     required this.latitude,
     required this.longitude,
     required this.categoryGroup,
+    required this.categoryGroupWire,
     required this.categoryDetail,
     required this.categoryDetailLabel,
     required this.source,
     required this.identityKey,
     this.serverId,
+    this.externalPlaceId,
     this.imageUrl,
   });
 
@@ -34,6 +37,7 @@ class ExplorePlace {
       latitude: place.latitude,
       longitude: place.longitude,
       categoryGroup: PlaceCategoryGroup.fromWire(place.categoryGroup),
+      categoryGroupWire: place.categoryGroup,
       categoryDetail: PlaceCategoryDetail.fromWire(place.categoryDetail),
       categoryDetailLabel: place.categoryDetail,
       source: place.source,
@@ -46,6 +50,11 @@ class ExplorePlace {
         address: place.address,
       ),
       serverId: place.id,
+      externalPlaceId: _externalPlaceId(
+        source: place.source,
+        tourContentId: place.tourContentId,
+        kakaoPlaceId: place.kakaoPlaceId,
+      ),
       imageUrl: place.firstImageUrl,
     );
   }
@@ -57,6 +66,7 @@ class ExplorePlace {
       latitude: place.latitude,
       longitude: place.longitude,
       categoryGroup: PlaceCategoryGroup.fromWire(place.categoryGroup),
+      categoryGroupWire: place.categoryGroup,
       categoryDetail: PlaceCategoryDetail.fromWire(place.categoryDetail),
       categoryDetailLabel: place.categoryDetail,
       source: place.source,
@@ -69,7 +79,33 @@ class ExplorePlace {
         address: place.address,
       ),
       serverId: place.id,
+      externalPlaceId: _externalPlaceId(
+        source: place.source,
+        tourContentId: place.tourContentId,
+        kakaoPlaceId: place.kakaoPlaceId,
+      ),
       imageUrl: place.firstImageUrl,
+    );
+  }
+
+  /// 북마크(`BookmarkStore`, 로컬 전용)에서 저장해 둔 원본 필드로 복원한다.
+  /// 주소는 [BookmarkedPlace]가 보관하지 않아 빈 문자열로 채운다(코스 생성
+  /// 요청의 `address`는 선택 필드라 문제없다).
+  factory ExplorePlace.fromBookmarkedPlace(BookmarkedPlace place) {
+    return ExplorePlace(
+      title: place.title,
+      address: '',
+      latitude: place.latitude,
+      longitude: place.longitude,
+      categoryGroup: PlaceCategoryGroup.fromWire(place.categoryGroupWire),
+      categoryGroupWire: place.categoryGroupWire,
+      categoryDetail: PlaceCategoryDetail.fromWire(place.categoryLabel),
+      categoryDetailLabel: place.categoryLabel,
+      source: place.source,
+      identityKey: place.identityKey,
+      serverId: place.serverId,
+      externalPlaceId: place.externalPlaceId,
+      imageUrl: place.imageUrl,
     );
   }
 
@@ -78,6 +114,11 @@ class ExplorePlace {
   final double latitude;
   final double longitude;
   final PlaceCategoryGroup categoryGroup;
+
+  /// [categoryGroup]의 원본 wire 문자열. 알 수 없는 값이면 [PlaceCategoryGroup.unknown]
+  /// 으로 흡수돼 `wireValue`(빈 문자열)로는 복원할 수 없으므로, 코스 생성 요청처럼
+  /// 원본 값을 그대로 서버에 되돌려줘야 하는 경우를 위해 별도 보관한다.
+  final String categoryGroupWire;
   final PlaceCategoryDetail categoryDetail;
 
   /// 카드에 그대로 노출하는 원본 소분류 문자열(백엔드가 한글을 줄 수도 있어 보존).
@@ -85,6 +126,10 @@ class ExplorePlace {
   final String source;
   final String identityKey;
   final int? serverId;
+
+  /// TourAPI(`tourContentId`)/Kakao(`kakaoPlaceId`) 외부 장소 ID. [identityKey]에도
+  /// 인코딩돼 있지만 문자열 파싱으로 역산하지 않도록 별도 필드로 노출한다.
+  final String? externalPlaceId;
   final String? imageUrl;
 
   /// 장소를 진입 경로와 무관하게 동일하게 식별하는 키.
@@ -102,15 +147,28 @@ class ExplorePlace {
     required String title,
     required String address,
   }) {
-    final externalId = switch (source) {
-      _kakaoSource => kakaoPlaceId,
-      _tourApiSource => tourContentId,
-      _ => null,
-    };
+    final externalId = _externalPlaceId(
+      source: source,
+      tourContentId: tourContentId,
+      kakaoPlaceId: kakaoPlaceId,
+    );
     if (externalId != null && externalId.isNotEmpty) {
       return 'external:$source:$externalId';
     }
     if (serverId != null) return 'place:$serverId';
     return 'title:$source:$title:$address';
+  }
+
+  /// 소스별 외부 장소 ID(TourAPI는 `tourContentId`, Kakao는 `kakaoPlaceId`)를 고른다.
+  static String? _externalPlaceId({
+    required String source,
+    required String? tourContentId,
+    required String? kakaoPlaceId,
+  }) {
+    return switch (source) {
+      _kakaoSource => kakaoPlaceId,
+      _tourApiSource => tourContentId,
+      _ => null,
+    };
   }
 }
