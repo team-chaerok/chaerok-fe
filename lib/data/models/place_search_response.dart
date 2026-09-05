@@ -1,6 +1,6 @@
 class PlaceSearchResponse {
   const PlaceSearchResponse({
-    required this.id,
+    this.id,
     required this.title,
     required this.address,
     required this.latitude,
@@ -15,7 +15,7 @@ class PlaceSearchResponse {
 
   factory PlaceSearchResponse.fromJson(Map<String, dynamic> json) {
     return PlaceSearchResponse(
-      id: json['id'] as int,
+      id: json['id'] as int?,
       tourContentId: json['tourContentId'] as String?,
       kakaoPlaceId: json['kakaoPlaceId'] as String?,
       title: json['title'] as String,
@@ -29,7 +29,8 @@ class PlaceSearchResponse {
     );
   }
 
-  final int id;
+  /// 검색 결과는 DB에 저장되지 않으므로(`PlacesApi.searchPlaces` 참고) id가 없을 수 있다.
+  final int? id;
   final String? tourContentId;
   final String? kakaoPlaceId;
   final String title;
