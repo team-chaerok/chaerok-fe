@@ -14,7 +14,7 @@ int countDistinctVisitedCategories(List<FilmRollPlace> places) {
   final groups = <PlaceCategoryGroup>{};
   for (final place in places) {
     if (!place.isVisited) continue;
-    final group = _resolveGroup(place.category);
+    final group = resolvePlaceCategoryGroup(place.category);
     if (group != PlaceCategoryGroup.unknown) groups.add(group);
   }
   return groups.length;
@@ -26,7 +26,10 @@ bool hasMetLocalCategoryRequirement(List<FilmRollPlace> places) {
   return countDistinctVisitedCategories(places) >= requiredVisitCategoryCount;
 }
 
-PlaceCategoryGroup _resolveGroup(String rawCategory) {
+/// 장소 카테고리 문자열([FilmRollPlace.category])을 대분류 그룹으로 정규화한다.
+/// 소분류(categoryDetail) 값이면 대응 대분류로 승격하고, 매핑에 없으면
+/// [PlaceCategoryGroup.unknown]을 반환한다.
+PlaceCategoryGroup resolvePlaceCategoryGroup(String rawCategory) {
   final detail = PlaceCategoryDetail.fromWire(rawCategory);
   if (detail != PlaceCategoryDetail.unknown) {
     return _groupForDetail(detail);

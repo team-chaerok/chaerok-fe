@@ -1,5 +1,6 @@
 import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/location/mock_location_spots.dart';
+import 'package:chaerok/core/test_mode/test_mode_session.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -20,16 +21,36 @@ class MockLocationGate {
     return AppPreferences.instance.isTester();
   }
 
-  /// 실제로 mock 좌표를 반환해야 하는가(허용된 상태에서 사용자가 mock을 켰는지).
+  /// 실제로 mock 좌표를 반환해야 하는가(허용된 상태에서 사용자가 mock을 켰거나,
+  /// Test Mode가 위치 판정에 개입 중인지).
   static Future<bool> isActive() async {
     if (!await isAllowed()) return false;
+    if (TestModeSession.instance.overridesLocation) return true;
     return AppPreferences.instance.isMockLocationEnabled();
   }
 
-  /// 현재 선택된 지역/지점의 mock [Position].
+  /// 현재 반환해야 할 mock [Position].
+  ///
+  /// 우선순위:
+  /// 1. Test Mode가 특정 장소 좌표를 주입 중이면 그 좌표(방문 인증 대상 장소).
+  /// 2. Test Mode "공주 진입/이탈" 상태면 공주 대표 지점 좌표.
+  /// 3. 그 외에는 마이/QA에서 선택한 지역·지점 좌표.
+  ///
   /// 방문 인증 게이트를 실제처럼 통과시키기 위해 `accuracy`는 0이 아니라
   /// [kMockGpsAccuracyMeters]를 쓴다.
   static Future<Position> currentMockPosition() async {
+    final session = TestModeSession.instance;
+    if (session.isInjecting) {
+      return _mockPosition(
+        session.injectedLatitude!,
+        session.injectedLongitude!,
+      );
+    }
+    if (session.gongjuEntered || session.gongjuExited) {
+      final anchor = mockLocationSpots[RegionCode.gongju]!.first;
+      return _mockPosition(anchor.latitude, anchor.longitude);
+    }
+
     final preferences = AppPreferences.instance;
     final regionCodeName = await preferences.getMockRegionCodeName();
     final region = RegionCode.values.firstWhere(
@@ -42,9 +63,13 @@ class MockLocationGate {
     final index = storedIndex.clamp(0, spots.length - 1);
     final spot = spots[index];
 
+    return _mockPosition(spot.latitude, spot.longitude);
+  }
+
+  static Position _mockPosition(double latitude, double longitude) {
     return Position(
-      latitude: spot.latitude,
-      longitude: spot.longitude,
+      latitude: latitude,
+      longitude: longitude,
       timestamp: DateTime.now(),
       accuracy: kMockGpsAccuracyMeters,
       altitude: 0,

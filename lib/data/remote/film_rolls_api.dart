@@ -3,6 +3,9 @@ import 'package:chaerok/data/models/film_roll_create_request.dart';
 import 'package:chaerok/data/models/film_roll_exit_response.dart';
 import 'package:chaerok/data/models/film_roll_photo_list_response.dart';
 import 'package:chaerok/data/models/film_roll_response.dart';
+import 'package:chaerok/data/models/photo_complete_response.dart';
+import 'package:chaerok/data/models/photo_upload_url_request.dart';
+import 'package:chaerok/data/models/photo_upload_url_response.dart';
 
 /// FilmRollsApi 클래스는 필름 롤(FilmRoll) 리소스 관련 API 호출을 제공합니다.
 class FilmRollsApi {
@@ -66,6 +69,37 @@ class FilmRollsApi {
           FilmRollPhotoListResponse.fromJson(data as Map<String, dynamic>),
     );
     return response.data ?? FilmRollPhotoListResponse.empty();
+  }
+
+  /// [사진 업로드 URL 발급] API 호출
+  /// 서버가 S3 presigned PUT URL과 함께 photoId를 발급한다. 같은 sequence가
+  /// UPLOADING이면 같은 photoId로 URL만 재발급되고, 이미 UPLOADED면 409다.
+  static Future<PhotoUploadUrlResponse> requestPhotoUploadUrl(
+    int filmRollId,
+    PhotoUploadUrlRequest request,
+  ) async {
+    final response = await DioClient.instance.post<PhotoUploadUrlResponse>(
+      '/api/film-rolls/$filmRollId/photos/upload-url',
+      data: request.toJson(),
+      fromJson: (data) =>
+          PhotoUploadUrlResponse.fromJson(data as Map<String, dynamic>),
+    );
+    return response.data ?? PhotoUploadUrlResponse.empty();
+  }
+
+  /// [사진 업로드 완료 확인] API 호출
+  /// S3 PUT 성공 후 호출한다. 서버가 HeadObject로 검증 후 UPLOADED로 전환한다.
+  /// 멱등: 이미 UPLOADED면 카운트 증가 없이 같은 응답을 준다.
+  static Future<PhotoCompleteResponse> completePhotoUpload(
+    int filmRollId,
+    int photoId,
+  ) async {
+    final response = await DioClient.instance.post<PhotoCompleteResponse>(
+      '/api/film-rolls/$filmRollId/photos/$photoId/complete',
+      fromJson: (data) =>
+          PhotoCompleteResponse.fromJson(data as Map<String, dynamic>),
+    );
+    return response.data ?? PhotoCompleteResponse.empty();
   }
 
   /// [현재 진행 중인 필름 롤 조회] API 호출

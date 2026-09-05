@@ -24,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   static AppDatabase get instance => _instance ??= AppDatabase._();
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -77,6 +77,25 @@ class AppDatabase extends _$AppDatabase {
         if (from < 6) {
           await _relativizePhotoPath('original_path');
           await _relativizePhotoPath('thumbnail_path');
+        }
+        // v7: 사진 서버 업로드. sequence는 촬영 순서(1~24), serverPhotoId는
+        // 업로드 완료 후 서버가 발급한 PK. 기존 행은 sequence를 taken_at 순으로
+        // 백필하고 serverPhotoId는 null로 둔다.
+        if (from < 7) {
+          await m.addColumn(photos, photos.sequence);
+          await m.addColumn(photos, photos.serverPhotoId);
+          await customStatement('''
+            UPDATE photos
+            SET sequence = (
+              SELECT COUNT(*)
+              FROM photos AS p2
+              WHERE p2.film_roll_id = photos.film_roll_id
+                AND (
+                  p2.taken_at < photos.taken_at
+                  OR (p2.taken_at = photos.taken_at AND p2.id <= photos.id)
+                )
+            )
+          ''');
         }
       },
       // FilmRolls 삭제 시 FilmRollPlaces/Photos가 cascade로 함께 삭제되도록

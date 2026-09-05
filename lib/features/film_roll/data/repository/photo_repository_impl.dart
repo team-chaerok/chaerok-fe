@@ -38,6 +38,9 @@ class PhotoRepositoryImpl implements PhotoRepository {
     );
 
     final now = DateTime.now();
+    // 서버 업로드에 쓸 촬영 순서(1~24). 필름롤 안에서 단조 증가하도록 기존
+    // 사진 수 + 1을 부여한다.
+    final sequence = await _photoDs.countByFilmRoll(filmRollId) + 1;
     try {
       // DB에는 문서 디렉터리 기준 상대 경로만 저장한다. 절대 경로는 iOS 앱
       // 컨테이너 UUID가 재설치·백업 복원 시 바뀌어 이후 파일을 못 찾는다.
@@ -49,6 +52,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
           originalPath: paths.originalPath,
           thumbnailPath: paths.thumbnailPath,
           takenAt: now,
+          sequence: Value(sequence),
           latitude: Value(latitude),
           longitude: Value(longitude),
         ),
@@ -72,6 +76,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
       latitude: latitude,
       longitude: longitude,
       takenAt: now,
+      sequence: sequence,
       isSynced: false,
     );
   }
@@ -120,5 +125,27 @@ class PhotoRepositoryImpl implements PhotoRepository {
   @override
   Future<int> countByFilmRoll(String filmRollId) {
     return _photoDs.countByFilmRoll(filmRollId);
+  }
+
+  @override
+  Future<List<FilmRollPhoto>> findUnuploadedByFilmRoll(
+    String filmRollId,
+  ) async {
+    // 동기화가 원본 파일을 읽어 S3로 올리므로, 저장된 상대 경로를 실제
+    // 접근 가능한 절대 경로로 복원해서 넘긴다.
+    final rows = await _photoDs.findUnuploadedByFilmRoll(filmRollId);
+    return _resolvePaths(rows);
+  }
+
+  @override
+  Future<FilmRollPhoto?> findUploadedByPlace(String filmRollPlaceId) async {
+    final row = await _photoDs.firstUploadedByPlace(filmRollPlaceId);
+    if (row == null) return null;
+    return (await _resolvePaths([row])).first;
+  }
+
+  @override
+  Future<void> markUploaded(String photoId, {required int serverPhotoId}) {
+    return _photoDs.setServerPhotoId(photoId, serverPhotoId);
   }
 }

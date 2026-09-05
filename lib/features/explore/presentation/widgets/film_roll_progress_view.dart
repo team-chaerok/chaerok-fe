@@ -5,6 +5,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/core/test_mode/test_mode_session.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
@@ -107,6 +108,19 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
       },
     );
     unawaited(_controller.load());
+    TestModeSession.instance.addListener(_onTestModeSessionChanged);
+    unawaited(_checkRegionDeparture());
+  }
+
+  @override
+  void dispose() {
+    TestModeSession.instance.removeListener(_onTestModeSessionChanged);
+    super.dispose();
+  }
+
+  /// Test Mode "공주 이탈"이 눌리면 즉시 이탈 감지를 재평가한다.
+  void _onTestModeSessionChanged() {
+    if (!mounted) return;
     unawaited(_checkRegionDeparture());
   }
 
@@ -261,8 +275,23 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   Future<void> _checkRegionDeparture() async {
     if (_departureCheckInFlight || _isExiting) return;
     final filmRoll = _filmRoll;
+    if (filmRoll == null) return;
+
+    // Test Mode: "공주 이탈"이면 실제 GPS/역지오코딩을 건너뛰고 이탈로 처리하고,
+    // "공주 진입"만 걸린 상태면 실제 위치가 공주 밖이어도 이탈로 보지 않는다.
+    if (TestModeSession.instance.gongjuExited) {
+      if (_exitDialogShown) {
+        if (!_showDepartedBanner) setState(() => _showDepartedBanner = true);
+      } else {
+        _exitDialogShown = true;
+        await _showExitConfirmDialog();
+      }
+      return;
+    }
+    if (TestModeSession.instance.gongjuEntered) return;
+
     final position = widget.currentPosition;
-    if (filmRoll == null || position == null) return;
+    if (position == null) return;
 
     _departureCheckInFlight = true;
     try {

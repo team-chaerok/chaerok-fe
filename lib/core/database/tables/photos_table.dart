@@ -20,8 +20,15 @@ class Photos extends Table {
   RealColumn get latitude => real().nullable()();
   RealColumn get longitude => real().nullable()();
   DateTimeColumn get takenAt => dateTime()();
-  // 서버 동기화는 이번 스코프 밖. 필드만 예약하고 항상 false로 둔다.
-  // TODO(#41): 서버 동기화 기능 구현 시 실제 동기화 로직 연결.
+
+  /// 서버 필름롤 안에서의 사진 순서(1~24). 촬영 시점에 로컬에서 부여하고
+  /// `POST .../photos/upload-url` 의 sequence로 보낸다.
+  IntColumn get sequence => integer().withDefault(const Constant(0))();
+
+  /// 서버가 발급한 photoId. null이면 아직 업로드되지 않은 상태.
+  IntColumn get serverPhotoId => integer().nullable()();
+
+  /// 서버 업로드 완료 여부. true면 [serverPhotoId]가 채워져 있다.
   BoolColumn get isSynced => boolean().withDefault(const Constant(false))();
 
   @override

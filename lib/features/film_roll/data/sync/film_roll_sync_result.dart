@@ -3,6 +3,8 @@
 class FilmRollSyncResult {
   const FilmRollSyncResult({
     this.created = false,
+    this.photosPushed = 0,
+    this.photosSkipped = 0,
     this.visitsPushed = 0,
     this.visitsSkipped = 0,
     this.serverStatus,
@@ -12,10 +14,16 @@ class FilmRollSyncResult {
   /// 이번 호출에서 서버 필름롤을 새로 생성(또는 멱등 조회로 연결)했는지 여부.
   final bool created;
 
+  /// 이번 호출에서 S3로 새로 업로드된(또는 이미 업로드된 것으로 복구된) 사진 수.
+  final int photosPushed;
+
+  /// 업로드하지 못하고 건너뛴 사진 수(S3 미설정 환경 등).
+  final int photosSkipped;
+
   /// 이번 호출에서 서버로 새로 전송된 방문 수(중복 응답으로 동기화 처리된 것 포함).
   final int visitsPushed;
 
-  /// `serverPlaceId`가 없어 서버로 보내지 못한 방문 수.
+  /// `serverPlaceId` 또는 업로드된 사진이 없어 서버로 보내지 못한 방문 수.
   final int visitsSkipped;
 
   /// 미러링된 서버 필름롤 status. 조회 실패 시 null.
