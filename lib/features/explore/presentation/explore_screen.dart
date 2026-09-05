@@ -162,6 +162,18 @@ class ExploreScreenState extends State<ExploreScreen>
     await _fetchPlaces();
   }
 
+  /// 홈(충남 외 지역 둘러보기)에서 특정 지역으로 채록길 탭에 진입할 때
+  /// MainTabScreen이 GlobalKey로 호출한다.
+  ///
+  /// 지역 선택은 탐색 모드([_ExploreMode.exploring])의 지역 칩에만 반영된다.
+  /// 진행중/현상 대기중 필름롤이 있는 상태로 진입하면 진행/현상 뷰가 보이고
+  /// 지역 칩 자체가 없으므로, 이 요청은 화면상 아무 효과가 없다(요청을 쌓아
+  /// 두는 stash 로직은 없다).
+  void selectRegion(RegionCode region) {
+    if (!mounted || region == _selectedRegion) return;
+    unawaited(_onRegionSelected(region));
+  }
+
   Future<void> _fetchPlaces() async {
     final requestId = ++_fetchRequestId;
     final region = _selectedRegion;
@@ -288,7 +300,7 @@ class ExploreScreenState extends State<ExploreScreen>
               Text(place.title, style: ChaerokTypography.titleMedium),
               const SizedBox(height: ChaerokSpacing.xs),
               Text(
-                '${place.categoryDetailLabel}'
+                '${place.categoryDisplayLabel}'
                 '${_distanceLabel(place) != null ? ' · ${_distanceLabel(place)}' : ''}',
                 style: ChaerokTypography.bodyMedium.copyWith(
                   color: ChaerokColors.textSecondary,
@@ -402,7 +414,7 @@ class ExploreScreenState extends State<ExploreScreen>
     const moods = PlacePlaceholderMood.values;
     return RecommendedPlaceSummaryData(
       name: place.title,
-      category: place.categoryDetailLabel,
+      category: place.categoryDisplayLabel,
       imageUrl: place.imageUrl,
       distance: _distanceLabel(place),
       placeholderMood: moods[index % moods.length],

@@ -5,6 +5,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/data/models/place_category.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
@@ -19,10 +20,14 @@ import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/nearby_place_recorder.dart';
 import 'package:chaerok/features/home/presentation/widgets/active_film_roll_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
+import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of_service_home_view.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/weather_card.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
 import 'package:chaerok/features/location/presentation/location_verification_screen.dart';
+import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -31,7 +36,11 @@ import 'package:geolocator/geolocator.dart';
 /// 이끄는 상태 요약 대시보드. `home_screen.dart`(구 홈 화면)의 사용자 조회 ·
 /// 위치 인증 게이트 · 필름롤 진입/재개 로직을 이식했다.
 class HomeDashboardScreen extends StatefulWidget {
-  const HomeDashboardScreen({super.key});
+  const HomeDashboardScreen({super.key, this.onExploreRegionRequested});
+
+  /// 충남 외 지역 홈에서 "OO 추천 채록길"/"전체보기" 탭 시, 채록길 탭으로
+  /// 전환하며 해당 지역을 선택하도록 MainTabScreen에 위임한다.
+  final ValueChanged<RegionCode>? onExploreRegionRequested;
 
   @override
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
@@ -51,6 +60,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   UserResponse? _user;
   LocationVerificationResult? _locationResult;
+  bool _isOutOfService = false;
   FilmRoll? _recoveredFilmRoll;
   bool _isEnteringFilmRoll = false;
 
@@ -98,13 +108,31 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       unawaited(_onLocationVerified(cached));
       return;
     }
+    if (LocationVerificationResult.outOfServiceSessionCache) {
+      setState(() => _isOutOfService = true);
+      return;
+    }
 
-    final result = await Navigator.of(context).push<LocationVerificationResult>(
-      MaterialPageRoute(builder: (_) => const LocationVerificationScreen()),
-    );
-    if (!mounted || result == null) return;
-    setState(() => _locationResult = result);
-    unawaited(_onLocationVerified(result));
+    final outcome = await Navigator.of(context)
+        .push<LocationVerificationOutcome>(
+          MaterialPageRoute(builder: (_) => const LocationVerificationScreen()),
+        );
+    if (!mounted) return;
+    switch (outcome) {
+      case LocationVerified(:final result):
+        setState(() => _locationResult = result);
+        unawaited(_onLocationVerified(result));
+      case LocationOutOfService():
+        setState(() => _isOutOfService = true);
+      case null:
+        // 사용자가 "지역별로 둘러보기" CTA 대신 AppBar/시스템 뒤로가기로 게이트를
+        // 빠져나오면 outcome은 null이다. 이때도 게이트가 "서비스 지역 외" 카드를
+        // 렌더하며 outOfServiceSessionCache를 세팅했을 수 있으므로, 캐시를 다시
+        // 읽어 빈 대시보드에 갇히지 않고 충남 외 지역 홈으로 복구한다.
+        if (LocationVerificationResult.outOfServiceSessionCache) {
+          setState(() => _isOutOfService = true);
+        }
+    }
   }
 
   /// 위치 인증 결과가 확정된 뒤, 이 결과에 의존하는 날씨/근처 채록 장소
@@ -221,7 +249,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     return RecommendedPlaceSummaryData(
       name: place.title,
-      category: place.categoryDetail,
+      category: PlaceExternalCategory.displayLabel(place.categoryDetail),
       imageUrl: place.firstImageUrl,
       distance: distance,
       placeholderMood: moods[index % moods.length],
@@ -331,6 +359,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isOutOfService) {
+      return OutOfServiceHomeView(
+        onExploreRegionRequested: (region) =>
+            widget.onExploreRegionRequested?.call(region),
+      );
+    }
+
     // 지름 593 고정 원. left/right를 둘 다 주면 자식 폭이 화면 폭으로 강제돼
     // 원이 393으로 줄어들기 때문에, left만 음수로 줘서 화면 중앙에 두고
     // 좌우로 넘치는 부분은 Stack 기본 클립(Clip.hardEdge)으로 잘리게 한다.
@@ -477,18 +512,36 @@ class _HomeHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: ChaerokSpacing.xs),
-        Text(
-          regionName != null ? '$_todayLabel · $regionName' : _todayLabel,
-          style: ChaerokTypography.caption.copyWith(
-            color: ChaerokColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: ChaerokSpacing.xxs),
-        Text(
-          userNickname != null ? '$userNickname님,\n오늘의 여행 기록을 남겨주세요' : '안녕하세요',
-          style: ChaerokTypography.titleLarge.copyWith(
-            color: ChaerokColors.textPrimary,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    regionName != null
+                        ? '$_todayLabel · $regionName'
+                        : _todayLabel,
+                    style: ChaerokTypography.caption.copyWith(
+                      color: ChaerokColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: ChaerokSpacing.xxs),
+                  Text(
+                    userNickname != null
+                        ? '$userNickname님,\n오늘의 여행 기록을 남겨주세요'
+                        : '안녕하세요',
+                    style: ChaerokTypography.titleLarge.copyWith(
+                      color: ChaerokColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const FilmCollectionButton(),
+            const MyPageButton(),
+          ],
         ),
         const SizedBox(height: ChaerokSpacing.xs),
       ],

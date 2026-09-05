@@ -9,12 +9,10 @@ import 'package:chaerok/features/explore/presentation/explore_screen.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
-import 'package:chaerok/features/film_roll/presentation/page/film_roll_collection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/home_dashboard_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/home_bottom_navigation.dart';
-import 'package:chaerok/features/settings/presentation/my_screen.dart';
 import 'package:flutter/material.dart';
 
 /// 로그인 이후 진입하는 5탭(홈/채록길/카메라/필름/마이) 하단 네비게이션 셸.
@@ -191,10 +189,13 @@ class _MainTabScreenState extends State<MainTabScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const HomeDashboardScreen(),
+          HomeDashboardScreen(
+            onExploreRegionRequested: (region) {
+              _onExploreRequested();
+              _exploreKey.currentState?.selectRegion(region);
+            },
+          ),
           ExploreScreen(key: _exploreKey),
-          const FilmRollCollectionScreen(),
-          const MyScreen(),
         ],
       ),
       bottomNavigationBar: HomeBottomNavigation(

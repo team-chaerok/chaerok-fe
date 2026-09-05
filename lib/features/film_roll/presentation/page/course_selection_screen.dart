@@ -870,7 +870,7 @@ class _PlacePickerTile extends StatelessWidget {
                   Text(place.title, style: ChaerokTypography.bodyMedium),
                   const SizedBox(height: 2),
                   Text(
-                    place.categoryDetailLabel,
+                    place.categoryDisplayLabel,
                     style: ChaerokTypography.caption.copyWith(
                       color: ChaerokColors.textSecondary,
                     ),

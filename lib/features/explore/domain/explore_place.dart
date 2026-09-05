@@ -127,6 +127,11 @@ class ExplorePlace {
 
   /// 카드에 그대로 노출하는 원본 소분류 문자열(백엔드가 한글을 줄 수도 있어 보존).
   final String categoryDetailLabel;
+
+  /// 화면 표기용 한글 카테고리. 영문 코드(RESTAURANT 등)는 [PlaceExternalCategory]로
+  /// 한글화하고, 매핑에 없는 값(이미 한글이거나 미지값)은 원본을 그대로 쓴다.
+  String get categoryDisplayLabel =>
+      PlaceExternalCategory.displayLabel(categoryDetailLabel);
   final String source;
   final String identityKey;
   final int? serverId;

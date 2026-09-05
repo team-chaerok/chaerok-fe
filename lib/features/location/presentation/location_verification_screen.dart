@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/core/location/location_provider_factory.dart';
+import 'package:chaerok/core/location/mock_location_gate.dart';
 import 'package:chaerok/core/location/mock_location_provider.dart';
 import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
@@ -28,6 +30,10 @@ const _serviceProvinceName = '충청남도';
 /// 디버그 빌드에서 서비스 지역 외 좌표로도 지역 검증 이후 흐름(관광지 조회 등)을
 /// 테스트할 수 있도록 백엔드에 전달하는 지역명만 대체하는 값.
 /// 실제 좌표(위도/경도)는 그대로 사용하므로 관광지 조회는 실제 위치 기준으로 동작한다.
+///
+/// 반대로 "충남 외 지역 홈"([OutOfServiceHomeView]) 자체를 확인하려면 마이 탭의
+/// "충남 외 지역 홈 강제 (QA)" 스위치([AppPreferences.isDebugOutOfServiceArea])를
+/// 켠다 — 이 대체가 비활성화되고 실제 서비스 지역 외 경로가 실행된다.
 const _debugFallbackProvinceName = '충청남도';
 const _debugFallbackCityCountyName = '공주시';
 
@@ -45,9 +51,16 @@ enum _Step {
 
 /// 위치 권한 확인 → 좌표 획득 → 행정구역 판별 → 서비스 지역 검증 → 관광지 조회를
 /// 하나의 흐름으로 오케스트레이션하는 실제 위치 인증 화면.
-/// 성공 시 [LocationVerificationResult]를 반환하며 `Navigator.pop`으로 닫힌다.
+/// 종료 시 [LocationVerificationOutcome]를 반환하며 `Navigator.pop`으로 닫힌다.
 class LocationVerificationScreen extends StatefulWidget {
-  const LocationVerificationScreen({super.key});
+  const LocationVerificationScreen({
+    super.key,
+    @visibleForTesting this.debugInitialOutOfServiceArea = false,
+  });
+
+  /// 테스트에서 outOfServiceArea 스텝을 바로 렌더하기 위한 플래그.
+  @visibleForTesting
+  final bool debugInitialOutOfServiceArea;
 
   @override
   State<LocationVerificationScreen> createState() =>
@@ -76,6 +89,10 @@ class _LocationVerificationScreenState
   @override
   void initState() {
     super.initState();
+    if (widget.debugInitialOutOfServiceArea) {
+      LocationVerificationResult.outOfServiceSessionCache = true;
+      _step = _Step.outOfServiceArea;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _mapEnabled = true);
     });
@@ -117,7 +134,7 @@ class _LocationVerificationScreenState
     if (cached != null) {
       log('세션 캐시된 위치 인증 결과 재사용', name: _tag);
       if (!mounted) return;
-      Navigator.of(context).pop(cached);
+      Navigator.of(context).pop(LocationVerified(cached));
       return;
     }
 
@@ -167,10 +184,20 @@ class _LocationVerificationScreenState
       return;
     }
 
+    // QA 토글: 마이 탭에서 "충남 외 지역 홈 강제"를 켜면 실제 좌표와 무관하게
+    // 서비스 지역 외로 판정하고, 아래 디버그 지역 대체도 건너뛴다.
+    final forceOutOfServiceArea =
+        await MockLocationGate.isAllowed() &&
+        await AppPreferences.instance.isDebugOutOfServiceArea();
+    if (!mounted) return;
+
     final isOutOfServiceArea =
+        forceOutOfServiceArea ||
         administrativeRegion.provinceName != _serviceProvinceName;
-    final useDebugFallbackRegion = kDebugMode && isOutOfServiceArea;
+    final useDebugFallbackRegion =
+        kDebugMode && isOutOfServiceArea && !forceOutOfServiceArea;
     if (isOutOfServiceArea && !useDebugFallbackRegion) {
+      LocationVerificationResult.outOfServiceSessionCache = true;
       setState(() => _step = _Step.outOfServiceArea);
       return;
     }
@@ -203,6 +230,7 @@ class _LocationVerificationScreenState
     if (!mounted) return;
 
     if (!region.serviceArea) {
+      LocationVerificationResult.outOfServiceSessionCache = true;
       setState(() => _step = _Step.outOfServiceArea);
       return;
     }
@@ -217,7 +245,7 @@ class _LocationVerificationScreenState
         places: places,
       );
       LocationVerificationResult.sessionCache = result;
-      Navigator.of(context).pop(result);
+      Navigator.of(context).pop(LocationVerified(result));
     } catch (e, st) {
       log('관광지 조회 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
@@ -318,10 +346,11 @@ class _LocationVerificationScreenState
       _Step.outOfServiceArea => _buildInfoCard(
         title: '서비스 지역이 아니에요',
         description:
-            '채록은 현재 충청남도 지역에서만 이용할 수 있어요.\n'
-            '충청남도 전용 기능은 이용이 제한됩니다.',
-        buttonText: '메인으로 돌아가기',
-        onPressed: () => Navigator.of(context).pop(),
+            '채록의 필름롤은 현재 충청남도 지역에서만 시작할 수 있어요.\n'
+            '대신 공주·부여·서산·예산을 지역별로 둘러볼 수 있어요.',
+        buttonText: '지역별로 둘러보기',
+        onPressed: () =>
+            Navigator.of(context).pop(const LocationOutOfService()),
       ),
       _Step.regionVerificationFailed => _buildInfoCard(
         title: '지역 정보를 확인하지 못했어요',

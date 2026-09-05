@@ -41,6 +41,7 @@ class _MyScreenState extends State<MyScreen> {
   bool _isMockLocationEnabled = false;
   RegionCode _mockRegionCode = RegionCode.gongju;
   int _mockSpotIndex = 0;
+  bool _isDebugOutOfServiceArea = false;
 
   /// 디버그 빌드이거나 서버가 테스트 계정으로 내려준 경우에만 목업 위치
   /// 도구를 노출한다(release 일반 사용자에게는 숨긴다).
@@ -91,6 +92,7 @@ class _MyScreenState extends State<MyScreen> {
     final isEnabled = await preferences.isMockLocationEnabled();
     final regionCodeName = await preferences.getMockRegionCodeName();
     final spotIndex = await preferences.getMockSpotIndex();
+    final isDebugOutOfServiceArea = await preferences.isDebugOutOfServiceArea();
     if (!mounted) return;
     final region = RegionCode.values.firstWhere(
       (value) => value.name == regionCodeName,
@@ -100,6 +102,7 @@ class _MyScreenState extends State<MyScreen> {
       _isMockLocationEnabled = isEnabled;
       _mockRegionCode = region;
       _mockSpotIndex = _clampSpotIndex(spotIndex, _spotsFor(region));
+      _isDebugOutOfServiceArea = isDebugOutOfServiceArea;
     });
   }
 
@@ -112,6 +115,11 @@ class _MyScreenState extends State<MyScreen> {
   Future<void> _onMockLocationEnabledChanged(bool enabled) async {
     setState(() => _isMockLocationEnabled = enabled);
     await AppPreferences.instance.setMockLocationEnabled(enabled);
+  }
+
+  Future<void> _onDebugOutOfServiceAreaChanged(bool enabled) async {
+    setState(() => _isDebugOutOfServiceArea = enabled);
+    await AppPreferences.instance.setDebugOutOfServiceArea(enabled);
   }
 
   Future<void> _onMockRegionCodeChanged(RegionCode? regionCode) async {
@@ -287,6 +295,21 @@ class _MyScreenState extends State<MyScreen> {
               onChanged: _onMockSpotIndexChanged,
             ),
           ],
+          const Divider(height: ChaerokSpacing.lg),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              '충남 외 지역 홈 강제',
+              style: ChaerokTypography.bodyMedium,
+            ),
+            subtitle: const Text(
+              '실제 위치와 무관하게 위치 인증이 서비스 지역 외로 판정돼 '
+              '지역별 둘러보기 홈을 확인할 수 있어요.',
+              style: ChaerokTypography.caption,
+            ),
+            value: _isDebugOutOfServiceArea,
+            onChanged: _onDebugOutOfServiceAreaChanged,
+          ),
           const SizedBox(height: ChaerokSpacing.sm),
           TextButton(
             onPressed: _onOpenDbViewerTap,

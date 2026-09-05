@@ -21,4 +21,7 @@ extension RegionCodeX on RegionCode {
 
   /// 필름롤 생성 시 기본 제목.
   String get filmRollTitle => '$displayName 필름롤';
+
+  /// 충남 외 지역 홈 화면의 필름롤 아코디언 헤더 라벨.
+  String get filmStripLabel => '$displayName 필름롤';
 }

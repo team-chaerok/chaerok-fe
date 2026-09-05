@@ -6,6 +6,7 @@ const _keyMockLocationEnabled = 'mock_location_enabled';
 const _keyMockRegionCode = 'mock_region_code';
 const _keyMockSpotIndex = 'mock_spot_index';
 const _keyIsTester = 'is_tester';
+const _keyDebugOutOfServiceArea = 'debug_out_of_service_area';
 
 /// 앱 재시작 복구/개발용 mock 설정 등 단순 값을 저장하는 SharedPreferences 래퍼.
 class AppPreferences {
@@ -92,5 +93,19 @@ class AppPreferences {
   Future<void> setTester(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyIsTester, value);
+  }
+
+  /// QA용 "충남 외 지역 홈" 강제 플래그. 켜져 있으면 위치 인증이 실제 좌표와
+  /// 무관하게 서비스 지역 외로 판정돼 `OutOfServiceHomeView`를 확인할 수 있다.
+  /// `MockLocationGate.isAllowed()`가 true인 빌드(디버그/프로파일, release는
+  /// 테스트 계정)에서만 효력이 있고, 기본값은 false다.
+  Future<bool> isDebugOutOfServiceArea() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyDebugOutOfServiceArea) ?? false;
+  }
+
+  Future<void> setDebugOutOfServiceArea(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyDebugOutOfServiceArea, value);
   }
 }
