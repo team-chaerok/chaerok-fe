@@ -19,6 +19,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
@@ -347,6 +348,56 @@ class ExploreScreenState extends State<ExploreScreen>
     }
   }
 
+  /// 북마크 카드의 "이 장소로 코스 만들기" 진입점. [_onEnterRegionTap]과 같은
+  /// find-or-create 경로([FilmRollModule.instance.resolveFilmRollEntry])로
+  /// 필름롤을 잡은 뒤, 직접 만들기 모드로 이 장소를 미리 담아 코스 선택
+  /// 화면을 연다 — 지역을 다시 진입해도 기존 필름롤을 재사용하므로 중복
+  /// 생성되지 않는다([EnterRegionUseCase.call] 참고).
+  Future<void> _onCreateCourseFromBookmark(ExplorePlace place) async {
+    if (_isEnteringFilmRoll) return;
+    final regionId = _regionId;
+    if (regionId == null) return;
+
+    setState(() => _isEnteringFilmRoll = true);
+    try {
+      final decision = await FilmRollModule.instance.resolveFilmRollEntry(
+        _selectedRegion.cityCountyName,
+        regionId: regionId,
+      );
+      if (!mounted) return;
+
+      if (decision.action == FilmRollEntryAction.showDeveloping) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('현상 대기 중에는 새 코스를 만들 수 없어요.')),
+        );
+        return;
+      }
+
+      await pushCourseSelectionAndConfirm(
+        context,
+        filmRollId: decision.filmRoll.id,
+        regionId: regionId,
+        initialTab: CourseSelectionInitialTab.custom,
+        initialSelectedPlace: place,
+      );
+      if (!mounted) return;
+      await reevaluate();
+    } on UnsupportedRegionException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('아직 필름롤을 지원하지 않는 지역이에요.')));
+    } catch (e, st) {
+      log('북마크로 코스 만들기 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('필름롤을 불러오지 못했어요.')));
+    } finally {
+      if (mounted) setState(() => _isEnteringFilmRoll = false);
+    }
+  }
+
   RecommendedPlaceSummaryData _toSummaryData(ExplorePlace place, int index) {
     const moods = PlacePlaceholderMood.values;
     return RecommendedPlaceSummaryData(
@@ -570,6 +621,7 @@ class ExploreScreenState extends State<ExploreScreen>
       separatorBuilder: (_, _) => const SizedBox(height: ChaerokSpacing.sm),
       itemBuilder: (context, index) {
         final place = places[index];
+        final isBookmarked = _bookmarkedKeys.contains(place.identityKey);
         return Stack(
           children: [
             RecommendedPlaceCard(
@@ -580,9 +632,19 @@ class ExploreScreenState extends State<ExploreScreen>
             Positioned(
               top: ChaerokSpacing.xs,
               right: ChaerokSpacing.xs,
-              child: _BookmarkButton(
-                isBookmarked: _bookmarkedKeys.contains(place.identityKey),
-                onPressed: () => _onToggleBookmark(place),
+              child: Row(
+                children: [
+                  if (isBookmarked) ...[
+                    _CreateCourseButton(
+                      onPressed: () => _onCreateCourseFromBookmark(place),
+                    ),
+                    const SizedBox(width: ChaerokSpacing.xxs),
+                  ],
+                  _BookmarkButton(
+                    isBookmarked: isBookmarked,
+                    onPressed: () => _onToggleBookmark(place),
+                  ),
+                ],
               ),
             ),
           ],
@@ -605,6 +667,33 @@ class ExploreScreenState extends State<ExploreScreen>
           isEnabled: _regionId != null && !_isLoading,
           isLoading: _isEnteringFilmRoll,
           onPressed: _onEnterRegionTap,
+        ),
+      ),
+    );
+  }
+}
+
+/// 북마크된 장소 카드에만 노출되는 "이 장소로 코스 만들기" 진입점.
+class _CreateCourseButton extends StatelessWidget {
+  const _CreateCourseButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ChaerokColors.surface,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: const Padding(
+          padding: EdgeInsets.all(ChaerokSpacing.xs),
+          child: Icon(
+            Icons.route_outlined,
+            size: 20,
+            color: ChaerokColors.primaryDark,
+          ),
         ),
       ),
     );
