@@ -40,13 +40,6 @@ class HomeBottomNavigation extends StatelessWidget {
               isSelected: selectedIndex == 0,
               onTap: () => onItemSelected(0),
             ),
-            _NavigationItem(
-              label: '채록길',
-              icon: Icons.explore_outlined,
-              selectedIcon: Icons.explore,
-              isSelected: selectedIndex == 1,
-              onTap: () => onItemSelected(1),
-            ),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -64,11 +57,11 @@ class HomeBottomNavigation extends StatelessWidget {
               ),
             ),
             _NavigationItem(
-              label: '필름',
-              icon: Icons.photo_library_outlined,
-              selectedIcon: Icons.photo_library_rounded,
-              isSelected: selectedIndex == 2,
-              onTap: () => onItemSelected(2),
+              label: '채록길',
+              icon: Icons.explore_outlined,
+              selectedIcon: Icons.explore,
+              isSelected: selectedIndex == 1,
+              onTap: () => onItemSelected(1),
             ),
           ],
         ),

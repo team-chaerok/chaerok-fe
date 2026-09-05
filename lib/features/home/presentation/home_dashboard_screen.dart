@@ -20,6 +20,7 @@ import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/nearby_place_recorder.dart';
 import 'package:chaerok/features/home/presentation/widgets/active_film_roll_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of_service_home_view.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
@@ -538,6 +539,7 @@ class _HomeHeader extends StatelessWidget {
                 ],
               ),
             ),
+            const FilmCollectionButton(),
             const MyPageButton(),
           ],
         ),

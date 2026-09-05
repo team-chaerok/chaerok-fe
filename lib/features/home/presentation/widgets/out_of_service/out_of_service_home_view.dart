@@ -6,6 +6,7 @@ import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
+import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_detail_panel.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_strip.dart';
@@ -121,9 +122,9 @@ class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Align(
-              alignment: Alignment.centerRight,
-              child: MyPageButton(),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [FilmCollectionButton(), MyPageButton()],
             ),
             RegionFilmStrip(selected: _selected, onSelect: _onSelect),
             Expanded(
