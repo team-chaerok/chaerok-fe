@@ -1,41 +1,20 @@
 import 'dart:async';
 import 'dart:developer';
 
-import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/core/location/location_provider_factory.dart';
-import 'package:chaerok/core/location/mock_location_gate.dart';
-import 'package:chaerok/core/location/mock_location_provider.dart';
-import 'package:chaerok/data/models/region_response.dart';
-import 'package:chaerok/data/models/resolve_region_request.dart';
-import 'package:chaerok/data/remote/places_api.dart';
-import 'package:chaerok/data/remote/regions_api.dart';
 import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
-import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
+import 'package:chaerok/features/location/data/location_verification_runner.dart';
 import 'package:chaerok/features/location/presentation/widgets/location_verification_idle_view.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
-
-const _serviceProvinceName = '충청남도';
-
-/// 디버그 빌드에서 서비스 지역 외 좌표로도 지역 검증 이후 흐름(관광지 조회 등)을
-/// 테스트할 수 있도록 백엔드에 전달하는 지역명만 대체하는 값.
-/// 실제 좌표(위도/경도)는 그대로 사용하므로 관광지 조회는 실제 위치 기준으로 동작한다.
-///
-/// 반대로 "충남 외 지역 홈"([OutOfServiceHomeView]) 자체를 확인하려면 마이 탭의
-/// "충남 외 지역 홈 강제 (QA)" 스위치([AppPreferences.isDebugOutOfServiceArea])를
-/// 켠다 — 이 대체가 비활성화되고 실제 서비스 지역 외 경로가 실행된다.
-const _debugFallbackProvinceName = '충청남도';
-const _debugFallbackCityCountyName = '공주시';
 
 enum _Step {
   /// 인증 전 기본 뷰(지도 미리보기 + 안내 + FAQ + CTA).
@@ -55,8 +34,13 @@ enum _Step {
 class LocationVerificationScreen extends StatefulWidget {
   const LocationVerificationScreen({
     super.key,
+    this.initialFailure,
     @visibleForTesting this.debugInitialOutOfServiceArea = false,
   });
+
+  /// 홈 진입 시 조용한 위치 확인([LocationVerificationRunner])이 실패해 이 화면으로
+  /// 폴백할 때, 온보딩(idle) 뷰 대신 해당 안내 스텝을 바로 렌더하기 위한 값.
+  final LocationVerificationFailed? initialFailure;
 
   /// 테스트에서 outOfServiceArea 스텝을 바로 렌더하기 위한 플래그.
   @visibleForTesting
@@ -92,6 +76,9 @@ class _LocationVerificationScreenState
     if (widget.debugInitialOutOfServiceArea) {
       LocationVerificationResult.outOfServiceSessionCache = true;
       _step = _Step.outOfServiceArea;
+    } else if (widget.initialFailure case final failure?) {
+      _isLocationServiceEnabled = failure.isLocationServiceEnabled;
+      _step = _stepForFailure(failure.reason);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _mapEnabled = true);
@@ -130,127 +117,37 @@ class _LocationVerificationScreenState
   Future<void> _run() async {
     setState(() => _step = _Step.checking);
 
-    final cached = LocationVerificationResult.sessionCache;
-    if (cached != null) {
-      log('세션 캐시된 위치 인증 결과 재사용', name: _tag);
-      if (!mounted) return;
-      Navigator.of(context).pop(LocationVerified(cached));
-      return;
-    }
-
-    final locationProvider = await LocationProviderFactory.create();
-
-    if (locationProvider is! MockLocationProvider) {
-      var status = await LocationPermissionService.checkStatus();
-      if (!status.isGranted) {
-        status = await LocationPermissionService.requestPermission();
-      }
-      if (!mounted) return;
-
-      if (status.isPermanentlyDenied) {
-        setState(() => _step = _Step.permissionPermanentlyDenied);
-        return;
-      }
-      if (!status.isGranted) {
-        setState(() => _step = _Step.permissionDenied);
-        return;
-      }
-    }
-
-    final position = await locationProvider.getCurrentPosition();
-    if (!mounted) return;
-    if (position == null) {
-      final serviceEnabled =
-          await LocationPermissionService.isLocationServiceEnabled();
-      if (!mounted) return;
-      setState(() {
-        _isLocationServiceEnabled = serviceEnabled;
-        _step = _Step.locationFailed;
-      });
-      return;
-    }
-
-    final administrativeRegion =
-        await KakaoLocalApiService.resolveAdministrativeRegion(
-          latitude: position.latitude,
-          longitude: position.longitude,
-        );
-    if (!mounted) return;
-    if (administrativeRegion == null) {
-      setState(() {
-        _isLocationServiceEnabled = true;
-        _step = _Step.locationFailed;
-      });
-      return;
-    }
-
-    // QA 토글: 마이 탭에서 "충남 외 지역 홈 강제"를 켜면 실제 좌표와 무관하게
-    // 서비스 지역 외로 판정하고, 아래 디버그 지역 대체도 건너뛴다.
-    final forceOutOfServiceArea =
-        await MockLocationGate.isAllowed() &&
-        await AppPreferences.instance.isDebugOutOfServiceArea();
+    final outcome = await LocationVerificationRunner.run();
     if (!mounted) return;
 
-    final isOutOfServiceArea =
-        forceOutOfServiceArea ||
-        administrativeRegion.provinceName != _serviceProvinceName;
-    final useDebugFallbackRegion =
-        kDebugMode && isOutOfServiceArea && !forceOutOfServiceArea;
-    if (isOutOfServiceArea && !useDebugFallbackRegion) {
-      LocationVerificationResult.outOfServiceSessionCache = true;
-      setState(() => _step = _Step.outOfServiceArea);
-      return;
+    switch (outcome) {
+      case LocationVerified(:final result):
+        Navigator.of(context).pop(LocationVerified(result));
+      case LocationOutOfService():
+        setState(() => _step = _Step.outOfServiceArea);
+      case LocationVerificationFailed(
+        :final reason,
+        :final isLocationServiceEnabled,
+      ):
+        setState(() {
+          _isLocationServiceEnabled = isLocationServiceEnabled;
+          _step = _stepForFailure(reason);
+        });
     }
-    if (useDebugFallbackRegion) {
-      log(
-        '디버그 모드 - 서비스 지역 외 좌표를 테스트 지역'
-        '($_debugFallbackProvinceName $_debugFallbackCityCountyName)으로 대체',
-        name: _tag,
-      );
-    }
+  }
 
-    final RegionResponse region;
-    try {
-      region = await RegionsApi.resolveRegion(
-        ResolveRegionRequest(
-          provinceName: useDebugFallbackRegion
-              ? _debugFallbackProvinceName
-              : administrativeRegion.provinceName,
-          cityCountyName: useDebugFallbackRegion
-              ? _debugFallbackCityCountyName
-              : administrativeRegion.cityCountyName,
-        ),
-      );
-    } catch (e, st) {
-      log('지역 검증 실패', name: _tag, error: e, stackTrace: st);
-      if (!mounted) return;
-      setState(() => _step = _Step.regionVerificationFailed);
-      return;
-    }
-    if (!mounted) return;
-
-    if (!region.serviceArea) {
-      LocationVerificationResult.outOfServiceSessionCache = true;
-      setState(() => _step = _Step.outOfServiceArea);
-      return;
-    }
-
-    try {
-      final places = await PlacesApi.getExternalPlaces(region.regionId);
-      if (!mounted) return;
-
-      final result = LocationVerificationResult(
-        position: position,
-        region: region,
-        places: places,
-      );
-      LocationVerificationResult.sessionCache = result;
-      Navigator.of(context).pop(LocationVerified(result));
-    } catch (e, st) {
-      log('관광지 조회 실패', name: _tag, error: e, stackTrace: st);
-      if (!mounted) return;
-      setState(() => _step = _Step.placesFailed);
-    }
+  static _Step _stepForFailure(LocationVerificationFailureReason reason) {
+    return switch (reason) {
+      LocationVerificationFailureReason.permissionDenied =>
+        _Step.permissionDenied,
+      LocationVerificationFailureReason.permissionPermanentlyDenied =>
+        _Step.permissionPermanentlyDenied,
+      LocationVerificationFailureReason.locationUnavailable =>
+        _Step.locationFailed,
+      LocationVerificationFailureReason.regionVerificationFailed =>
+        _Step.regionVerificationFailed,
+      LocationVerificationFailureReason.placesFailed => _Step.placesFailed,
+    };
   }
 
   Future<void> _onOpenSettingsTap() async {

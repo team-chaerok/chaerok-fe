@@ -39,3 +39,27 @@ class LocationVerified extends LocationVerificationOutcome {
 class LocationOutOfService extends LocationVerificationOutcome {
   const LocationOutOfService();
 }
+
+/// 위치 인증 절차가 사용자 안내가 필요한 실패로 끝난 경우.
+/// (서비스 지역 외는 안내가 아닌 별도 홈으로 가므로 [LocationOutOfService]로 구분한다.)
+class LocationVerificationFailed extends LocationVerificationOutcome {
+  const LocationVerificationFailed(
+    this.reason, {
+    this.isLocationServiceEnabled = true,
+  });
+
+  final LocationVerificationFailureReason reason;
+
+  /// [LocationVerificationFailureReason.locationUnavailable] 안내에서 기기 위치
+  /// 서비스(GPS)가 꺼져 있는지 여부에 따라 문구를 분기하기 위한 값. 그 외 사유에선 의미 없다.
+  final bool isLocationServiceEnabled;
+}
+
+/// [LocationVerificationFailed]의 세부 사유. 위치 인증 화면의 안내 스텝과 1:1 대응한다.
+enum LocationVerificationFailureReason {
+  permissionDenied,
+  permissionPermanentlyDenied,
+  locationUnavailable,
+  regionVerificationFailed,
+  placesFailed,
+}
