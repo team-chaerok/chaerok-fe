@@ -26,6 +26,7 @@ import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/weather_card.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
+import 'package:chaerok/features/location/data/location_verification_runner.dart';
 import 'package:chaerok/features/location/presentation/location_verification_screen.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
@@ -36,11 +37,21 @@ import 'package:geolocator/geolocator.dart';
 /// 이끄는 상태 요약 대시보드. `home_screen.dart`(구 홈 화면)의 사용자 조회 ·
 /// 위치 인증 게이트 · 필름롤 진입/재개 로직을 이식했다.
 class HomeDashboardScreen extends StatefulWidget {
-  const HomeDashboardScreen({super.key, this.onExploreRegionRequested});
+  const HomeDashboardScreen({
+    super.key,
+    this.onExploreRegionRequested,
+    @visibleForTesting this.debugRunLocationVerification,
+  });
 
   /// 충남 외 지역 홈에서 "OO 추천 채록길"/"전체보기" 탭 시, 채록길 탭으로
   /// 전환하며 해당 지역을 선택하도록 MainTabScreen에 위임한다.
   final ValueChanged<RegionCode>? onExploreRegionRequested;
+
+  /// 테스트에서 실제 위치 인증 절차([LocationVerificationRunner]) 대신 결과를
+  /// 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<LocationVerificationOutcome> Function()?
+  debugRunLocationVerification;
 
   @override
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
@@ -100,7 +111,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   /// 위치 인증(권한 확인 → 좌표 획득 → 지역 판별 → 관광지 조회)이 이번 세션에
-  /// 아직 완료되지 않았다면 위치 인증 화면을 진입시킨다.
+  /// 아직 완료되지 않았다면 화면 전환 없이 조용히 수행한다.
+  ///
+  /// 회원가입 직후 경로([SignupNavigation.toMainViaLocationVerification])는
+  /// MainTabScreen 진입 전에 이미 sessionCache를 채우므로 아래 캐시 분기로 빠지고,
+  /// 위치 인증 화면은 그 경로에서만 노출된다. 기존 회원이 앱을 재실행하면
+  /// sessionCache가 비어 있으므로 러너로 조용히 확인하고, 권한 미허용·조회 실패
+  /// 등 안내가 필요한 경우에만 위치 인증 화면(에러 스텝)으로 폴백한다.
   Future<void> _ensureLocationVerified() async {
     final cached = LocationVerificationResult.sessionCache;
     if (cached != null) {
@@ -113,19 +130,42 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       return;
     }
 
-    final outcome = await Navigator.of(context)
+    final outcome = await _runLocationVerification();
+    if (!mounted) return;
+
+    if (outcome is! LocationVerificationFailed) {
+      _applyLocationOutcome(outcome);
+      return;
+    }
+
+    // 권한 미허용·좌표/지역/관광지 조회 실패 → 온보딩(idle) 뷰 없이 해당 안내
+    // 스텝을 바로 띄우는 위치 인증 화면으로 폴백한다.
+    final fallback = await Navigator.of(context)
         .push<LocationVerificationOutcome>(
-          MaterialPageRoute(builder: (_) => const LocationVerificationScreen()),
+          MaterialPageRoute(
+            builder: (_) => LocationVerificationScreen(initialFailure: outcome),
+          ),
         );
     if (!mounted) return;
+    _applyLocationOutcome(fallback);
+  }
+
+  Future<LocationVerificationOutcome> _runLocationVerification() {
+    final override = widget.debugRunLocationVerification;
+    return override != null ? override() : LocationVerificationRunner.run();
+  }
+
+  /// 조용한 확인 또는 폴백 화면에서 돌아온 결과를 홈 상태에 반영한다.
+  void _applyLocationOutcome(LocationVerificationOutcome? outcome) {
     switch (outcome) {
       case LocationVerified(:final result):
         setState(() => _locationResult = result);
         unawaited(_onLocationVerified(result));
       case LocationOutOfService():
         setState(() => _isOutOfService = true);
+      case LocationVerificationFailed():
       case null:
-        // 사용자가 "지역별로 둘러보기" CTA 대신 AppBar/시스템 뒤로가기로 게이트를
+        // 폴백 화면을 "지역별로 둘러보기" CTA 대신 AppBar/시스템 뒤로가기로
         // 빠져나오면 outcome은 null이다. 이때도 게이트가 "서비스 지역 외" 카드를
         // 렌더하며 outOfServiceSessionCache를 세팅했을 수 있으므로, 캐시를 다시
         // 읽어 빈 대시보드에 갇히지 않고 충남 외 지역 홈으로 복구한다.
