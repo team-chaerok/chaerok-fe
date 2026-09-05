@@ -5,6 +5,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/data/models/place_category.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
@@ -246,7 +247,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     return RecommendedPlaceSummaryData(
       name: place.title,
-      category: place.categoryDetail,
+      category: PlaceExternalCategory.displayLabel(place.categoryDetail),
       imageUrl: place.firstImageUrl,
       distance: distance,
       placeholderMood: moods[index % moods.length],

@@ -300,7 +300,7 @@ class ExploreScreenState extends State<ExploreScreen>
               Text(place.title, style: ChaerokTypography.titleMedium),
               const SizedBox(height: ChaerokSpacing.xs),
               Text(
-                '${place.categoryDetailLabel}'
+                '${place.categoryDisplayLabel}'
                 '${_distanceLabel(place) != null ? ' · ${_distanceLabel(place)}' : ''}',
                 style: ChaerokTypography.bodyMedium.copyWith(
                   color: ChaerokColors.textSecondary,
@@ -414,7 +414,7 @@ class ExploreScreenState extends State<ExploreScreen>
     const moods = PlacePlaceholderMood.values;
     return RecommendedPlaceSummaryData(
       name: place.title,
-      category: place.categoryDetailLabel,
+      category: place.categoryDisplayLabel,
       imageUrl: place.imageUrl,
       distance: _distanceLabel(place),
       placeholderMood: moods[index % moods.length],

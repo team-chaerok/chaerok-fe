@@ -2,6 +2,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/data/models/place_category.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
@@ -141,7 +142,7 @@ class _PlaceCard extends StatelessWidget {
               ],
             ),
             Text(
-              place.categoryDetail,
+              PlaceExternalCategory.displayLabel(place.categoryDetail),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: ChaerokTypography.caption.copyWith(
