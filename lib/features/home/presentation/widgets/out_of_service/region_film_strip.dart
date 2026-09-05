@@ -5,8 +5,8 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 
-/// 충남 외 지역 홈 상단의 "필름롤" 아코디언. 4개 지역 헤더를 필름 스트립처럼
-/// 살짝 겹쳐 쌓고, 접힌 헤더를 탭하면 [onSelect]로 전환을 요청한다.
+/// 충남 외 지역 홈 상단의 "필름롤" 아코디언. 4개 지역 헤더를 세로로 쌓고,
+/// 접힌 헤더를 탭하면 [onSelect]로 전환을 요청한다.
 /// 상세 패널은 이 위젯이 아니라 부모가 그린다.
 class RegionFilmStrip extends StatelessWidget {
   const RegionFilmStrip({
@@ -18,23 +18,22 @@ class RegionFilmStrip extends StatelessWidget {
   final RegionCode selected;
   final ValueChanged<RegionCode> onSelect;
 
-  /// 겹쳐 쌓이는 느낌을 주는 헤더 간 음수 오버랩(Figma 근사). 토큰이 없어 raw 사용.
-  static const double _overlap = 8;
+  /// 헤더 사이 간격(겹치지 않게 살짝 띄운다). 토큰이 없어 raw 사용.
+  static const double _gap = 2;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final (index, region) in RegionCode.values.indexed)
-          Transform.translate(
-            offset: Offset(0, index == 0 ? 0 : -_overlap * index),
-            child: _FilmRollHeader(
-              label: region.filmStripLabel,
-              isSelected: region == selected,
-              onTap: () => onSelect(region),
-            ),
+        for (final (index, region) in RegionCode.values.indexed) ...[
+          if (index != 0) const SizedBox(height: _gap),
+          _FilmRollHeader(
+            label: region.filmStripLabel,
+            isSelected: region == selected,
+            onTap: () => onSelect(region),
           ),
+        ],
       ],
     );
   }
@@ -62,10 +61,7 @@ class _FilmRollHeader extends StatelessWidget {
           color: isSelected
               ? ChaerokColors.primaryDark
               : ChaerokColors.primaryDark.withValues(alpha: 0.72),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(ChaerokRadius.lg),
-            topRight: Radius.circular(ChaerokRadius.lg),
-          ),
+          borderRadius: BorderRadius.circular(ChaerokRadius.md),
         ),
         alignment: Alignment.centerLeft,
         child: Row(
