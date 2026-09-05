@@ -6,7 +6,6 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/api_error.dart';
-import 'package:chaerok/data/models/course_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
@@ -15,6 +14,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
+import 'package:chaerok/features/film_roll/presentation/page/course_selection_result.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
@@ -90,14 +90,22 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     }
 
     if (!mounted) return;
-    final selected = await Navigator.of(context).push<CourseResponse>(
+    final result = await Navigator.of(context).push<CourseSelectionResult>(
       MaterialPageRoute(
         builder: (_) => CourseSelectionScreen(regionId: regionId!),
       ),
     );
-    if (selected == null || !mounted) return;
+    if (result == null || !mounted) return;
 
-    final success = await _controller.selectCourse(selected);
+    final success = switch (result.outcome) {
+      CourseSelectionOutcome.recommended => await _controller.selectCourse(
+        result.recommendedCourse!,
+      ),
+      CourseSelectionOutcome.custom => await _controller.selectCustomCourse(
+        course: result.customCourse!,
+        places: result.customPlaces!,
+      ),
+    };
     if (!mounted || success) return;
     final message = _controller.state.errorMessage;
     if (message != null) {
