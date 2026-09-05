@@ -6,10 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
-const _camera = CameraDescription(
+const _backCamera = CameraDescription(
   name: 'back',
   lensDirection: CameraLensDirection.back,
   sensorOrientation: 90,
+);
+
+const _frontCamera = CameraDescription(
+  name: 'front',
+  lensDirection: CameraLensDirection.front,
+  sensorOrientation: 270,
 );
 
 /// 실제 권한 다이얼로그처럼, [request]가 완료되기 전까지 대기하다가
@@ -61,13 +67,23 @@ class _PermanentlyDeniedPermissionPlatform extends PermissionHandlerPlatform {
   }
 }
 
-/// 카메라 컨트롤러 생성 횟수를 세는 가짜 카메라 플랫폼.
+/// 카메라 컨트롤러 동작을 흉내내며 호출 인자를 기록하는 가짜 카메라 플랫폼.
 class _FakeCameraPlatform extends CameraPlatform {
+  _FakeCameraPlatform({this.includeFrontCamera = false});
+
+  final bool includeFrontCamera;
+
   int createCameraCallCount = 0;
   int _nextCameraId = 0;
 
+  final List<FlashMode> flashModeCalls = [];
+  bool setFlashModeThrows = false;
+
   @override
-  Future<List<CameraDescription>> availableCameras() async => [_camera];
+  Future<List<CameraDescription>> availableCameras() async => [
+    _backCamera,
+    if (includeFrontCamera) _frontCamera,
+  ];
 
   @override
   Future<int> createCameraWithSettings(
@@ -135,7 +151,12 @@ class _FakeCameraPlatform extends CameraPlatform {
   Future<void> setZoomLevel(int cameraId, double zoom) async {}
 
   @override
-  Future<void> setFlashMode(int cameraId, FlashMode mode) async {}
+  Future<void> setFlashMode(int cameraId, FlashMode mode) async {
+    if (setFlashModeThrows) {
+      throw CameraException('setFlashModeFailed', '이 렌즈는 플래시를 지원하지 않아요.');
+    }
+    flashModeCalls.add(mode);
+  }
 }
 
 void main() {
@@ -195,5 +216,105 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fakePermissions.openAppSettingsCallCount, 1);
+  });
+
+  testWidgets('본문은 RotatedBox로 회전돼 세로 폰에서도 가로 UI로 렌더된다', (tester) async {
+    final fakePermissions = _FakePermissionPlatform();
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = _FakeCameraPlatform();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+        ),
+      ),
+    );
+    fakePermissions.grant();
+    await tester.pumpAndSettle();
+
+    final rotator = tester.widget<RotatedBox>(
+      find.byKey(const ValueKey('capture-body-rotator')),
+    );
+    expect(rotator.quarterTurns, 1);
+  });
+
+  testWidgets('플래시 토글을 누르면 상단 바 상태가 ON으로 바뀌고 플래시 모드가 적용된다', (tester) async {
+    final fakePermissions = _FakePermissionPlatform();
+    final fakeCamera = _FakeCameraPlatform();
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = fakeCamera;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+        ),
+      ),
+    );
+    fakePermissions.grant();
+    await tester.pumpAndSettle();
+
+    expect(find.text('OFF'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.flash_off));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ON'), findsOneWidget);
+    expect(find.byIcon(Icons.flash_on), findsOneWidget);
+    expect(fakeCamera.flashModeCalls, contains(FlashMode.always));
+  });
+
+  testWidgets('플래시 모드 변경이 실패하면 상태를 바꾸지 않고 무시한다', (tester) async {
+    final fakePermissions = _FakePermissionPlatform();
+    final fakeCamera = _FakeCameraPlatform()..setFlashModeThrows = true;
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = fakeCamera;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+        ),
+      ),
+    );
+    fakePermissions.grant();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.flash_off));
+    await tester.pumpAndSettle();
+
+    expect(find.text('OFF'), findsOneWidget, reason: '실패 시 OFF 상태를 유지해야 한다');
+    expect(find.byIcon(Icons.flash_on), findsNothing);
+    expect(tester.takeException(), isNull, reason: '예외가 화면 밖으로 전파되면 안 된다');
+  });
+
+  testWidgets('전면 카메라로 전환하면 플래시 토글을 노출하지 않는다', (tester) async {
+    final fakePermissions = _FakePermissionPlatform();
+    final fakeCamera = _FakeCameraPlatform(includeFrontCamera: true);
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = fakeCamera;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+        ),
+      ),
+    );
+    fakePermissions.grant();
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.flash_off), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.cameraswitch_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.flash_off), findsNothing);
+    expect(find.byIcon(Icons.flash_on), findsNothing);
   });
 }

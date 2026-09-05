@@ -11,6 +11,7 @@ class CameraTopBar extends StatelessWidget {
   const CameraTopBar({
     super.key,
     required this.flashMode,
+    required this.isFlashSupported,
     required this.filmTypeLabel,
     required this.photoCount,
     required this.maxPhotoCount,
@@ -19,6 +20,10 @@ class CameraTopBar extends StatelessWidget {
   });
 
   final FlashMode flashMode;
+
+  /// 현재 렌즈가 플래시를 지원하는지 여부. 전면 카메라 등 미지원 시 토글을
+  /// 렌더링하지 않는다.
+  final bool isFlashSupported;
   final String filmTypeLabel;
   final int photoCount;
   final int maxPhotoCount;
@@ -32,42 +37,7 @@ class CameraTopBar extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: onFlashToggle,
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  children: [
-                    Icon(
-                      _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                      color: ChaerokColors.textPrimary,
-                      size: 20,
-                    ),
-                    Text(
-                      _isFlashOn ? 'ON' : 'OFF',
-                      style: ChaerokTypography.caption.copyWith(
-                        color: ChaerokColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: ChaerokSpacing.sm),
-                Flexible(
-                  child: Text(
-                    filmTypeLabel,
-                    style: ChaerokTypography.displayMedium.copyWith(
-                      color: ChaerokColors.textPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: _buildFlashAndLabel()),
         const SizedBox(width: ChaerokSpacing.sm),
         Container(
           padding: const EdgeInsets.symmetric(
@@ -105,6 +75,48 @@ class CameraTopBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFlashAndLabel() {
+    final label = Text(
+      filmTypeLabel,
+      style: ChaerokTypography.displayMedium.copyWith(
+        color: ChaerokColors.textPrimary,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    if (!isFlashSupported) {
+      return Align(alignment: Alignment.centerLeft, child: label);
+    }
+
+    return GestureDetector(
+      onTap: onFlashToggle,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _isFlashOn ? Icons.flash_on : Icons.flash_off,
+                color: ChaerokColors.textPrimary,
+                size: 20,
+              ),
+              Text(
+                _isFlashOn ? 'ON' : 'OFF',
+                style: ChaerokTypography.caption.copyWith(
+                  color: ChaerokColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: ChaerokSpacing.sm),
+          Expanded(child: label),
+        ],
+      ),
     );
   }
 }

@@ -16,7 +16,6 @@ import 'package:chaerok/features/location/data/location_permission_service.dart'
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// 목업에 고정된 필름 타입/카메라 브랜드 표기. 실제 데이터 모델과 연동되는
@@ -63,24 +62,38 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   double _maxZoom = 1.0;
   FlashMode _flashMode = FlashMode.off;
 
+  /// 앱은 세로 전용이고 폰을 돌리지 않는다. 대신 촬영 화면 본문 전체를 이만큼
+  /// 회전시켜 그려, 세로로 든 폰에서도 필름 카메라 같은 가로 UI로 보이게 한다.
+  /// (iOS 인터페이스 회전 강제는 iOS 16+에서 거부/프리뷰 불일치가 생겨 쓰지 않음)
+  /// 방향이 통째로 90° 반대면 이 값을 3으로 바꾼다.
+  static const _bodyQuarterTurns = 1;
+
   int _photoCount = 0;
 
   List<double> get _availableZoomLevels => _zoomLevelCandidates
       .where((zoom) => zoom >= _minZoom && zoom <= _maxZoom)
       .toList();
 
+  /// 전면 카메라는 플래시 유닛이 없어 토글을 노출하지 않는다.
+  bool get _isFlashSupported => _lensDirection == CameraLensDirection.back;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]),
-    );
     unawaited(_initializeCamera());
     unawaited(_loadPhotoCount());
+  }
+
+  /// 플래시 모드를 적용하되, 미지원 렌즈/기기에서 던지는 예외는 삼켜 카메라
+  /// 초기화나 촬영 흐름이 중단되지 않게 한다.
+  Future<void> _applyFlashModeSafely(CameraController controller) async {
+    if (!_isFlashSupported) return;
+    try {
+      await controller.setFlashMode(_flashMode);
+    } catch (e, st) {
+      log('플래시 모드 적용 실패', name: _tag, error: e, stackTrace: st);
+    }
   }
 
   Future<void> _loadPhotoCount() async {
@@ -144,7 +157,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       }
       final clampedZoom = _zoomLevel.clamp(minZoom, maxZoom).toDouble();
       await controller.setZoomLevel(clampedZoom);
-      await controller.setFlashMode(_flashMode);
+      await _applyFlashModeSafely(controller);
       setState(() {
         _cameraController = controller;
         _errorMessage = null;
@@ -192,12 +205,19 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
   Future<void> _onFlashToggle() async {
     final controller = _cameraController;
-    if (controller == null) return;
+    if (controller == null || !_isFlashSupported) return;
 
     final nextFlashMode = _flashMode == FlashMode.off
         ? FlashMode.always
         : FlashMode.off;
-    await controller.setFlashMode(nextFlashMode);
+    try {
+      await controller.setFlashMode(nextFlashMode);
+    } catch (e, st) {
+      // 일부 기기/렌즈는 플래시 모드 변경을 거부한다. 상태를 바꾸지 않고
+      // 무시해 토글이 화면을 깨뜨리지 않도록 한다.
+      log('플래시 모드 변경 실패', name: _tag, error: e, stackTrace: st);
+      return;
+    }
     if (!mounted) return;
     setState(() => _flashMode = nextFlashMode);
   }
@@ -215,6 +235,10 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       _lensDirection = _lensDirection == CameraLensDirection.back
           ? CameraLensDirection.front
           : CameraLensDirection.back;
+      // 전면은 플래시가 없으므로 상태를 꺼둔다(_initializeCamera가 이 값을 반영).
+      if (_lensDirection == CameraLensDirection.front) {
+        _flashMode = FlashMode.off;
+      }
       await _initializeCamera();
     } finally {
       _isSwitchingCamera = false;
@@ -227,6 +251,9 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
     setState(() => _isSaving = true);
     try {
+      // 촬영 직전 플래시 모드를 한 번 더 확정한다(이전 촬영 후 모드가 초기화되는
+      // 기기 대비).
+      await _applyFlashModeSafely(controller);
       final file = await controller.takePicture();
       final bytes = await file.readAsBytes();
       final position = await LocationPermissionService.getCurrentPosition();
@@ -255,12 +282,6 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_cameraController?.dispose());
-    unawaited(
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]),
-    );
     super.dispose();
   }
 
@@ -268,7 +289,14 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.primaryLight,
-      body: SafeArea(child: _buildBody()),
+      // 앱 인터페이스는 세로. 이 화면만 본문 전체를 회전시켜 가로로 보이게 한다.
+      body: SafeArea(
+        child: RotatedBox(
+          key: const ValueKey('capture-body-rotator'),
+          quarterTurns: _bodyQuarterTurns,
+          child: _buildBody(),
+        ),
+      ),
     );
   }
 
@@ -313,6 +341,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
         children: [
           CameraTopBar(
             flashMode: _flashMode,
+            isFlashSupported: _isFlashSupported,
             filmTypeLabel: _filmTypeLabel,
             photoCount: _photoCount,
             maxPhotoCount: FilmRoll.maxExposureCount,
@@ -331,7 +360,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                       Expanded(
                         child: Center(
                           child: AspectRatio(
-                            aspectRatio: 4 / 3,
+                            aspectRatio: 3 / 2,
                             child: FilmViewfinderFrame(
                               child: CameraPreview(controller),
                             ),
