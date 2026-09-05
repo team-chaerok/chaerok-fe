@@ -11,12 +11,14 @@ import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -230,6 +232,10 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
           ),
         );
       case FilmRollLoadStatus.loaded:
+        final filmRoll = _state.filmRoll!;
+        if (filmRoll.status == FilmRollStatus.developing) {
+          return FilmRollDevelopingView(filmRoll: filmRoll);
+        }
         return _buildLoaded();
     }
   }

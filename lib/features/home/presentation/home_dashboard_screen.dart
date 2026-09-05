@@ -11,8 +11,10 @@ import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/nearby_place_recorder.dart';
@@ -51,6 +53,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   LocationVerificationResult? _locationResult;
   FilmRoll? _recoveredFilmRoll;
   bool _isEnteringFilmRoll = false;
+
+  // 위치 인증 성공 직후 자동으로 지역 진입 → 코스 선택까지 이어주는 동안,
+  // 같은 화면의 수동 "필름롤 시작하기" 버튼이 동시에 눌려 내비게이션이
+  // 중복 push되는 것을 막기 위한 플래그.
+  bool _isAutoConnectingFilmRoll = false;
   WeatherSummaryData? _weather;
   List<String> _recentPhotoThumbnailPaths = const [];
   List<RecommendedPlaceSummaryData> _nearbyPlaces = const [];
@@ -101,9 +108,54 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   /// 위치 인증 결과가 확정된 뒤, 이 결과에 의존하는 날씨/근처 채록 장소
-  /// 섹션을 채운다.
+  /// 섹션을 채우고, 진행중 필름롤이 없으면 코스 선택까지 자동으로 이어준다.
   Future<void> _onLocationVerified(LocationVerificationResult result) async {
-    await Future.wait([_fetchWeather(result), _loadNearbyPlaces(result)]);
+    await Future.wait([
+      _fetchWeather(result),
+      _loadNearbyPlaces(result),
+      _autoConnectFilmRollEntry(result),
+    ]);
+  }
+
+  /// 서비스 지역 확인 직후, 활성 필름롤이 없으면 해당 지역으로 자동 진입해
+  /// 코스 선택 화면까지 이어준다. 이미 진행중이면 진행 화면으로, 현상
+  /// 대기중이면 현상 대기 화면으로 바로 연결한다(`ResolveFilmRollEntryUseCase`).
+  Future<void> _autoConnectFilmRollEntry(
+    LocationVerificationResult result,
+  ) async {
+    setState(() => _isAutoConnectingFilmRoll = true);
+    try {
+      final decision = await FilmRollModule.instance.resolveFilmRollEntry(
+        result.region.cityCountyName,
+        regionId: result.region.regionId,
+      );
+      if (!mounted) return;
+
+      if (decision.action == FilmRollEntryAction.needsCourseSelection) {
+        await pushCourseSelectionAndConfirm(
+          context,
+          filmRollId: decision.filmRoll.id,
+          regionId: result.region.regionId,
+        );
+        if (!mounted) return;
+      }
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => FilmRollScreen(
+            filmRollId: decision.filmRoll.id,
+            regionId: result.region.regionId,
+          ),
+        ),
+      );
+    } on UnsupportedRegionException {
+      // 서비스 미지원 지역 — 자동 진입 없이 기존 "필름롤 시작하기" 카드로 폴백.
+    } catch (e, st) {
+      log('필름롤 자동 진입 실패', name: _tag, error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _isAutoConnectingFilmRoll = false);
+      if (mounted) await _loadRecoveredFilmRoll();
+    }
   }
 
   Future<void> _fetchWeather(LocationVerificationResult result) async {
@@ -238,7 +290,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// 위치 인증으로 확인된 지역에 대한 로컬 필름롤을 찾거나 새로 생성해 진입한다.
   Future<void> _onStartFilmRollTap() async {
     final locationResult = _locationResult;
-    if (locationResult == null || _isEnteringFilmRoll) return;
+    if (locationResult == null ||
+        _isEnteringFilmRoll ||
+        _isAutoConnectingFilmRoll) {
+      return;
+    }
 
     setState(() => _isEnteringFilmRoll = true);
     try {
@@ -391,8 +447,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           const SizedBox(height: ChaerokSpacing.sm),
           ChaerokButton(
             text: '필름롤 시작하기',
-            isEnabled: _locationResult != null,
-            isLoading: _isEnteringFilmRoll,
+            isEnabled: _locationResult != null && !_isAutoConnectingFilmRoll,
+            isLoading: _isEnteringFilmRoll || _isAutoConnectingFilmRoll,
             onPressed: _onStartFilmRollTap,
           ),
         ],
