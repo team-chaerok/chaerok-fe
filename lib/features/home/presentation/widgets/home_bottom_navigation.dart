@@ -70,13 +70,6 @@ class HomeBottomNavigation extends StatelessWidget {
               isSelected: selectedIndex == 2,
               onTap: () => onItemSelected(2),
             ),
-            _NavigationItem(
-              label: '마이',
-              icon: Icons.person_outline_rounded,
-              selectedIcon: Icons.person_rounded,
-              isSelected: selectedIndex == 3,
-              onTap: () => onItemSelected(3),
-            ),
           ],
         ),
       ),

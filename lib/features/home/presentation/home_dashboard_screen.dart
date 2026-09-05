@@ -20,6 +20,7 @@ import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/nearby_place_recorder.dart';
 import 'package:chaerok/features/home/presentation/widgets/active_film_roll_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of_service_home_view.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/weather_card.dart';
@@ -510,18 +511,35 @@ class _HomeHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: ChaerokSpacing.xs),
-        Text(
-          regionName != null ? '$_todayLabel · $regionName' : _todayLabel,
-          style: ChaerokTypography.caption.copyWith(
-            color: ChaerokColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: ChaerokSpacing.xxs),
-        Text(
-          userNickname != null ? '$userNickname님,\n오늘의 여행 기록을 남겨주세요' : '안녕하세요',
-          style: ChaerokTypography.titleLarge.copyWith(
-            color: ChaerokColors.textPrimary,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    regionName != null
+                        ? '$_todayLabel · $regionName'
+                        : _todayLabel,
+                    style: ChaerokTypography.caption.copyWith(
+                      color: ChaerokColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: ChaerokSpacing.xxs),
+                  Text(
+                    userNickname != null
+                        ? '$userNickname님,\n오늘의 여행 기록을 남겨주세요'
+                        : '안녕하세요',
+                    style: ChaerokTypography.titleLarge.copyWith(
+                      color: ChaerokColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const MyPageButton(),
+          ],
         ),
         const SizedBox(height: ChaerokSpacing.xs),
       ],
