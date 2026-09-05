@@ -153,11 +153,8 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
         throw StateError('필름롤을 찾을 수 없습니다: $filmRollId');
       }
 
-      final hasVisitOrPhotoRecords =
-          await _placeDs.hasAnyVisited(filmRollId) ||
-          await _photoDs.hasAnyByFilmRoll(filmRollId);
       final isDifferentCourse = row.selectedCourseId != courseId;
-      if (hasVisitOrPhotoRecords && isDifferentCourse) {
+      if (await hasVisitOrPhotoRecords(filmRollId) && isDifferentCourse) {
         throw const CourseChangeBlockedException();
       }
 
@@ -191,6 +188,12 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
         ),
       );
     });
+  }
+
+  @override
+  Future<bool> hasVisitOrPhotoRecords(String filmRollId) async {
+    return await _placeDs.hasAnyVisited(filmRollId) ||
+        await _photoDs.hasAnyByFilmRoll(filmRollId);
   }
 
   @override

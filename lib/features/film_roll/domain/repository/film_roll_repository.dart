@@ -57,6 +57,13 @@ abstract class FilmRollRepository {
     required List<CourseCandidatePlace> places,
   });
 
+  /// [filmRollId]에 방문(채록) 완료 또는 촬영된 사진 기록이 있는지 확인한다.
+  /// 기록이 있으면 [selectCourse]가 다른 코스로의 변경을 차단한다. 커스텀
+  /// 코스처럼 로컬 확정 전에 서버에 먼저 코스를 생성해야 하는 흐름에서,
+  /// 어차피 차단될 변경이면 서버 호출 자체를 건너뛰기 위한 사전 확인용이다
+  /// (최종 판정은 여전히 [selectCourse]가 원자적으로 다시 수행한다).
+  Future<bool> hasVisitOrPhotoRecords(String filmRollId);
+
   /// 필름롤과 연관된 장소/사진 레코드(DB) 및 사진 원본 파일을 함께 삭제한다.
   Future<void> deleteFilmRoll(String filmRollId);
 

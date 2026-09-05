@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:chaerok/data/models/course_response.dart';
+import 'package:chaerok/data/models/selected_course_response.dart';
 import 'package:chaerok/data/models/visit_list_response.dart';
 import 'package:chaerok/data/remote/visits_api.dart';
+import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
@@ -13,6 +15,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/complete_visit_use_cas
 import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_result.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/select_custom_course_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
 
@@ -28,6 +31,7 @@ class FilmRollController {
     FilmRollRepository? filmRollRepository,
     FilmRollPlaceRepository? filmRollPlaceRepository,
     SelectCourseUseCase? selectCourseUseCase,
+    SelectCustomCourseUseCase? selectCustomCourseUseCase,
     CompleteVisitUseCase? completeVisitUseCase,
     ExitFilmRollUseCase? exitFilmRollUseCase,
     FilmRollSyncService? syncService,
@@ -40,6 +44,9 @@ class FilmRollController {
            FilmRollModule.instance.filmRollPlaceRepository,
        _selectCourseUseCase =
            selectCourseUseCase ?? FilmRollModule.instance.selectCourse,
+       _selectCustomCourseUseCase =
+           selectCustomCourseUseCase ??
+           FilmRollModule.instance.selectCustomCourse,
        _completeVisitUseCase =
            completeVisitUseCase ?? FilmRollModule.instance.completeVisit,
        _exitFilmRollUseCase =
@@ -53,6 +60,7 @@ class FilmRollController {
   final FilmRollRepository _filmRollRepository;
   final FilmRollPlaceRepository _filmRollPlaceRepository;
   final SelectCourseUseCase _selectCourseUseCase;
+  final SelectCustomCourseUseCase _selectCustomCourseUseCase;
   final CompleteVisitUseCase _completeVisitUseCase;
   final ExitFilmRollUseCase _exitFilmRollUseCase;
   final FilmRollSyncService _syncService;
@@ -187,6 +195,40 @@ class FilmRollController {
       return false;
     } catch (e, st) {
       log('코스 선택 실패', name: _tag, error: e, stackTrace: st);
+      _emit(
+        _state.copyWith(
+          status: FilmRollLoadStatus.loaded,
+          errorMessage: e.toString(),
+        ),
+      );
+      return false;
+    }
+  }
+
+  /// 커스텀 코스([SelectCustomCourseUseCase])를 확정한다. [selectCourse]와 동일한
+  /// 성공/실패 규약(코스 변경 차단 시 false + 안내 메시지)을 따른다.
+  Future<bool> selectCustomCourse({
+    required SelectedCourseResponse course,
+    required List<ExplorePlace> places,
+  }) async {
+    try {
+      await _selectCustomCourseUseCase(
+        filmRollId: filmRollId,
+        course: course,
+        places: places,
+      );
+      await load();
+      return true;
+    } on CourseChangeBlockedException {
+      _emit(
+        _state.copyWith(
+          status: FilmRollLoadStatus.loaded,
+          errorMessage: '이미 방문/촬영 기록이 있어 코스를 변경할 수 없습니다.',
+        ),
+      );
+      return false;
+    } catch (e, st) {
+      log('커스텀 코스 선택 실패', name: _tag, error: e, stackTrace: st);
       _emit(
         _state.copyWith(
           status: FilmRollLoadStatus.loaded,

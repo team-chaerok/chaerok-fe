@@ -61,6 +61,13 @@ void main() {
       expect(NearbyPlaceRecorder.isRecorded(place, filmRollPlaces), isTrue);
     });
 
+    test('KAKAO_LOCAL 출처(실제 백엔드 값)도 kakaoPlaceId를 externalPlaceId와 비교한다', () {
+      final place = _place(kakaoPlaceId: 'kakao-1', source: 'KAKAO_LOCAL');
+      final filmRollPlaces = [_filmRollPlace(externalPlaceId: 'kakao-1')];
+
+      expect(NearbyPlaceRecorder.isRecorded(place, filmRollPlaces), isTrue);
+    });
+
     test('TOUR_API 출처는 tourContentId를 externalPlaceId와 비교한다', () {
       final place = _place(tourContentId: 'tour-1', source: 'TOUR_API');
       final filmRollPlaces = [_filmRollPlace(externalPlaceId: 'tour-1')];

@@ -12,6 +12,11 @@ class NearbyPlaceRecorder {
   const NearbyPlaceRecorder._();
 
   static const _kakaoSource = 'KAKAO';
+
+  /// `/api/places/search`가 실제로 내려주는 Kakao 소스 값(Swagger 예시의 `KAKAO`와
+  /// 다름 — 실기기 로그로 확인, [ExplorePlace] 참고). 어느 값이 오든 Kakao 장소로
+  /// 인식하도록 둘 다 받는다.
+  static const _kakaoLocalSource = 'KAKAO_LOCAL';
   static const _tourApiSource = 'TOUR_API';
 
   static bool isRecorded(
@@ -36,7 +41,7 @@ class NearbyPlaceRecorder {
 
   static String? _externalIdOf(PlaceListResponse place) {
     switch (place.source) {
-      case _kakaoSource:
+      case _kakaoSource || _kakaoLocalSource:
         return place.kakaoPlaceId;
       case _tourApiSource:
         return place.tourContentId;

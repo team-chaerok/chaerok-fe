@@ -57,6 +57,30 @@ void main() {
     expect(result.firstImageUrl, isNull);
   });
 
+  test('id가 null이어도(검색 결과는 DB에 저장되지 않아 id가 없음) 예외 없이 파싱한다', () {
+    final json =
+        jsonDecode('''
+    {
+      "id": null,
+      "tourContentId": null,
+      "kakaoPlaceId": "27122308",
+      "title": "왕릉치안센터",
+      "address": "충남 공주시 봉황로 172",
+      "latitude": 36.4613862752355,
+      "longitude": 127.1210546025,
+      "categoryGroup": "TOURISM",
+      "categoryDetail": "EXPERIENCE",
+      "source": "KAKAO_LOCAL"
+    }
+    ''')
+            as Map<String, dynamic>;
+
+    final result = PlaceSearchResponse.fromJson(json);
+
+    expect(result.id, isNull);
+    expect(result.title, '왕릉치안센터');
+  });
+
   test('PlaceListResponse와 달리 isRepresentative 필드를 갖지 않는다', () {
     final json =
         jsonDecode('''
