@@ -150,7 +150,8 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
     if (!mounted) return;
     final result = await Navigator.of(context).push<CourseSelectionResult>(
       MaterialPageRoute(
-        builder: (_) => CourseSelectionScreen(regionId: regionId!),
+        builder: (_) =>
+            CourseSelectionScreen(regionId: regionId!, filmRollId: filmRoll.id),
       ),
     );
     if (result == null || !mounted) return;

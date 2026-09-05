@@ -13,6 +13,7 @@ import 'package:chaerok/data/remote/courses_api.dart';
 import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/features/explore/data/bookmark_store.dart';
 import 'package:chaerok/features/explore/domain/explore_place.dart';
+import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_result.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
@@ -34,16 +35,22 @@ enum _CustomPlaceSource { region, search, bookmark }
 /// 추천 모드에서 고른 [CourseResponse], 또는 직접 만들기 모드에서 이미
 /// `CoursesApi.createCourse`로 생성한 [SelectedCourseResponse]와 원본 장소
 /// 목록이 [CourseSelectionResult]에 담겨 `Navigator.pop`으로 반환된다.
-/// 필름롤 스냅샷 저장(로컬 DB)은 `filmRollId`를 아는 호출부가 맡는다.
+/// 필름롤 스냅샷 저장(로컬 DB)은 [filmRollId]를 다시 요구하는 호출부가 맡는다.
+/// 이 화면은 [filmRollId]를 직접 만들기 확정 전 변경 차단 여부 사전 확인에만 쓴다.
 class CourseSelectionScreen extends StatefulWidget {
   const CourseSelectionScreen({
     super.key,
     required this.regionId,
+    required this.filmRollId,
     this.initialTab = CourseSelectionInitialTab.recommended,
     this.initialSelectedPlace,
   });
 
   final int regionId;
+
+  /// 직접 만들기 모드 확정 시, 서버에 코스를 생성하기 전에 이미 방문/촬영
+  /// 기록이 있어 변경이 차단될지 미리 확인하는 데 쓴다(§ 위험요소 참고).
+  final String filmRollId;
   final CourseSelectionInitialTab initialTab;
 
   /// 북마크 카드의 "이 장소로 코스 만들기" 진입점에서 미리 담아 둘 장소.
@@ -74,6 +81,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   Timer? _searchDebounce;
   int _searchRequestId = 0;
   List<BookmarkedPlace> _bookmarkedPlaces = const [];
+  String? _bookmarkedPlacesError;
   final List<ExplorePlace> _selectedPlaces = [];
   bool _isCreatingCustomCourse = false;
 
@@ -178,9 +186,18 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   }
 
   Future<void> _loadBookmarkedPlaces() async {
-    final places = await BookmarkStore.instance.list();
-    if (!mounted) return;
-    setState(() => _bookmarkedPlaces = places);
+    try {
+      final places = await BookmarkStore.instance.list();
+      if (!mounted) return;
+      setState(() {
+        _bookmarkedPlaces = places;
+        _bookmarkedPlacesError = null;
+      });
+    } catch (e, st) {
+      log('북마크 목록 조회 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      setState(() => _bookmarkedPlacesError = apiErrorMessage(e));
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -256,6 +273,21 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
     setState(() => _isCreatingCustomCourse = true);
     try {
+      // 커스텀 코스는 매번 서버가 새 courseId를 발급하므로, 이미 방문/촬영
+      // 기록이 있는 필름롤이면 항상 CourseChangeBlockedException으로
+      // 차단된다. 이 판정은 로컬 확정 시점(호출부의 selectCustomCourse)에야
+      // 내려지는데, 그때는 이미 서버 ACTIVE 코스가 생성/대체된 뒤라 서버와
+      // 로컬이 어긋난다. createCourse를 호출하기 전에 미리 확인해 막는다.
+      final isBlocked = await FilmRollModule.instance.filmRollRepository
+          .hasVisitOrPhotoRecords(widget.filmRollId);
+      if (isBlocked) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미 방문/촬영 기록이 있어 코스를 변경할 수 없습니다.')),
+        );
+        return;
+      }
+
       final hasActiveCourse = await _hasActiveCourse();
       if (hasActiveCourse) {
         if (!mounted) return;
@@ -613,10 +645,74 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   }
 
   Widget _buildBookmarkedPlacesList() {
-    final usable = _bookmarkedPlaces.where((place) => place.canBuildCourse);
-    return _buildPlacePickerList(
-      usable.map(ExplorePlace.fromBookmarkedPlace).toList(),
-      emptyLabel: '북마크한 장소가 없어요',
+    if (_bookmarkedPlacesError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _bookmarkedPlacesError!,
+              style: ChaerokTypography.bodyMedium.copyWith(
+                color: ChaerokColors.error,
+              ),
+            ),
+            const SizedBox(height: ChaerokSpacing.sm),
+            TextButton(
+              onPressed: _loadBookmarkedPlaces,
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final usable = <ExplorePlace>[];
+    var excludedCount = 0;
+    for (final place in _bookmarkedPlaces) {
+      if (place.canBuildCourse) {
+        usable.add(ExplorePlace.fromBookmarkedPlace(place));
+      } else {
+        excludedCount++;
+      }
+    }
+
+    // 필드 보강(categoryGroupWire/source 등) 이전에 저장된 북마크는
+    // canBuildCourse가 false라 조용히 제외되는데, 그러면 실제로는 북마크가
+    // 있는데도 "없어요"만 보여 사용자가 원인을 알 수 없다. 제외된 개수를 알린다.
+    if (usable.isEmpty) {
+      return Center(
+        child: Text(
+          excludedCount > 0
+              ? '코스에 사용할 수 없는 북마크 $excludedCount곳은 다시 북마크해 주세요'
+              : '북마크한 장소가 없어요',
+          textAlign: TextAlign.center,
+          style: ChaerokTypography.bodyMedium,
+        ),
+      );
+    }
+
+    if (excludedCount == 0) {
+      return _buildPlacePickerList(usable, emptyLabel: '북마크한 장소가 없어요');
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ChaerokSpacing.md,
+            vertical: ChaerokSpacing.xs,
+          ),
+          child: Text(
+            '코스에 사용할 수 없는 북마크 $excludedCount곳은 제외했어요. 다시 북마크해 주세요.',
+            style: ChaerokTypography.caption.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+        ),
+        Expanded(
+          child: _buildPlacePickerList(usable, emptyLabel: '북마크한 장소가 없어요'),
+        ),
+      ],
     );
   }
 

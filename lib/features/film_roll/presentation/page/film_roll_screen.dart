@@ -92,7 +92,10 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     if (!mounted) return;
     final result = await Navigator.of(context).push<CourseSelectionResult>(
       MaterialPageRoute(
-        builder: (_) => CourseSelectionScreen(regionId: regionId!),
+        builder: (_) => CourseSelectionScreen(
+          regionId: regionId!,
+          filmRollId: widget.filmRollId,
+        ),
       ),
     );
     if (result == null || !mounted) return;

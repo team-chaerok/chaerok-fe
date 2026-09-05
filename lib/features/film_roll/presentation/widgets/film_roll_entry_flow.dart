@@ -61,6 +61,7 @@ Future<void> pushCourseSelectionAndConfirm(
     MaterialPageRoute(
       builder: (_) => CourseSelectionScreen(
         regionId: regionId,
+        filmRollId: filmRollId,
         initialTab: initialTab,
         initialSelectedPlace: initialSelectedPlace,
       ),
