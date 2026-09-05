@@ -22,4 +22,19 @@ class FilmRollPhoto {
   final double? longitude;
   final DateTime takenAt;
   final bool isSynced;
+
+  /// 저장된 상대 경로를 실제 접근 가능한 절대 경로로 교체할 때 사용한다.
+  FilmRollPhoto copyWith({String? originalPath, String? thumbnailPath}) {
+    return FilmRollPhoto(
+      id: id,
+      filmRollId: filmRollId,
+      filmRollPlaceId: filmRollPlaceId,
+      originalPath: originalPath ?? this.originalPath,
+      thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+      takenAt: takenAt,
+      isSynced: isSynced,
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
 }

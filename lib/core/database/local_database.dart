@@ -24,7 +24,7 @@ class AppDatabase extends _$AppDatabase {
   static AppDatabase get instance => _instance ??= AppDatabase._();
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -68,12 +68,32 @@ class AppDatabase extends _$AppDatabase {
         if (from < 5) {
           await m.addColumn(filmRolls, filmRolls.developAvailableAt);
         }
+        // v6: 방문 인증 사진 경로를 절대 경로로 저장하던 것을 문서 디렉터리
+        // 기준 상대 경로로 바꾼다. iOS는 앱 Data 컨테이너 절대 경로
+        // (.../Application/{UUID}/)가 재설치·백업 복원 시 바뀌어, 기존에 저장된
+        // 절대 경로로는 파일을 찾지 못한다. 'film_rolls/' 세그먼트부터 잘라
+        // 상대 경로로 재작성한다. 이미 상대 경로인 행은 instr가 1을 반환해
+        // substr(x, 1) = 원본 그대로라 영향이 없다.
+        if (from < 6) {
+          await _relativizePhotoPath('original_path');
+          await _relativizePhotoPath('thumbnail_path');
+        }
       },
       // FilmRolls 삭제 시 FilmRollPlaces/Photos가 cascade로 함께 삭제되도록
       // SQLite의 외래 키 제약을 명시적으로 활성화한다(기본값 OFF).
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON;');
       },
+    );
+  }
+
+  /// photos 테이블의 경로 컬럼([column])에서 'film_rolls/' 이후만 남겨
+  /// 문서 디렉터리 기준 상대 경로로 만든다. 'film_rolls/'를 포함하지 않는
+  /// 행은 건드리지 않고, 이미 상대 경로인 행은 값이 그대로 유지된다.
+  Future<void> _relativizePhotoPath(String column) async {
+    await customStatement(
+      "UPDATE photos SET $column = substr($column, instr($column, 'film_rolls/')) "
+      "WHERE instr($column, 'film_rolls/') > 0",
     );
   }
 

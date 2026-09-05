@@ -9,22 +9,33 @@ const _thumbnailMaxWidth = 480;
 const _thumbnailJpegQuality = 80;
 
 /// 필름롤 사진 원본/썸네일 파일을 앱 내부 영구 저장소에 저장/삭제하는 서비스.
-/// 저장 경로: `app_documents/film_rolls/{filmRollId}/{filmRollPlaceId}/original|thumbnail/{photoId}.jpg`
+///
+/// DB에는 문서 디렉터리 기준 **상대 경로**
+/// (`film_rolls/{filmRollId}/{filmRollPlaceId}/original|thumbnail/{photoId}.jpg`)만
+/// 저장하고, 실제 파일 접근이 필요한 시점에 [resolve]로 절대 경로를 만든다.
+/// iOS는 앱 Data 컨테이너 절대 경로(`.../Application/{UUID}/`)가 재설치·OS
+/// 마이그레이션·백업 복원 시 바뀌므로, 절대 경로를 그대로 저장하면 이후
+/// 파일을 찾지 못한다.
 class LocalPhotoStorage {
   const LocalPhotoStorage._();
 
   static const LocalPhotoStorage instance = LocalPhotoStorage._();
 
-  /// 원본 사진을 저장하고, 썸네일을 리사이즈해 함께 저장한 뒤 두 파일의 경로를 반환한다.
+  /// 상대 경로의 최상위 디렉터리 이름. 구버전에서 절대 경로로 저장된 값을
+  /// 상대 경로로 되돌릴 때 기준이 되는 마커이기도 하다.
+  static const filmRollsDirName = 'film_rolls';
+
+  /// 원본 사진을 저장하고, 썸네일을 리사이즈해 함께 저장한 뒤 두 파일의
+  /// **문서 디렉터리 기준 상대 경로**를 반환한다.
   Future<({String originalPath, String thumbnailPath})> save({
     required String filmRollId,
     required String filmRollPlaceId,
     required String photoId,
     required Uint8List imageBytes,
   }) async {
-    final placeDir = await _placeDirectory(
-      filmRollId: filmRollId,
-      filmRollPlaceId: filmRollPlaceId,
+    final documentsDir = await getApplicationDocumentsDirectory();
+    final placeDir = Directory(
+      p.join(documentsDir.path, filmRollsDirName, filmRollId, filmRollPlaceId),
     );
 
     final originalDir = Directory(p.join(placeDir.path, 'original'));
@@ -38,22 +49,34 @@ class LocalPhotoStorage {
     final thumbnailFile = File(p.join(thumbnailDir.path, '$photoId.jpg'));
     await thumbnailFile.writeAsBytes(_buildThumbnail(imageBytes), flush: true);
 
-    return (originalPath: originalFile.path, thumbnailPath: thumbnailFile.path);
+    return (
+      originalPath: _relativeToDocuments(originalFile.path, documentsDir),
+      thumbnailPath: _relativeToDocuments(thumbnailFile.path, documentsDir),
+    );
   }
 
-  /// 사진 원본/썸네일 파일을 삭제한다. 파일이 이미 없어도 예외를 던지지 않는다.
+  /// 저장된 경로([save] 반환값 또는 구버전 절대 경로)를 현재 문서 디렉터리
+  /// 기준 절대 경로로 복원한다.
+  Future<String> resolve(String storedPath) async {
+    final documentsDir = await getApplicationDocumentsDirectory();
+    return p.join(documentsDir.path, _toRelativePath(storedPath));
+  }
+
+  /// 사진 원본/썸네일 파일을 삭제한다. 저장값이 상대/구버전 절대 경로 어느
+  /// 쪽이든 처리하며, 파일이 이미 없어도 예외를 던지지 않는다.
   Future<void> delete({
     required String originalPath,
     required String thumbnailPath,
   }) async {
-    await _deleteIfExists(originalPath);
-    await _deleteIfExists(thumbnailPath);
+    await _deleteIfExists(await resolve(originalPath));
+    await _deleteIfExists(await resolve(thumbnailPath));
   }
 
   /// 필름롤 전체 디렉터리(장소별 원본/썸네일 전부)를 삭제한다.
   Future<void> deleteFilmRollDirectory(String filmRollId) async {
+    final documentsDir = await getApplicationDocumentsDirectory();
     final dir = Directory(
-      p.join((await _filmRollsRootDirectory()).path, filmRollId),
+      p.join(documentsDir.path, filmRollsDirName, filmRollId),
     );
     if (await dir.exists()) {
       await dir.delete(recursive: true);
@@ -72,17 +95,19 @@ class LocalPhotoStorage {
     );
   }
 
-  Future<Directory> _placeDirectory({
-    required String filmRollId,
-    required String filmRollPlaceId,
-  }) async {
-    final root = await _filmRollsRootDirectory();
-    return Directory(p.join(root.path, filmRollId, filmRollPlaceId));
+  String _relativeToDocuments(String absolutePath, Directory documentsDir) {
+    return p.relative(absolutePath, from: documentsDir.path);
   }
 
-  Future<Directory> _filmRollsRootDirectory() async {
-    final documentsDir = await getApplicationDocumentsDirectory();
-    return Directory(p.join(documentsDir.path, 'film_rolls'));
+  /// 절대 경로면 [filmRollsDirName] 세그먼트부터 잘라 상대 경로로 만든다.
+  /// 이미 상대 경로면 그대로 반환한다. 마커가 없으면(예상 밖의 값) 원본을
+  /// 그대로 두어 최소한 기존 동작을 유지한다.
+  String _toRelativePath(String storedPath) {
+    if (!p.isAbsolute(storedPath)) return storedPath;
+    final segments = p.split(storedPath);
+    final markerIndex = segments.lastIndexOf(filmRollsDirName);
+    if (markerIndex == -1) return storedPath;
+    return p.joinAll(segments.sublist(markerIndex));
   }
 
   Future<void> _deleteIfExists(String path) async {

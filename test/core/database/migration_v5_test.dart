@@ -114,6 +114,40 @@ void main() {
           PRIMARY KEY (id)
         );
       ''');
+    // photos / film_roll_places는 v1부터 존재한 테이블이라 v4 픽스처에도
+    // 있어야 한다(onUpgrade의 from < 6 블록이 photos를 UPDATE한다).
+    raw.execute('''
+        CREATE TABLE film_roll_places (
+          id TEXT NOT NULL,
+          film_roll_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          address TEXT NOT NULL,
+          category TEXT NOT NULL,
+          latitude REAL NOT NULL,
+          longitude REAL NOT NULL,
+          visit_order INTEGER NOT NULL,
+          is_visited INTEGER NOT NULL DEFAULT 0,
+          visited_at INTEGER NULL,
+          PRIMARY KEY (id),
+          UNIQUE (film_roll_id, id)
+        );
+      ''');
+    raw.execute('''
+        CREATE TABLE photos (
+          id TEXT NOT NULL,
+          film_roll_id TEXT NOT NULL REFERENCES film_rolls (id) ON DELETE CASCADE,
+          film_roll_place_id TEXT NOT NULL,
+          original_path TEXT NOT NULL,
+          thumbnail_path TEXT NOT NULL,
+          latitude REAL NULL,
+          longitude REAL NULL,
+          taken_at INTEGER NOT NULL,
+          is_synced INTEGER NOT NULL DEFAULT 0 CHECK ("is_synced" IN (0, 1)),
+          PRIMARY KEY (id),
+          FOREIGN KEY (film_roll_id, film_roll_place_id)
+            REFERENCES film_roll_places (film_roll_id, id) ON DELETE CASCADE
+        );
+      ''');
     raw.execute(
       'INSERT INTO film_rolls '
       '(id, region_code, region_name, title, status, created_at, updated_at) '
@@ -128,7 +162,7 @@ void main() {
         legacyCreatedAt.millisecondsSinceEpoch ~/ 1000,
       ],
     );
-    // v4까지 적용된 상태를 표시 — onUpgrade(4, 5)만 실행되게 한다.
+    // v4까지 적용된 상태를 표시 — onUpgrade(4, 최신)이 실행된다.
     raw.execute('PRAGMA user_version = 4;');
     raw.dispose();
 
