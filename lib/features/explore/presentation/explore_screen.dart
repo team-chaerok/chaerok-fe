@@ -162,6 +162,13 @@ class ExploreScreenState extends State<ExploreScreen>
     await _fetchPlaces();
   }
 
+  /// 홈(충남 외 지역 둘러보기)에서 특정 지역으로 채록길 탭에 진입할 때
+  /// MainTabScreen이 GlobalKey로 호출한다.
+  void selectRegion(RegionCode region) {
+    if (!mounted || region == _selectedRegion) return;
+    unawaited(_onRegionSelected(region));
+  }
+
   Future<void> _fetchPlaces() async {
     final requestId = ++_fetchRequestId;
     final region = _selectedRegion;

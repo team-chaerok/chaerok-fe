@@ -191,7 +191,12 @@ class _MainTabScreenState extends State<MainTabScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const HomeDashboardScreen(),
+          HomeDashboardScreen(
+            onExploreRegionRequested: (region) {
+              setState(() => _selectedIndex = _exploreTabIndex);
+              _exploreKey.currentState?.selectRegion(region);
+            },
+          ),
           ExploreScreen(key: _exploreKey),
           const FilmRollCollectionScreen(),
           const MyScreen(),
