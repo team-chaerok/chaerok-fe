@@ -633,6 +633,7 @@ class ExploreScreenState extends State<ExploreScreen>
               top: ChaerokSpacing.xs,
               right: ChaerokSpacing.xs,
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isBookmarked) ...[
                     _CreateCourseButton(
