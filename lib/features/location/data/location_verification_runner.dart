@@ -4,6 +4,7 @@ import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/location/location_provider_factory.dart';
 import 'package:chaerok/core/location/mock_location_gate.dart';
 import 'package:chaerok/core/location/mock_location_provider.dart';
+import 'package:chaerok/core/test_mode/test_mode_session.dart';
 import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
@@ -92,24 +93,30 @@ class LocationVerificationRunner {
       );
     }
 
-    // QA 토글: 마이 탭에서 "충남 외 지역 홈 강제"를 켜면 실제 좌표와 무관하게
-    // 서비스 지역 외로 판정하고, 아래 디버그 지역 대체도 건너뛴다.
+    // Test Mode "공주 진입": 실제 좌표/역지오코딩과 무관하게 공주로 통과시킨다.
+    final forceTestModeGongju = TestModeSession.instance.gongjuEntered;
+
+    // QA 토글: Test Mode 패널에서 "충남 외 지역 홈 강제"를 켜면 실제 좌표와
+    // 무관하게 서비스 지역 외로 판정하고, 아래 지역 대체도 건너뛴다.
     final forceOutOfServiceArea =
+        !forceTestModeGongju &&
         await MockLocationGate.isAllowed() &&
         await AppPreferences.instance.isDebugOutOfServiceArea();
 
     final isOutOfServiceArea =
-        forceOutOfServiceArea ||
-        administrativeRegion.provinceName != _serviceProvinceName;
-    final useDebugFallbackRegion =
-        kDebugMode && isOutOfServiceArea && !forceOutOfServiceArea;
-    if (isOutOfServiceArea && !useDebugFallbackRegion) {
+        !forceTestModeGongju &&
+        (forceOutOfServiceArea ||
+            administrativeRegion.provinceName != _serviceProvinceName);
+    final useFallbackRegion =
+        forceTestModeGongju ||
+        (kDebugMode && isOutOfServiceArea && !forceOutOfServiceArea);
+    if (isOutOfServiceArea && !useFallbackRegion) {
       LocationVerificationResult.outOfServiceSessionCache = true;
       return const LocationOutOfService();
     }
-    if (useDebugFallbackRegion) {
+    if (useFallbackRegion) {
       log(
-        '디버그 모드 - 서비스 지역 외 좌표를 테스트 지역'
+        '서비스 지역 외/Test Mode 좌표를 테스트 지역'
         '($_debugFallbackProvinceName $_debugFallbackCityCountyName)으로 대체',
         name: _tag,
       );
@@ -119,10 +126,10 @@ class LocationVerificationRunner {
     try {
       region = await RegionsApi.resolveRegion(
         ResolveRegionRequest(
-          provinceName: useDebugFallbackRegion
+          provinceName: useFallbackRegion
               ? _debugFallbackProvinceName
               : administrativeRegion.provinceName,
-          cityCountyName: useDebugFallbackRegion
+          cityCountyName: useFallbackRegion
               ? _debugFallbackCityCountyName
               : administrativeRegion.cityCountyName,
         ),

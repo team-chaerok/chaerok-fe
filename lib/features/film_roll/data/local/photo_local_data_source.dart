@@ -42,6 +42,38 @@ class PhotoLocalDataSource {
     return query.map((row) => row.read(count)!).getSingle();
   }
 
+  /// 서버에 아직 업로드되지 않은 사진을 sequence 오름차순으로 조회한다.
+  Future<List<Photo>> findUnuploadedByFilmRoll(String filmRollId) {
+    return (_db.select(_db.photos)
+          ..where(
+            (t) => t.filmRollId.equals(filmRollId) & t.serverPhotoId.isNull(),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.sequence)]))
+        .get();
+  }
+
+  /// 이 장소에서 촬영했고 서버 업로드가 끝난 사진 중 sequence가 가장 작은 것.
+  Future<Photo?> firstUploadedByPlace(String filmRollPlaceId) {
+    return (_db.select(_db.photos)
+          ..where(
+            (t) =>
+                t.filmRollPlaceId.equals(filmRollPlaceId) &
+                t.serverPhotoId.isNotNull(),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.sequence)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Future<void> setServerPhotoId(String id, int serverPhotoId) {
+    return (_db.update(_db.photos)..where((t) => t.id.equals(id))).write(
+      PhotosCompanion(
+        serverPhotoId: Value(serverPhotoId),
+        isSynced: const Value(true),
+      ),
+    );
+  }
+
   Future<bool> hasAnyByFilmRoll(String filmRollId) async {
     final row =
         await (_db.select(_db.photos)

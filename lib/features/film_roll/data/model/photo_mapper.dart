@@ -13,6 +13,8 @@ extension PhotoMapper on Photo {
       latitude: latitude,
       longitude: longitude,
       takenAt: takenAt,
+      sequence: sequence,
+      serverPhotoId: serverPhotoId,
       isSynced: isSynced,
     );
   }

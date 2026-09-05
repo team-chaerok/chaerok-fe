@@ -1959,6 +1959,29 @@ class $PhotosTable extends Photos with TableInfo<$PhotosTable, Photo> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _sequenceMeta = const VerificationMeta(
+    'sequence',
+  );
+  @override
+  late final GeneratedColumn<int> sequence = GeneratedColumn<int>(
+    'sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _serverPhotoIdMeta = const VerificationMeta(
+    'serverPhotoId',
+  );
+  @override
+  late final GeneratedColumn<int> serverPhotoId = GeneratedColumn<int>(
+    'server_photo_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isSyncedMeta = const VerificationMeta(
     'isSynced',
   );
@@ -1984,6 +2007,8 @@ class $PhotosTable extends Photos with TableInfo<$PhotosTable, Photo> {
     latitude,
     longitude,
     takenAt,
+    sequence,
+    serverPhotoId,
     isSynced,
   ];
   @override
@@ -2067,6 +2092,21 @@ class $PhotosTable extends Photos with TableInfo<$PhotosTable, Photo> {
     } else if (isInserting) {
       context.missing(_takenAtMeta);
     }
+    if (data.containsKey('sequence')) {
+      context.handle(
+        _sequenceMeta,
+        sequence.isAcceptableOrUnknown(data['sequence']!, _sequenceMeta),
+      );
+    }
+    if (data.containsKey('server_photo_id')) {
+      context.handle(
+        _serverPhotoIdMeta,
+        serverPhotoId.isAcceptableOrUnknown(
+          data['server_photo_id']!,
+          _serverPhotoIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_synced')) {
       context.handle(
         _isSyncedMeta,
@@ -2114,6 +2154,14 @@ class $PhotosTable extends Photos with TableInfo<$PhotosTable, Photo> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}taken_at'],
       )!,
+      sequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sequence'],
+      )!,
+      serverPhotoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_photo_id'],
+      ),
       isSynced: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_synced'],
@@ -2136,6 +2184,15 @@ class Photo extends DataClass implements Insertable<Photo> {
   final double? latitude;
   final double? longitude;
   final DateTime takenAt;
+
+  /// 서버 필름롤 안에서의 사진 순서(1~24). 촬영 시점에 로컬에서 부여하고
+  /// `POST .../photos/upload-url` 의 sequence로 보낸다.
+  final int sequence;
+
+  /// 서버가 발급한 photoId. null이면 아직 업로드되지 않은 상태.
+  final int? serverPhotoId;
+
+  /// 서버 업로드 완료 여부. true면 [serverPhotoId]가 채워져 있다.
   final bool isSynced;
   const Photo({
     required this.id,
@@ -2146,6 +2203,8 @@ class Photo extends DataClass implements Insertable<Photo> {
     this.latitude,
     this.longitude,
     required this.takenAt,
+    required this.sequence,
+    this.serverPhotoId,
     required this.isSynced,
   });
   @override
@@ -2163,6 +2222,10 @@ class Photo extends DataClass implements Insertable<Photo> {
       map['longitude'] = Variable<double>(longitude);
     }
     map['taken_at'] = Variable<DateTime>(takenAt);
+    map['sequence'] = Variable<int>(sequence);
+    if (!nullToAbsent || serverPhotoId != null) {
+      map['server_photo_id'] = Variable<int>(serverPhotoId);
+    }
     map['is_synced'] = Variable<bool>(isSynced);
     return map;
   }
@@ -2181,6 +2244,10 @@ class Photo extends DataClass implements Insertable<Photo> {
           ? const Value.absent()
           : Value(longitude),
       takenAt: Value(takenAt),
+      sequence: Value(sequence),
+      serverPhotoId: serverPhotoId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverPhotoId),
       isSynced: Value(isSynced),
     );
   }
@@ -2199,6 +2266,8 @@ class Photo extends DataClass implements Insertable<Photo> {
       latitude: serializer.fromJson<double?>(json['latitude']),
       longitude: serializer.fromJson<double?>(json['longitude']),
       takenAt: serializer.fromJson<DateTime>(json['takenAt']),
+      sequence: serializer.fromJson<int>(json['sequence']),
+      serverPhotoId: serializer.fromJson<int?>(json['serverPhotoId']),
       isSynced: serializer.fromJson<bool>(json['isSynced']),
     );
   }
@@ -2214,6 +2283,8 @@ class Photo extends DataClass implements Insertable<Photo> {
       'latitude': serializer.toJson<double?>(latitude),
       'longitude': serializer.toJson<double?>(longitude),
       'takenAt': serializer.toJson<DateTime>(takenAt),
+      'sequence': serializer.toJson<int>(sequence),
+      'serverPhotoId': serializer.toJson<int?>(serverPhotoId),
       'isSynced': serializer.toJson<bool>(isSynced),
     };
   }
@@ -2227,6 +2298,8 @@ class Photo extends DataClass implements Insertable<Photo> {
     Value<double?> latitude = const Value.absent(),
     Value<double?> longitude = const Value.absent(),
     DateTime? takenAt,
+    int? sequence,
+    Value<int?> serverPhotoId = const Value.absent(),
     bool? isSynced,
   }) => Photo(
     id: id ?? this.id,
@@ -2237,6 +2310,10 @@ class Photo extends DataClass implements Insertable<Photo> {
     latitude: latitude.present ? latitude.value : this.latitude,
     longitude: longitude.present ? longitude.value : this.longitude,
     takenAt: takenAt ?? this.takenAt,
+    sequence: sequence ?? this.sequence,
+    serverPhotoId: serverPhotoId.present
+        ? serverPhotoId.value
+        : this.serverPhotoId,
     isSynced: isSynced ?? this.isSynced,
   );
   Photo copyWithCompanion(PhotosCompanion data) {
@@ -2257,6 +2334,10 @@ class Photo extends DataClass implements Insertable<Photo> {
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
       longitude: data.longitude.present ? data.longitude.value : this.longitude,
       takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
+      sequence: data.sequence.present ? data.sequence.value : this.sequence,
+      serverPhotoId: data.serverPhotoId.present
+          ? data.serverPhotoId.value
+          : this.serverPhotoId,
       isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
     );
   }
@@ -2272,6 +2353,8 @@ class Photo extends DataClass implements Insertable<Photo> {
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
           ..write('takenAt: $takenAt, ')
+          ..write('sequence: $sequence, ')
+          ..write('serverPhotoId: $serverPhotoId, ')
           ..write('isSynced: $isSynced')
           ..write(')'))
         .toString();
@@ -2287,6 +2370,8 @@ class Photo extends DataClass implements Insertable<Photo> {
     latitude,
     longitude,
     takenAt,
+    sequence,
+    serverPhotoId,
     isSynced,
   );
   @override
@@ -2301,6 +2386,8 @@ class Photo extends DataClass implements Insertable<Photo> {
           other.latitude == this.latitude &&
           other.longitude == this.longitude &&
           other.takenAt == this.takenAt &&
+          other.sequence == this.sequence &&
+          other.serverPhotoId == this.serverPhotoId &&
           other.isSynced == this.isSynced);
 }
 
@@ -2313,6 +2400,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
   final Value<double?> latitude;
   final Value<double?> longitude;
   final Value<DateTime> takenAt;
+  final Value<int> sequence;
+  final Value<int?> serverPhotoId;
   final Value<bool> isSynced;
   final Value<int> rowid;
   const PhotosCompanion({
@@ -2324,6 +2413,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
     this.takenAt = const Value.absent(),
+    this.sequence = const Value.absent(),
+    this.serverPhotoId = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2336,6 +2427,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
     required DateTime takenAt,
+    this.sequence = const Value.absent(),
+    this.serverPhotoId = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -2353,6 +2446,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
     Expression<double>? latitude,
     Expression<double>? longitude,
     Expression<DateTime>? takenAt,
+    Expression<int>? sequence,
+    Expression<int>? serverPhotoId,
     Expression<bool>? isSynced,
     Expression<int>? rowid,
   }) {
@@ -2365,6 +2460,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (takenAt != null) 'taken_at': takenAt,
+      if (sequence != null) 'sequence': sequence,
+      if (serverPhotoId != null) 'server_photo_id': serverPhotoId,
       if (isSynced != null) 'is_synced': isSynced,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2379,6 +2476,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
     Value<double?>? latitude,
     Value<double?>? longitude,
     Value<DateTime>? takenAt,
+    Value<int>? sequence,
+    Value<int?>? serverPhotoId,
     Value<bool>? isSynced,
     Value<int>? rowid,
   }) {
@@ -2391,6 +2490,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       takenAt: takenAt ?? this.takenAt,
+      sequence: sequence ?? this.sequence,
+      serverPhotoId: serverPhotoId ?? this.serverPhotoId,
       isSynced: isSynced ?? this.isSynced,
       rowid: rowid ?? this.rowid,
     );
@@ -2423,6 +2524,12 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
     if (takenAt.present) {
       map['taken_at'] = Variable<DateTime>(takenAt.value);
     }
+    if (sequence.present) {
+      map['sequence'] = Variable<int>(sequence.value);
+    }
+    if (serverPhotoId.present) {
+      map['server_photo_id'] = Variable<int>(serverPhotoId.value);
+    }
     if (isSynced.present) {
       map['is_synced'] = Variable<bool>(isSynced.value);
     }
@@ -2443,6 +2550,8 @@ class PhotosCompanion extends UpdateCompanion<Photo> {
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
           ..write('takenAt: $takenAt, ')
+          ..write('sequence: $sequence, ')
+          ..write('serverPhotoId: $serverPhotoId, ')
           ..write('isSynced: $isSynced, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3649,6 +3758,8 @@ typedef $$PhotosTableCreateCompanionBuilder =
       Value<double?> latitude,
       Value<double?> longitude,
       required DateTime takenAt,
+      Value<int> sequence,
+      Value<int?> serverPhotoId,
       Value<bool> isSynced,
       Value<int> rowid,
     });
@@ -3662,6 +3773,8 @@ typedef $$PhotosTableUpdateCompanionBuilder =
       Value<double?> latitude,
       Value<double?> longitude,
       Value<DateTime> takenAt,
+      Value<int> sequence,
+      Value<int?> serverPhotoId,
       Value<bool> isSynced,
       Value<int> rowid,
     });
@@ -3729,6 +3842,16 @@ class $$PhotosTableFilterComposer
 
   ColumnFilters<DateTime> get takenAt => $composableBuilder(
     column: $table.takenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverPhotoId => $composableBuilder(
+    column: $table.serverPhotoId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3805,6 +3928,16 @@ class $$PhotosTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverPhotoId => $composableBuilder(
+    column: $table.serverPhotoId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isSynced => $composableBuilder(
     column: $table.isSynced,
     builder: (column) => ColumnOrderings(column),
@@ -3870,6 +4003,14 @@ class $$PhotosTableAnnotationComposer
   GeneratedColumn<DateTime> get takenAt =>
       $composableBuilder(column: $table.takenAt, builder: (column) => column);
 
+  GeneratedColumn<int> get sequence =>
+      $composableBuilder(column: $table.sequence, builder: (column) => column);
+
+  GeneratedColumn<int> get serverPhotoId => $composableBuilder(
+    column: $table.serverPhotoId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get isSynced =>
       $composableBuilder(column: $table.isSynced, builder: (column) => column);
 
@@ -3933,6 +4074,8 @@ class $$PhotosTableTableManager
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
                 Value<DateTime> takenAt = const Value.absent(),
+                Value<int> sequence = const Value.absent(),
+                Value<int?> serverPhotoId = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhotosCompanion(
@@ -3944,6 +4087,8 @@ class $$PhotosTableTableManager
                 latitude: latitude,
                 longitude: longitude,
                 takenAt: takenAt,
+                sequence: sequence,
+                serverPhotoId: serverPhotoId,
                 isSynced: isSynced,
                 rowid: rowid,
               ),
@@ -3957,6 +4102,8 @@ class $$PhotosTableTableManager
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
                 required DateTime takenAt,
+                Value<int> sequence = const Value.absent(),
+                Value<int?> serverPhotoId = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PhotosCompanion.insert(
@@ -3968,6 +4115,8 @@ class $$PhotosTableTableManager
                 latitude: latitude,
                 longitude: longitude,
                 takenAt: takenAt,
+                sequence: sequence,
+                serverPhotoId: serverPhotoId,
                 isSynced: isSynced,
                 rowid: rowid,
               ),

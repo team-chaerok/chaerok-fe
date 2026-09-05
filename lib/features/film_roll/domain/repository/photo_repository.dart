@@ -24,4 +24,14 @@ abstract class PhotoRepository {
 
   /// 필름롤 전체에서 촬영된 사진 수를 센다.
   Future<int> countByFilmRoll(String filmRollId);
+
+  /// 아직 서버에 업로드되지 않은(`serverPhotoId == null`) 사진을 sequence 오름차순으로 반환한다.
+  Future<List<FilmRollPhoto>> findUnuploadedByFilmRoll(String filmRollId);
+
+  /// 서버에 업로드 완료된(`serverPhotoId != null`) 사진 중 이 장소에서 촬영한
+  /// 가장 이른(sequence 최소) 사진을 반환한다. 없으면 null.
+  Future<FilmRollPhoto?> findUploadedByPlace(String filmRollPlaceId);
+
+  /// 서버 업로드가 끝나 발급받은 [serverPhotoId]를 저장하고 `isSynced`를 true로 만든다.
+  Future<void> markUploaded(String photoId, {required int serverPhotoId});
 }

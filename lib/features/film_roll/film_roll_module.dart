@@ -45,6 +45,7 @@ class FilmRollModule {
     filmRollSyncService = FilmRollSyncService(
       filmRollRepository: filmRollRepository,
       filmRollPlaceRepository: filmRollPlaceRepository,
+      photoRepository: photoRepository,
     );
     enterRegion = EnterRegionUseCase(
       filmRollRepository: filmRollRepository,

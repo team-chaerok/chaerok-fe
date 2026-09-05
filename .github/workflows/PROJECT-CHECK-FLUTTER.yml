@@ -46,6 +46,13 @@ jobs:
           EOF
           dart format lib/core/config/app_secrets.dart
 
+      - name: Guard - no Test Mode flag in prod config
+        run: |
+          if grep -q "CHAEROK_TEST_MODE" config/prod.json; then
+            echo "config/prod.json 에 CHAEROK_TEST_MODE 가 있으면 안 됩니다 (정식 빌드에 Test Mode 유입)."
+            exit 1
+          fi
+
       - name: Install dependencies
         run: flutter pub get
 

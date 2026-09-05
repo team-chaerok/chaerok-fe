@@ -76,3 +76,26 @@ lib/
 - 앱 전체 테마는 `ChaerokTheme`을 통해 `MaterialApp`에 연결합니다.
 
 자세한 디자인 시스템 규칙은 [Design System Guide](docs/design-system.md)를 참고합니다.
+
+## 빌드
+
+### 정식 빌드
+
+```bash
+flutter build appbundle          # Android
+flutter build ipa                # iOS
+```
+
+### 비공개 테스트 빌드 (Test Mode)
+
+원거리 테스터가 실제 GPS 이동 없이 채록 E2E 플로우를 완주할 수 있도록,
+위치 판정만 우회하는 **Test Mode** 를 컴파일 타임 플래그(`CHAEROK_TEST_MODE`)로 켠다.
+정식 빌드에는 이 플래그가 주입되지 않아 관련 코드 경로가 컴파일에서 제외된다.
+
+```bash
+scripts/build-testers.sh appbundle    # = flutter build appbundle --dart-define-from-file=config/testers.json
+scripts/build-testers.sh ipa
+```
+
+- 켜진 뒤에도 마이 탭 → **Test Mode (QA)** 패널은 서버 테스트 계정(`isTester`)
+  또는 디버그 빌드에서만 열린다. `config/prod.json` 은 항상 `{}` 로 둔다(CI가 검사).
