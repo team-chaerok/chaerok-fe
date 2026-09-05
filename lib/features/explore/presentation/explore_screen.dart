@@ -13,12 +13,14 @@ import 'package:chaerok/features/explore/data/bookmark_store.dart';
 import 'package:chaerok/features/explore/domain/explore_category_filter.dart';
 import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/explore/presentation/widgets/explore_map_view.dart';
-import 'package:chaerok/features/explore/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/explore/presentation/widgets/film_roll_progress_view.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
@@ -305,7 +307,8 @@ class ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  /// 선택한 지역의 로컬 필름롤을 찾거나 새로 생성하고 진행 모드로 전환한다.
+  /// 선택한 지역의 로컬 필름롤을 찾거나 새로 생성하고, 코스 미선택
+  /// 상태면 코스 선택 화면까지 이어준 뒤 진행 모드로 전환한다.
   Future<void> _onEnterRegionTap() async {
     if (_isEnteringFilmRoll) return;
     final regionId = _regionId;
@@ -313,11 +316,20 @@ class ExploreScreenState extends State<ExploreScreen>
 
     setState(() => _isEnteringFilmRoll = true);
     try {
-      await FilmRollModule.instance.enterRegion(
+      final decision = await FilmRollModule.instance.resolveFilmRollEntry(
         _selectedRegion.cityCountyName,
         regionId: regionId,
       );
       if (!mounted) return;
+
+      if (decision.action == FilmRollEntryAction.needsCourseSelection) {
+        await pushCourseSelectionAndConfirm(
+          context,
+          filmRollId: decision.filmRoll.id,
+          regionId: regionId,
+        );
+        if (!mounted) return;
+      }
       await reevaluate();
     } on UnsupportedRegionException {
       if (!mounted) return;

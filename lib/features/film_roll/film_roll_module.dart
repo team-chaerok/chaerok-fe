@@ -17,6 +17,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/enter_region_use_case.
 import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_photo_count_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
 
@@ -56,6 +57,10 @@ class FilmRollModule {
     recoverLastActiveFilmRoll = RecoverLastActiveFilmRollUseCase(
       filmRollRepository: filmRollRepository,
     );
+    resolveFilmRollEntry = ResolveFilmRollEntryUseCase(
+      recoverLastActiveFilmRoll: recoverLastActiveFilmRoll,
+      enterRegion: enterRegion,
+    );
     deleteFilmRoll = DeleteFilmRollUseCase(
       filmRollRepository: filmRollRepository,
     );
@@ -83,6 +88,7 @@ class FilmRollModule {
   late final DeletePhotoUseCase deletePhoto;
   late final GetFilmRollPhotoCountUseCase getFilmRollPhotoCount;
   late final RecoverLastActiveFilmRollUseCase recoverLastActiveFilmRoll;
+  late final ResolveFilmRollEntryUseCase resolveFilmRollEntry;
   late final DeleteFilmRollUseCase deleteFilmRoll;
   late final ExitFilmRollUseCase exitFilmRoll;
 }
