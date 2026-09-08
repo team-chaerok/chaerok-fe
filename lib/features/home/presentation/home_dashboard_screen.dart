@@ -54,10 +54,11 @@ class HomeDashboardScreen extends StatefulWidget {
   debugRunLocationVerification;
 
   @override
-  State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
+  State<HomeDashboardScreen> createState() => HomeDashboardScreenState();
 }
 
-class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
+class HomeDashboardScreenState extends State<HomeDashboardScreen>
+    with WidgetsBindingObserver {
   static const _tag = 'HomeDashboardScreen';
 
   /// 홈 화면 캐러셀에 노출할 최근 촬영 사진 수(전체가 아닌 미리보기).
@@ -79,6 +80,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   // 같은 화면의 수동 "필름롤 시작하기" 버튼이 동시에 눌려 내비게이션이
   // 중복 push되는 것을 막기 위한 플래그.
   bool _isAutoConnectingFilmRoll = false;
+
+  // 탭 재진입·카메라 종료·앱 포그라운드 복귀로 [refresh]가 연달아 불릴 때
+  // recoverLastActiveFilmRoll 조회가 중복 실행되지 않도록 막는다.
+  bool _isRefreshing = false;
+
   WeatherSummaryData? _weather;
   List<String> _recentPhotoThumbnailPaths = const [];
   List<RecommendedPlaceSummaryData> _nearbyPlaces = const [];
@@ -92,12 +98,47 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_fetchUserInfo());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_ensureLocationVerified());
     });
     unawaited(_loadRecoveredFilmRoll());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 앱이 포그라운드로 복귀하면 홈 대시보드를 재조회한다. 다른 탭·다른 앱에
+  /// 머무는 동안 진행중 필름롤이 바뀌었을 수 있으므로 `ExploreScreenState`와
+  /// 대칭으로 동작한다.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(refresh());
+    }
+  }
+
+  /// 홈 대시보드가 [IndexedStack]으로 상시 유지되므로, 탭 재진입 · 카메라 액션
+  /// 종료 · route pop 복귀 · 앱 포그라운드 복귀 시 `MainTabScreen` 또는
+  /// 라이프사이클 콜백이 이 훅으로 진행중 필름롤 · 진행률 · 최근 사진 · 가까운
+  /// 채록 장소를 재조회하게 한다. `ExploreScreenState.reevaluate`와 대칭이다.
+  ///
+  /// 사용자 정보 · 위치 인증 · 날씨는 재조회하지 않는다. 위치 인증을 다시
+  /// 태우면 캐시 히트 시 [_autoConnectFilmRollEntry]가 코스 선택/필름롤 화면으로
+  /// 자동 네비게이션하므로, 단순 탭 전환에서 절대 재실행하지 않는다.
+  Future<void> refresh() async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    try {
+      await _loadRecoveredFilmRoll();
+    } finally {
+      if (mounted) _isRefreshing = false;
+    }
   }
 
   Future<void> _fetchUserInfo() async {
@@ -222,7 +263,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       log('필름롤 자동 진입 실패', name: _tag, error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _isAutoConnectingFilmRoll = false);
-      if (mounted) await _loadRecoveredFilmRoll();
+      if (mounted) await refresh();
     }
   }
 
@@ -352,7 +393,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       ),
     );
     if (!mounted) return;
-    await _loadRecoveredFilmRoll();
+    await refresh();
   }
 
   /// 위치 인증으로 확인된 지역에 대한 로컬 필름롤을 찾거나 새로 생성해 진입한다.
@@ -380,7 +421,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ),
       );
       if (!mounted) return;
-      await _loadRecoveredFilmRoll();
+      await refresh();
     } on UnsupportedRegionException {
       if (!mounted) return;
       ScaffoldMessenger.of(

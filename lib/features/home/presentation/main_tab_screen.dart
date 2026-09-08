@@ -28,10 +28,16 @@ class MainTabScreen extends StatefulWidget {
 class _MainTabScreenState extends State<MainTabScreen> {
   static const _tag = 'MainTabScreen';
 
+  /// 홈 탭 인덱스. 다른 탭에서 홈으로 복귀하거나 카메라 액션이 끝나면
+  /// 진행중 필름롤·근처 장소가 바뀌었을 수 있으므로 홈 대시보드를 새로고침한다.
+  static const _homeTabIndex = 0;
+
   /// 채록길 탭 인덱스. 이 탭으로 이동하거나 카메라 액션이 끝나면
   /// 진행중 필름롤 상태가 바뀌었을 수 있으므로 모드를 재평가한다.
   static const _exploreTabIndex = 1;
 
+  final GlobalKey<HomeDashboardScreenState> _homeKey =
+      GlobalKey<HomeDashboardScreenState>();
   final GlobalKey<ExploreScreenState> _exploreKey =
       GlobalKey<ExploreScreenState>();
 
@@ -40,7 +46,9 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   void _onTabSelected(int index) {
     setState(() => _selectedIndex = index);
-    if (index == _exploreTabIndex) {
+    if (index == _homeTabIndex) {
+      unawaited(_homeKey.currentState?.refresh() ?? Future.value());
+    } else if (index == _exploreTabIndex) {
       unawaited(_exploreKey.currentState?.reevaluate() ?? Future.value());
     }
   }
@@ -123,6 +131,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
     } finally {
       if (mounted) setState(() => _isResolvingCameraEntry = false);
       unawaited(_exploreKey.currentState?.reevaluate() ?? Future.value());
+      unawaited(_homeKey.currentState?.refresh() ?? Future.value());
     }
   }
 
@@ -190,6 +199,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
         index: _selectedIndex,
         children: [
           HomeDashboardScreen(
+            key: _homeKey,
             onExploreRegionRequested: (region) {
               _onExploreRequested();
               _exploreKey.currentState?.selectRegion(region);
