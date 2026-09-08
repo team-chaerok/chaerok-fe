@@ -3,7 +3,6 @@ import 'dart:developer';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
-import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/core/network/token_storage.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/o_auth_login_request.dart';
@@ -20,6 +19,7 @@ import 'package:chaerok/shared/widgets/social_login_button.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 
 enum _LoginProvider { kakao, google, apple }
 
@@ -164,37 +164,17 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Stack(
-                children: [
-                  Image.asset('assets/images/chaerok-logo.png', width: 213),
-                  const Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Text(
-                      '채록',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
-                        fontSize: 48,
-                        color: ChaerokColors.primaryDark,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
+              SvgPicture.asset('assets/images/chaerok-logo.svg'),
+              const SizedBox(height: ChaerokSpacing.sm),
               Text(
-                '필름처럼 남기는\n나의 여행 기록',
+                '필름처럼 남기는 나의 여행 기록',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
-                  fontSize: 14,
-                  color: ChaerokColors.primaryDark.withValues(alpha: 0.5),
+                  color: const Color(0xFF797A5E).withValues(alpha: 0.6),
                 ),
               ),
 
-              const SizedBox(height: ChaerokSpacing.xxl * 5),
+              const SizedBox(height: ChaerokSpacing.xxl * 4),
               SocialLoginButton(
                 logo: 'assets/images/kakao-logo.svg',
                 label: '카카오로 계속하기',
