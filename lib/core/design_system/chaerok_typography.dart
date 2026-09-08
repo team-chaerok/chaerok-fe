@@ -5,6 +5,7 @@ class ChaerokTypography {
 
   static const String nanumSquareRoundFontFamily = 'NanumSquareRound';
   static const String jeongnimsajiFontFamily = 'Jeongnimsaji';
+  static const String pretendardFontFamily = 'Pretendard';
 
   /// 28px · line-height 36/28(≈1.29) · 나눔스퀘어라운드.
   /// 화면 최상단 대표 제목.
