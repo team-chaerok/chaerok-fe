@@ -11,9 +11,10 @@ iOS `PrivacyInfo.xcprivacy`와 App Store / Google Play 개인정보 신고 값�
 ## 1. 한눈에
 
 - 앱은 `geolocator`로 **정밀 좌표**(전체 위·경도)를 수집한다. `LocationAccuracy.medium`은 배터리 절충일 뿐 좌표 정밀도 신고 등급은 **Precise**다.
-- 원시 좌표가 **기기 밖으로 나가는 경로는 카카오 로컬 API 한 곳**이다.
+- 코드에서 **원시 좌표를 파라미터로 직접 전송하는 경로는 카카오 로컬 API 한 곳**이다.
 - 기상청 API에는 좌표를 **격자(nx, ny)로 변환한 뒤** 보낸다(원시 좌표 자체는 미전송).
-- **채록 자체 백엔드는 어떤 경로로도 원시 좌표를 받거나 저장하지 않는다.**
+- **채록 자체 백엔드는 명시적 좌표 파라미터로는 위치를 받지 않는다.** 다만 방문 인증 촬영 원본 JPEG는 채록 S3에 **무변형 업로드**되므로, 사진에 GPS EXIF가 실려 있으면 좌표가 **간접 전송**된다 → T1(§5) 확인 전까지 "자체 인프라 미수신"을 단정하지 않는다.
+- 방문 인증 사진 촬영 좌표는 **로컬 Drift DB(`photos.latitude/longitude`)에 영속 저장**된다(온디바이스). 서버 동기화 payload에는 미포함.
 - 백그라운드 위치는 사용하지 않는다.
 
 ---
@@ -54,7 +55,7 @@ iOS `PrivacyInfo.xcprivacy`와 App Store / Google Play 개인정보 신고 값�
 | --- | --- |
 | 현재 위치 ↔ 장소 거리 계산 | `lib/features/home/presentation/home_dashboard_screen.dart`, `lib/features/explore/presentation/explore_screen.dart` (`Geolocator.distanceBetween`) |
 | 방문 인증 게이트 (반경 100m, GPS 오차 50m 이내) | `lib/features/film_roll/domain/visit_verification.dart` |
-| 방문 인증 사진 촬영 좌표 저장 | `lib/core/database/tables/photos_table.dart`, `photo_repository_impl.dart` — **로컬 Drift DB에만** 저장(`latitude`, `longitude` nullable). 서버 동기화 payload에는 미포함 |
+| 방문 인증 사진 촬영 좌표 저장 | `lib/core/database/tables/photos_table.dart`, `photo_repository_impl.dart` — **로컬 Drift DB에 영속 저장**(`latitude`, `longitude` nullable). 서버 동기화 payload에는 미포함하나, 촬영 **원본 파일 자체는 S3로 전송**되므로 §5 EXIF 확인 대상 |
 
 ---
 
@@ -66,9 +67,9 @@ iOS `PrivacyInfo.xcprivacy`와 App Store / Google Play 개인정보 신고 값�
 
 따라서 `camera` 플러그인이 JPEG에 **GPS EXIF**를 심으면 좌표가 채록 인프라로 간접 전송된다.
 
-- Flutter `camera`(`camera_avfoundation` / `camera_android`)는 기본적으로 위치 메타데이터를 사진에 넣지 않는다 → **GPS EXIF 미포함으로 간주**.
-- **릴리스마다 실기기(iOS·Android)에서 촬영본 EXIF에 GPS IFD가 없는지 재확인한다**([release-checklist.md](release-checklist.md)).
-- 만약 GPS가 발견되면: (1) 원본 저장 전 EXIF GPS 스트립을 별도 이슈로 추가, (2) 본 문서·`PrivacyInfo.xcprivacy`·스토어 체크리스트의 "제3자 공유/신원 연결" 값을 재검토.
+- Flutter `camera`(`camera_avfoundation` / `camera_android`)는 기본적으로 위치 메타데이터를 사진에 넣지 않는 것으로 알려져 있으나, **실기기 실측(T1) 전까지는 가정일 뿐이다**.
+- **T1은 신고 값 확정의 blocking 조건이다.** iOS·Android 실기기 촬영본 EXIF에 GPS IFD가 없음을 확인하기 전에는 `PrivacyInfo.xcprivacy`의 `Linked=false`와 스토어 신고 값(제3자 공유·신원 연결·수신처)을 최종 확정하지 않는다. 릴리스마다 재확인한다([release-checklist.md](release-checklist.md)).
+- 만약 GPS가 발견되면: (1) 원본 저장 전 EXIF GPS 스트립을 별도 이슈로 추가, (2) 본 문서·`PrivacyInfo.xcprivacy`·스토어 체크리스트의 "제3자 공유/신원 연결" 값과 수신처(채록 S3 포함)를 재검토.
 
 ---
 
@@ -98,13 +99,15 @@ iOS `PrivacyInfo.xcprivacy`와 App Store / Google Play 개인정보 신고 값�
 | --- | --- | --- |
 | 수집 데이터 | Precise Location | §2 — `geolocator` 전체 좌표 |
 | 수집 목적 | App Functionality (지역 판별·주변 채록 장소·필름롤·날씨) | §3, §4 |
-| 사용자 신원 연결 (Linked) | **아니오** | §3 — 자체 백엔드가 좌표를 계정과 함께 저장하지 않음. 카카오/기상청 전송분에 계정 식별자 없음 |
+| 사용자 신원 연결 (Linked) | **아니오** (T1 전제) | §3 — 명시적 좌표 파라미터가 계정과 함께 저장되지 않음. 카카오/기상청 전송분에 계정 식별자 없음. **단 촬영본 GPS EXIF가 없다는 T1 확인이 전제** — 있으면 사진은 계정에 연결되므로 재검토 |
 | 추적 (Tracking) | **아니오** | `pubspec.yaml`에 광고·어트리뷰션·분석 SDK 없음 |
 | 제3자 공유 | **예** — 카카오(역지오코딩), 기상청/공공데이터포털(날씨) | §3 |
+| 일시적으로만 처리 (Play) | **아니오** | 촬영 좌표가 로컬 Drift DB에 영속 저장되고, 촬영 원본이 S3에 저장됨 (§4, §5) |
 
 ---
 
 ## 8. 남은 확인 항목
 
+- [ ] **(blocking) EXIF 실측(T1)**: iOS·Android 실기기 촬영본에 GPS EXIF가 없는지 (§5). 신고 값 확정·심사 제출 전 필수
 - [ ] **백엔드 재확인**: 위치 인증·방문 인증 로그·분석 파이프라인에서 좌표를 별도로 수집·저장하지 않는지 (위 "Linked = 아니오" 근거 유지)
-- [ ] **EXIF 실측**: iOS·Android 실기기 촬영본에 GPS EXIF가 없는지 (§5)
+- [ ] **Play 계정·데이터 삭제**: 인앱 삭제 경로(`SettingsScreen` 회원탈퇴 → `DELETE /api/users/me`)는 존재. Play 정책상 필요한 **외부 삭제 요청 웹 URL** 확보 및 콘솔 등록 ([store-privacy-checklist.md](store-privacy-checklist.md) §5)

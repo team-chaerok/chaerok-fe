@@ -26,8 +26,9 @@
       (`unzip -l build/ios/ipa/*.ipa | grep PrivacyInfo`)
 - [ ] Xcode Organizer → **Generate Privacy Report** 정상 (정밀 위치 / 앱 기능 항목 표시)
 - [ ] **신규 SDK/플러그인 추가 시** 매니페스트·스토어 신고 재점검 (특히 광고·분석·어트리뷰션 → `NSPrivacyTracking` 영향)
-- [ ] **백엔드에 "위치 좌표 수집/저장 없음" 재확인** ([privacy-data-flow.md](privacy-data-flow.md) §8)
-- [ ] **`camera` 촬영본 EXIF에 GPS IFD 없음** 재확인 (iOS·Android 실기기 각각 — [privacy-data-flow.md](privacy-data-flow.md) §5)
+- [ ] **백엔드에 "명시적 좌표 파라미터 수집/저장 없음, 로그·분석에도 미포함" 재확인** ([privacy-data-flow.md](privacy-data-flow.md) §8)
+- [ ] **(blocking) `camera` 촬영본 EXIF에 GPS IFD 없음** 실기기 실측(T1, iOS·Android 각각). 신고 값(`Linked` 등) 확정 전 필수 — [privacy-data-flow.md](privacy-data-flow.md) §5·§8
+- [ ] Play "데이터 삭제" — 인앱 삭제 경로(`DELETE /api/users/me`) 동작 확인 + **외부 삭제 요청 웹 URL** Play Console 등록
 - [ ] App Store Connect App Privacy / Play 데이터 보안 콘솔 반영 완료 (제출 담당자 — [store-privacy-checklist.md](store-privacy-checklist.md) §5)
 - [ ] `Info.plist` 위치 권한: `NSLocationWhenInUseUsageDescription`만 존재, Always/Background 키 없음
 

@@ -16,7 +16,7 @@ App Store Connect / Google Play 콘솔에 **그대로 옮겨 적기 위한** 신
 | 데이터 유형 | **위치 → 정밀 위치(Precise Location)** |
 | 이 데이터를 수집합니까? | 예 |
 | 사용 목적 | **앱 기능(App Functionality)** |
-| 사용자 신원에 연결됩니까? (Linked to the user) | **아니오** |
+| 사용자 신원에 연결됩니까? (Linked to the user) | **아니오** (T1 전제 — [privacy-data-flow.md](privacy-data-flow.md) §5·§8: 촬영본 GPS EXIF 없음 확인 전에는 미확정) |
 | 사용자 추적에 사용됩니까? (Tracking) | **아니오** |
 | 제3자와 공유합니까? | **예** — 카카오(주소·행정구역 변환), 기상청/공공데이터포털(날씨 조회) |
 
@@ -36,8 +36,8 @@ App Store Connect / Google Play 콘솔에 **그대로 옮겨 적기 위한** 신
 | 공유(Shared) | 예 — 카카오, 기상청/공공데이터포털 |
 | 목적 | 앱 기능(App functionality) |
 | 전송 중 암호화 | 예 (모든 호출 HTTPS) |
-| 데이터가 일시적으로만 처리됩니까? | 예 — 자체 저장 없음. 카카오/기상청 전송분은 응답을 받으면 폐기 |
-| 사용자가 삭제를 요청할 수 있습니까? | 개인정보처리방침 정책에 맞춰 응답 |
+| 데이터가 일시적으로만 처리됩니까? | **아니오** — 방문 인증 촬영 좌표가 로컬 Drift DB(`photos.latitude/longitude`)에 영속 저장되고, 촬영 원본 JPEG가 채록 S3에 저장된다. (카카오/기상청으로 보낸 좌표 자체는 폐기하지만, 이 항목은 전체 수집을 기준으로 판단) |
+| 사용자가 삭제를 요청할 수 있습니까? | **예** — `SettingsScreen` 회원탈퇴가 `UsersApi.withdraw()` → `DELETE /api/users/me`로 계정·연관 데이터 삭제를 요청한다. (Play 정책상 **외부 삭제 요청 웹 URL**도 별도 등록 필요 → §5) |
 
 - Android 매니페스트에 `ACCESS_COARSE_LOCATION`이 선언되어 있으므로 **Approximate도 함께 체크**한다.
 - `ACCESS_BACKGROUND_LOCATION` 없음 → 백그라운드 위치 관련 항목은 모두 "아니오".
@@ -49,7 +49,7 @@ App Store Connect / Google Play 콘솔에 **그대로 옮겨 적기 위한** 신
 | `PrivacyInfo.xcprivacy` 필드 | 값 | App Store Connect 대응 답변 |
 | --- | --- | --- |
 | `NSPrivacyCollectedDataType` | `NSPrivacyCollectedDataTypePreciseLocation` | 데이터 유형 = 정밀 위치 |
-| `NSPrivacyCollectedDataTypeLinked` | `false` | 신원 연결 = 아니오 |
+| `NSPrivacyCollectedDataTypeLinked` | `false` | 신원 연결 = 아니오 (T1: 촬영본 GPS EXIF 없음 확인 전제) |
 | `NSPrivacyCollectedDataTypeTracking` | `false` | 추적 = 아니오 |
 | `NSPrivacyCollectedDataTypePurposes` | `[NSPrivacyCollectedDataTypePurposeAppFunctionality]` | 목적 = 앱 기능 |
 | `NSPrivacyTracking` | `false` | (앱 전체) 추적 없음 |
@@ -75,3 +75,5 @@ App Store Connect / Google Play 콘솔에 **그대로 옮겨 적기 위한** 신
 - [ ] Play Console 데이터 보안 폼에 위 §2 값 반영
 - [ ] 반영 후 §4 "변경 후" 열과 실제 콘솔 화면이 일치하는지 캡처로 확인
 - [ ] 개인정보처리방침 문서(웹)에 위치 수집·제3자 전송 문구가 있는지 확인 (없으면 별도 이슈)
+- [ ] **T1(촬영본 GPS EXIF 실측) 완료** — 결과에 따라 §1·§2·§3의 "신원 연결"·"제3자 공유" 값 최종 확정
+- [ ] Play "데이터 삭제" 질문: 인앱 삭제 경로(`DELETE /api/users/me`)는 있음. **외부 삭제 요청 웹 URL** 마련 후 Play Console URL 필드에 등록

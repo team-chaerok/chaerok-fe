@@ -52,7 +52,7 @@
 | 채록 백엔드 `/api/film-rolls/{id}/visits` | `placeId`(+`photoId`)만. 주석: "백엔드는 GPS 좌표…받거나 저장하지 않는다" | [visits_api.dart:29-39](../../../lib/data/remote/visits_api.dart#L29-L39) |
 | 채록 백엔드 사진 업로드 URL | `sequence`, `contentType`, `contentLength`, `takenAt` | [photo_upload_url_request.dart](../../../lib/data/models/photo_upload_url_request.dart) |
 | 채록 S3 (presigned PUT) | **원본 사진 바이트 그대로** (재인코딩 없음) | [local_photo_storage.dart:48](../../../lib/core/file/local_photo_storage.dart#L48) `writeAsBytes(imageBytes)` → [film_roll_sync_service.dart:246-263](../../../lib/features/film_roll/data/sync/film_roll_sync_service.dart#L246-L263) `_readPhotoBytes` → `_putPhotoToS3` |
-| 로컬 Drift DB `photos` | 촬영 좌표(`latitude`, `longitude` nullable) — **온디바이스만** | [photos_table.dart](../../../lib/core/database/tables/photos_table.dart), [photo_repository_impl.dart:54-59](../../../lib/features/film_roll/data/repository/photo_repository_impl.dart#L54-L59) |
+| 로컬 Drift DB `photos` | 촬영 좌표(`latitude`, `longitude` nullable) — **온디바이스에 영속 저장**(일시 처리 아님) | [photos_table.dart](../../../lib/core/database/tables/photos_table.dart), [photo_repository_impl.dart:54-59](../../../lib/features/film_roll/data/repository/photo_repository_impl.dart#L54-L59) |
 
 **신규 발견 (EXIF 리스크 상향)**: 촬영 원본은 [visit_capture_screen.dart:257-259](../../../lib/features/film_roll/presentation/page/visit_capture_screen.dart#L257-L259) `controller.takePicture()` → `readAsBytes()` 결과가 **디스크에 무변형 저장**되고, 동기화 시 **그대로 S3로 PUT**된다(썸네일만 `image` 패키지로 재인코딩, 원본은 손대지 않음). 따라서 `camera` 플러그인이 JPEG에 GPS EXIF를 심으면 **좌표가 채록 S3로 간접 전송**된다. → "자체 백엔드는 원시 좌표를 수신하지 않는다"(plan D1)의 전제 조건. **구현 전 실측 검증 필수(아래 T1)**.
 
@@ -154,7 +154,7 @@
 2. **Google Play — Data safety**
    - Location → **Approximate location** + **Precise location**: Collected = Yes, Shared = Yes
    - Purpose: App functionality
-   - "Is this data processed ephemerally?" — 실제 저장 여부에 맞춰 응답(자체 저장 없음 → 카카오/기상청 전송분은 일시 처리)
+   - "Is this data processed ephemerally?" → **아니오**. `VisitCaptureScreen._onCaptureTap`이 좌표를 `photos.latitude/longitude`로 넘겨 로컬 Drift DB에 영속 저장하고, 촬영 원본 JPEG가 채록 S3에 저장됨(§1 신규 발견). 카카오/기상청으로 보낸 좌표 자체는 폐기되나, 이 항목은 전체 수집 기준으로 판단
    - Data encrypted in transit: Yes (HTTPS) / User can request deletion: 정책에 맞춰
 3. **매니페스트 ↔ 폼 일치 표** — `.xcprivacy` 필드와 App Privacy 답변이 1:1로 맞는지 대조표
 4. **변경 전/후 스냅샷** (P2 결과)
