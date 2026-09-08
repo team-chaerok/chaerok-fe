@@ -81,9 +81,13 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   // 중복 push되는 것을 막기 위한 플래그.
   bool _isAutoConnectingFilmRoll = false;
 
-  // 탭 재진입·카메라 종료·앱 포그라운드 복귀로 [refresh]가 연달아 불릴 때
-  // recoverLastActiveFilmRoll 조회가 중복 실행되지 않도록 막는다.
+  // 탭 재진입·카메라 종료·앱 포그라운드 복귀로 [refresh]가 겹쳐 불릴 때,
+  // 진행 중인 조회에 나중 요청을 합류시키기 위한 상태. 나중 요청을 그냥
+  // 버리면 먼저 시작된 조회가 stale 값을 읽은 경우(예: 카메라에서 방문
+  // 완료 처리 전에 lifecycle resumed로 조회가 먼저 시작된 경우) 대시보드가
+  // 최신 상태를 반영하지 못하므로, 대기 플래그를 세워 한 번 더 조회한다.
   bool _isRefreshing = false;
+  bool _refreshQueued = false;
 
   WeatherSummaryData? _weather;
   List<String> _recentPhotoThumbnailPaths = const [];
@@ -104,7 +108,7 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
       if (!mounted) return;
       unawaited(_ensureLocationVerified());
     });
-    unawaited(_loadRecoveredFilmRoll());
+    unawaited(refresh());
   }
 
   @override
@@ -131,13 +135,24 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   /// 사용자 정보 · 위치 인증 · 날씨는 재조회하지 않는다. 위치 인증을 다시
   /// 태우면 캐시 히트 시 [_autoConnectFilmRollEntry]가 코스 선택/필름롤 화면으로
   /// 자동 네비게이션하므로, 단순 탭 전환에서 절대 재실행하지 않는다.
+  ///
+  /// 조회가 진행 중일 때 다시 호출되면 요청을 버리지 않고 대기시켰다가,
+  /// 현재 조회가 끝난 뒤 한 번 더 조회해 최신 상태를 반영한다.
   Future<void> refresh() async {
-    if (_isRefreshing) return;
+    if (_isRefreshing) {
+      _refreshQueued = true;
+      return;
+    }
     _isRefreshing = true;
     try {
       await _loadRecoveredFilmRoll();
+      while (_refreshQueued && mounted) {
+        _refreshQueued = false;
+        await _loadRecoveredFilmRoll();
+      }
     } finally {
-      if (mounted) _isRefreshing = false;
+      _isRefreshing = false;
+      _refreshQueued = false;
     }
   }
 
