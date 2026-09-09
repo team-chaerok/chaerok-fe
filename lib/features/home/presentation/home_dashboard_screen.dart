@@ -98,6 +98,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   // 덮어쓰지 않도록 각각 요청 토큰으로 최신 호출만 반영한다.
   int _nearbyPlacesRequestToken = 0;
   int _recentPhotosRequestToken = 0;
+  // QA 위치를 연속으로 바꾸면 이전 _fetchWeather 응답이 새 응답보다 늦게 도착해
+  // 최신 날씨를 덮어쓸 수 있으므로, _loadNearbyPlaces와 동일하게 토큰으로 막는다.
+  int _weatherRequestToken = 0;
 
   @override
   void initState() {
@@ -145,20 +148,22 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     }
     _isRefreshing = true;
     try {
-      // Test Mode(QA) 패널에서 "충남 외 지역 홈 강제" 토글이나 mock 위치를 바꾸면
-      // 세션 캐시가 비워지고 이 플래그가 선다. 홈으로 돌아온 지금 자동 네비게이션
-      // 없이 위치만 다시 판정해 정상 홈 ↔ 충남 외 지역 홈을 전환한다.
-      final qaLocationDirty = LocationVerificationResult.qaLocationDirty;
-      LocationVerificationResult.qaLocationDirty = false;
-      if (qaLocationDirty) {
-        await _reevaluateLocationForQa();
-      }
-
-      await _loadRecoveredFilmRoll();
-      while (_refreshQueued && mounted) {
+      do {
         _refreshQueued = false;
+
+        // Test Mode(QA) 패널에서 "충남 외 지역 홈 강제" 토글이나 mock 위치를
+        // 바꾸면 세션 캐시가 비워지고 이 플래그가 선다. 홈으로 돌아온 지금
+        // 자동 네비게이션 없이 위치만 다시 판정해 정상 홈 ↔ 충남 외 지역 홈을
+        // 전환한다. 재판정이 성공한 뒤에만 플래그를 내려, 도중에 예외가 나면
+        // 다음 refresh에서 다시 시도한다. 활성 refresh 중 QA 변경이 들어와도
+        // 큐 반복에서 이 검사를 다시 거치므로 놓치지 않는다.
+        if (LocationVerificationResult.qaLocationDirty) {
+          await _reevaluateLocationForQa();
+          LocationVerificationResult.qaLocationDirty = false;
+        }
+
         await _loadRecoveredFilmRoll();
-      }
+      } while (_refreshQueued && mounted);
     } finally {
       _isRefreshing = false;
       _refreshQueued = false;
@@ -318,12 +323,15 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   }
 
   Future<void> _fetchWeather(LocationVerificationResult result) async {
+    final requestToken = ++_weatherRequestToken;
     try {
       final weather = await WeatherApiService.getCurrentWeather(
         latitude: result.position.latitude,
         longitude: result.position.longitude,
       );
-      if (!mounted || weather == null) return;
+      if (!mounted || weather == null || requestToken != _weatherRequestToken) {
+        return;
+      }
       setState(() {
         _weather = WeatherSummaryData(
           regionName: result.region.cityCountyName,

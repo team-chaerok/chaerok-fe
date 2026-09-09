@@ -78,6 +78,8 @@ class TestModePanelScreenState extends State<TestModePanelScreen> {
   double? _pickedLongitude;
   KakaoMapController? _pickerMapController;
   Poi? _pickerPin;
+  // 겹쳐 실행되는 _syncPickerPin 중 최신 호출만 반영하기 위한 세대 카운터.
+  int _pinSyncGeneration = 0;
 
   @override
   void initState() {
@@ -89,6 +91,8 @@ class TestModePanelScreenState extends State<TestModePanelScreen> {
   @override
   void dispose() {
     TestModeSession.instance.removeListener(_onSessionChanged);
+    // 진행 중인 _syncPickerPin이 해제 후 지도를 건드리지 않도록 세대를 올린다.
+    _pinSyncGeneration++;
     super.dispose();
   }
 
@@ -263,6 +267,8 @@ class TestModePanelScreenState extends State<TestModePanelScreen> {
       await preferences.setMockCustomLocation(enabled: false);
       await preferences.setMockRegionCodeName(null);
       await preferences.setMockSpotIndex(0);
+      // 진행 중인 _syncPickerPin이 방금 지운 핀을 되살리지 않도록 세대를 올린다.
+      _pinSyncGeneration++;
       await _pickerPin?.remove();
       _pickerPin = null;
       if (mounted) {
@@ -337,21 +343,37 @@ class TestModePanelScreenState extends State<TestModePanelScreen> {
   }
 
   /// 지도 컨트롤러가 준비돼 있고 찍은 좌표가 있으면 핀을 다시 그린다.
+  ///
+  /// `_onMockMapPicked`가 `unawaited`로 호출하므로 빠른 연속 탭에서 여러 동기화가
+  /// 겹칠 수 있다. 세대([_pinSyncGeneration])를 비교해 매 await 이후 최신 호출만
+  /// 살아남게 하고, 뒤늦게 추가된 오래된 POI는 즉시 제거한다. `dispose`에서
+  /// 세대를 올려 위젯 해제 후 결과가 반영되지 않도록 한다.
   Future<void> _syncPickerPin() async {
     final controller = _pickerMapController;
     final latitude = _pickedLatitude;
     final longitude = _pickedLongitude;
     if (controller == null || latitude == null || longitude == null) return;
+
+    final generation = ++_pinSyncGeneration;
     try {
       await _pickerPin?.remove();
+      _pickerPin = null;
       final icon = await KImage.fromWidget(
         const _MockPickPin(),
         const Size(28, 28),
       );
-      _pickerPin = await controller.labelLayer.addPoi(
+      if (!mounted || generation != _pinSyncGeneration) return;
+
+      final poi = await controller.labelLayer.addPoi(
         LatLng(latitude, longitude),
         style: PoiStyle(icon: icon),
       );
+      if (!mounted || generation != _pinSyncGeneration) {
+        await poi.remove();
+        return;
+      }
+      _pickerPin = poi;
+
       await controller.moveCamera(
         CameraUpdate.newCenterPosition(LatLng(latitude, longitude)),
       );
