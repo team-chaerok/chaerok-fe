@@ -11,10 +11,12 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     LocationVerificationResult.sessionCache = null;
+    LocationVerificationResult.qaLocationDirty = false;
   });
 
   tearDown(() {
     LocationVerificationResult.outOfServiceSessionCache = false;
+    LocationVerificationResult.qaLocationDirty = false;
   });
 
   testWidgets('세션 캐시가 out-of-service면 OutOfServiceHomeView를 렌더한다', (

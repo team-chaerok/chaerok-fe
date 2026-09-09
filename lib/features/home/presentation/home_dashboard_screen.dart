@@ -145,6 +145,15 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     }
     _isRefreshing = true;
     try {
+      // Test Mode(QA) 패널에서 "충남 외 지역 홈 강제" 토글이나 mock 위치를 바꾸면
+      // 세션 캐시가 비워지고 이 플래그가 선다. 홈으로 돌아온 지금 자동 네비게이션
+      // 없이 위치만 다시 판정해 정상 홈 ↔ 충남 외 지역 홈을 전환한다.
+      final qaLocationDirty = LocationVerificationResult.qaLocationDirty;
+      LocationVerificationResult.qaLocationDirty = false;
+      if (qaLocationDirty) {
+        await _reevaluateLocationForQa();
+      }
+
       await _loadRecoveredFilmRoll();
       while (_refreshQueued && mounted) {
         _refreshQueued = false;
@@ -154,6 +163,15 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
       _isRefreshing = false;
       _refreshQueued = false;
     }
+  }
+
+  /// QA 패널에서 위치 관련 설정을 바꾼 뒤 홈 복귀 시 호출된다. 위치 인증만 다시
+  /// 수행하고 그 결과를 홈 표시 상태에만 반영한다 — [_autoConnectFilmRollEntry]
+  /// (코스 선택/필름롤 화면 자동 push)는 실행하지 않는다.
+  Future<void> _reevaluateLocationForQa() async {
+    final outcome = await _runLocationVerification();
+    if (!mounted) return;
+    _applyLocationOutcome(outcome, autoConnect: false);
   }
 
   Future<void> _fetchUserInfo() async {
@@ -212,13 +230,30 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   }
 
   /// 조용한 확인 또는 폴백 화면에서 돌아온 결과를 홈 상태에 반영한다.
-  void _applyLocationOutcome(LocationVerificationOutcome? outcome) {
+  ///
+  /// [autoConnect]가 false면(QA 재판정 경로) 위치 결과에 의존하는 날씨/근처
+  /// 장소만 갱신하고, 코스 선택/필름롤 화면으로 자동 진입하지 않는다.
+  void _applyLocationOutcome(
+    LocationVerificationOutcome? outcome, {
+    bool autoConnect = true,
+  }) {
     switch (outcome) {
       case LocationVerified(:final result):
-        setState(() => _locationResult = result);
-        unawaited(_onLocationVerified(result));
+        setState(() {
+          _locationResult = result;
+          _isOutOfService = false;
+        });
+        if (autoConnect) {
+          unawaited(_onLocationVerified(result));
+        } else {
+          unawaited(_fetchWeather(result));
+          unawaited(_loadNearbyPlaces(result));
+        }
       case LocationOutOfService():
-        setState(() => _isOutOfService = true);
+        setState(() {
+          _isOutOfService = true;
+          _locationResult = null;
+        });
       case LocationVerificationFailed():
       case null:
         // 폴백 화면을 "지역별로 둘러보기" CTA 대신 AppBar/시스템 뒤로가기로

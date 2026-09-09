@@ -13,11 +13,13 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     LocationVerificationResult.sessionCache = null;
     LocationVerificationResult.outOfServiceSessionCache = false;
+    LocationVerificationResult.qaLocationDirty = false;
   });
 
   tearDown(() {
     LocationVerificationResult.sessionCache = null;
     LocationVerificationResult.outOfServiceSessionCache = false;
+    LocationVerificationResult.qaLocationDirty = false;
   });
 
   // 위치 인증 러너(geolocator)를 태우지 않도록 out-of-service 상태로 홈을 띄운다.
@@ -88,6 +90,77 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(LocationVerificationScreen), findsNothing);
     expect(find.byType(OutOfServiceHomeView), findsOneWidget);
+
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('qaLocationDirty가 서 있으면 refresh()가 위치를 다시 판정하고 플래그를 내린다', (
+    tester,
+  ) async {
+    var runCount = 0;
+    final key = GlobalKey<HomeDashboardScreenState>();
+
+    await tester.binding.setSurfaceSize(const Size(1080, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeDashboardScreen(
+          key: key,
+          debugRunLocationVerification: () async {
+            runCount++;
+            return const LocationOutOfService();
+          },
+        ),
+      ),
+    );
+    await tester.pump(); // postFrameCallback → 최초 러너 1회
+    await tester.pump();
+    expect(runCount, 1);
+    expect(find.byType(OutOfServiceHomeView), findsOneWidget);
+
+    LocationVerificationResult.qaLocationDirty = true;
+    await key.currentState!.refresh();
+    await tester.pump();
+
+    expect(runCount, 2); // QA 재판정 수행
+    expect(LocationVerificationResult.qaLocationDirty, isFalse); // 소비됨
+    expect(find.byType(LocationVerificationScreen), findsNothing); // 자동 네비 없음
+    expect(find.byType(OutOfServiceHomeView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('qaLocationDirty가 없으면 refresh()는 위치를 다시 판정하지 않는다', (
+    tester,
+  ) async {
+    var runCount = 0;
+    final key = GlobalKey<HomeDashboardScreenState>();
+
+    await tester.binding.setSurfaceSize(const Size(1080, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeDashboardScreen(
+          key: key,
+          debugRunLocationVerification: () async {
+            runCount++;
+            return const LocationOutOfService();
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(runCount, 1);
+
+    await key.currentState!.refresh();
+    await tester.pump();
+
+    expect(runCount, 1); // 위치 재판정 없음 (필름롤만 재조회)
+    expect(tester.takeException(), isNull);
 
     await tester.pumpAndSettle();
   });

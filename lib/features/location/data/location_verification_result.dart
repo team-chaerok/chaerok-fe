@@ -21,6 +21,12 @@ class LocationVerificationResult {
   /// 이번 세션에서 위치 인증이 "서비스 지역 외"로 끝났는지 여부.
   /// 홈 탭 재진입 시 인증 흐름을 다시 타지 않기 위한 캐시.
   static bool outOfServiceSessionCache = false;
+
+  /// Test Mode(QA) 패널에서 "충남 외 지역 홈 강제" 토글이나 mock 위치(지역/지점/
+  /// 임의 좌표)를 바꿨을 때 세팅한다. 세팅 시 위 두 캐시는 함께 비워지고, 홈
+  /// 대시보드는 다음 [HomeDashboardScreenState.refresh] 에서 자동 네비게이션 없이
+  /// 위치 판정만 다시 수행한 뒤 이 플래그를 내린다.
+  static bool qaLocationDirty = false;
 }
 
 /// 위치 인증 화면의 종료 결과.
