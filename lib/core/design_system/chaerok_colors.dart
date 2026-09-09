@@ -10,7 +10,7 @@ class ChaerokColors {
   static const Color sageLight = Color(0xFFDCE6D1);
   static const Color skyBlue = Color(0xFFD7E5F6);
 
-  static const Color background = Color(0xFFFEFBF6);
+  static const Color background = Color(0xFFFAF6EF);
   static const Color surface = Color(0xFFF7F6F2);
 
   static const Color textPrimary = Color(0xFF000000);
@@ -22,4 +22,6 @@ class ChaerokColors {
   static const Color categoryHover = Color(0xFFDDE5DC);
 
   static const Color cameraBlack = Color(0xFF1E1F1D);
+
+  static const Color primaryGreen = Color(0xFF45523D);
 }
