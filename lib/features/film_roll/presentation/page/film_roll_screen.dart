@@ -19,6 +19,7 @@ import 'package:chaerok/features/film_roll/presentation/page/course_selection_sc
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -213,14 +214,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: Text(
-          _state.filmRoll?.title ?? '필름롤',
-          style: ChaerokTypography.titleMedium,
-        ),
-      ),
+      appBar: ChaerokAppbar(title: _state.filmRoll?.title ?? '필름롤'),
       body: _buildBody(),
     );
   }

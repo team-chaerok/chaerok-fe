@@ -41,6 +41,24 @@ class _LocationVerificationIdleViewState
     extends State<LocationVerificationIdleView> {
   static const double _mapPreviewHeight = 300;
 
+  /// "현재 여행 중인 지역을 확인해주세요." 헤드라인 (Figma: 20 · NanumSquareRound · 700).
+  static const TextStyle _headlineStyle = TextStyle(
+    fontFamily: ChaerokTypography.nanumSquareRoundFontFamily,
+    fontSize: 20,
+    fontWeight: FontWeight.w700,
+    height: 1,
+    color: ChaerokColors.textPrimary,
+  );
+
+  /// 헤드라인 아래 보조 문구 (Figma: 12 · NanumSquareRound · 400, 강조어만 700).
+  static const TextStyle _subtitleStyle = TextStyle(
+    fontFamily: ChaerokTypography.nanumSquareRoundFontFamily,
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    height: 1,
+    color: ChaerokColors.textPrimary,
+  );
+
   bool _whyExpanded = false;
   bool _troubleExpanded = false;
 
@@ -61,13 +79,25 @@ class _LocationVerificationIdleViewState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '현재 여행 중인 지역을 확인해주세요.',
-                  style: ChaerokTypography.titleLarge,
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: '현재 '),
+                      TextSpan(
+                        text: '여행 중인 지역',
+                        style: _headlineStyle.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF45523D),
+                        ),
+                      ),
+                      const TextSpan(text: '을 확인해주세요.'),
+                    ],
+                  ),
+                  style: _headlineStyle,
                 ),
                 const SizedBox(height: ChaerokSpacing.xs),
-                Text.rich(
-                  const TextSpan(
+                const Text.rich(
+                  TextSpan(
                     children: [
                       TextSpan(text: '위치를 인증하면 해당 지역의 '),
                       TextSpan(
@@ -82,9 +112,7 @@ class _LocationVerificationIdleViewState
                       TextSpan(text: '를 만나볼 수 있어요.'),
                     ],
                   ),
-                  style: ChaerokTypography.bodyMedium.copyWith(
-                    color: ChaerokColors.textSecondary,
-                  ),
+                  style: _subtitleStyle,
                 ),
                 const SizedBox(height: ChaerokSpacing.xl),
                 _FaqAccordion(
@@ -128,17 +156,22 @@ class _LocationVerificationIdleViewState
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            ChaerokSpacing.xl,
-            ChaerokSpacing.md,
-            ChaerokSpacing.xl,
-            ChaerokSpacing.xl,
-          ),
-          child: ChaerokButton(
-            text: '위치 인증하기',
-            backgroundColor: ChaerokColors.primaryDark,
-            onPressed: widget.onVerifyTap,
+        // signup_screen·nickname_screen과 동일하게 SafeArea 하단 인셋 + xl 패딩
+        // 위에 버튼이 오도록 맞춘다(버튼 높이는 ChaerokButton 고정 56).
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ChaerokSpacing.xl,
+              ChaerokSpacing.md,
+              ChaerokSpacing.xl,
+              ChaerokSpacing.xl,
+            ),
+            child: ChaerokButton(
+              text: '위치 인증하기',
+              backgroundColor: ChaerokColors.primaryGreen,
+              onPressed: widget.onVerifyTap,
+            ),
           ),
         ),
       ],
@@ -207,8 +240,9 @@ class _FaqAccordion extends StatelessWidget {
                 Expanded(
                   child: Text(
                     question,
+                    // Figma: 16 · NanumSquareRound · 400.
                     style: ChaerokTypography.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w700,
+                      color: ChaerokColors.textPrimary,
                     ),
                   ),
                 ),

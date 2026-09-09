@@ -11,6 +11,7 @@ import 'package:chaerok/features/location/data/location_permission_service.dart'
 import 'package:chaerok/features/location/data/location_verification_result.dart';
 import 'package:chaerok/features/location/data/location_verification_runner.dart';
 import 'package:chaerok/features/location/presentation/widgets/location_verification_idle_view.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -158,11 +159,7 @@ class _LocationVerificationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: const Text('위치 인증', style: ChaerokTypography.titleMedium),
-      ),
+      appBar: const ChaerokAppbar(title: '위치 인증'),
       body: _step == _Step.idle
           ? LocationVerificationIdleView(
               mapPreview: _buildMapPreview(),

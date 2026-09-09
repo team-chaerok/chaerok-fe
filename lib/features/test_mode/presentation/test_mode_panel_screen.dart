@@ -19,6 +19,7 @@ import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:drift_db_viewer/drift_db_viewer.dart';
 import 'package:flutter/material.dart';
@@ -240,14 +241,7 @@ class _TestModePanelScreenState extends State<TestModePanelScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: const Text(
-          'Test Mode (QA)',
-          style: ChaerokTypography.titleMedium,
-        ),
-      ),
+      appBar: const ChaerokAppbar(title: 'Test Mode (QA)'),
       body: AbsorbPointer(
         absorbing: _busy,
         child: SingleChildScrollView(

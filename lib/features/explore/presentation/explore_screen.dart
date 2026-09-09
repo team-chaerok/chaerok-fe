@@ -26,6 +26,7 @@ import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/region/region_code.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -440,15 +441,11 @@ class ExploreScreenState extends State<ExploreScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: Text(
-          _mode == _ExploreMode.progress || _mode == _ExploreMode.developing
-              ? (_activeFilmRoll?.title ?? '채록길')
-              : '채록길',
-          style: ChaerokTypography.titleMedium,
-        ),
+      appBar: ChaerokAppbar(
+        title:
+            _mode == _ExploreMode.progress || _mode == _ExploreMode.developing
+            ? (_activeFilmRoll?.title ?? '채록길')
+            : '채록길',
       ),
       body: switch (_mode) {
         _ExploreMode.loading => const Center(child: ChaerokLoadingIndicator()),
