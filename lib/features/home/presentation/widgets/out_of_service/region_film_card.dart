@@ -14,9 +14,12 @@ import 'package:chaerok/shared/region/region_guide.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 
-/// 필름롤 스택에서 "열린" 카드. 상단 탭 + 지역 상세 본문을 필름 프레임
+/// 필름롤 스택의 카드 한 장. 상단 탭 + 지역 상세 본문을 필름 프레임
 /// ([FilmCardFrame]) 안에 담는다. 본문은 카드 내부에서 스크롤되며,
 /// [status]에 따라 로딩/에러/빈값/본문을 그린다.
+///
+/// [opened]가 맨 앞(열린) 카드 여부다. 겹쳐서 가려지는 카드는 [opened]를
+/// false로 줘 탭만 그리고, 그 탭을 누르면 [onTabTap]으로 전환을 요청한다.
 class RegionFilmCard extends StatelessWidget {
   const RegionFilmCard({
     super.key,
@@ -25,6 +28,8 @@ class RegionFilmCard extends StatelessWidget {
     required this.places,
     required this.onRetry,
     required this.onExploreRegionRequested,
+    this.opened = true,
+    this.onTabTap,
   });
 
   final RegionCode region;
@@ -33,14 +38,26 @@ class RegionFilmCard extends StatelessWidget {
   final VoidCallback onRetry;
   final ValueChanged<RegionCode> onExploreRegionRequested;
 
+  /// 스택 맨 앞(열린) 카드인지. 탭 강조·펼침 아이콘·그림자에 반영되고,
+  /// false면 본문 없이 탭만 그린다(뒤에서 가려지는 카드).
+  final bool opened;
+
+  /// 겹친 탭을 눌렀을 때. 열린 카드는 null.
+  final VoidCallback? onTabTap;
+
   @override
   Widget build(BuildContext context) {
     return FilmCardFrame(
+      elevated: opened,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FilmTab(label: region.filmStripLabel, opened: true),
-          Expanded(child: _content()),
+          FilmTab(
+            label: region.filmStripLabel,
+            opened: opened,
+            onTap: onTabTap,
+          ),
+          Expanded(child: opened ? _content() : const SizedBox.shrink()),
         ],
       ),
     );

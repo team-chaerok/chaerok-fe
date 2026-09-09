@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_card.dart';
@@ -13,8 +16,9 @@ typedef RegionFilmData = ({
 
 /// 충남 외 지역 홈 상단의 "필름롤" 스택. [deckOrder]의 맨 뒤 원소가 열린 카드이고,
 /// 나머지는 위에 탭만 겹쳐 쌓인다. 겹친 탭을 누르면 [onOpen]으로 전환을 요청하며,
-/// 부모는 그 지역과 직전에 열려 있던 지역의 덱 순서를 스위치한다.
-class RegionFilmDeck extends StatelessWidget {
+/// 부모가 그 지역과 직전에 열려 있던 지역의 덱 순서를 스위치하면 두 카드가
+/// 앞뒤로 자리를 맞바꾸는 전환 애니메이션이 재생된다(값은 프로토타입 확정치).
+class RegionFilmDeck extends StatefulWidget {
   const RegionFilmDeck({
     super.key,
     required this.deckOrder,
@@ -30,60 +34,165 @@ class RegionFilmDeck extends StatelessWidget {
   final ValueChanged<RegionCode> onRetry;
   final ValueChanged<RegionCode> onExploreRegionRequested;
 
-  /// 겹친 탭 사이 간격. 살짝 띄워 층을 구분한다. 토큰 없음.
-  static const double _peekGap = 2;
+  @override
+  State<RegionFilmDeck> createState() => _RegionFilmDeckState();
+}
+
+class _RegionFilmDeckState extends State<RegionFilmDeck>
+    with SingleTickerProviderStateMixin {
+  // "필름롤 카드 전환" 프로토타입에서 확정한 값.
+  static const Duration _duration = Duration(milliseconds: 320);
+  static const double _recedeScaleMin = 0.98; // 물러나는 카드 최소 배율
+  static const double _recedePeak = 0.46; // 배율·기울기 정점 시점
+  static const double _tiltRadians = 15 * math.pi / 180; // 뒤로 눕는 각
+  static const double _staggerFraction = 170 / 320; // 수신 카드 진입 지연 비율
+  static const double _advancePop = (1 - _recedeScaleMin) * 0.45; // 수신 카드 미세 팝
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _duration,
+  );
+
+  List<RegionCode> _fromOrder = const [];
+  RegionCode? _incoming;
+  RegionCode? _outgoing;
+
+  @override
+  void initState() {
+    super.initState();
+    _fromOrder = widget.deckOrder;
+  }
+
+  @override
+  void didUpdateWidget(RegionFilmDeck oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.deckOrder.last != widget.deckOrder.last) {
+      _fromOrder = oldWidget.deckOrder;
+      _incoming = widget.deckOrder.last;
+      _outgoing = oldWidget.deckOrder.last;
+      final reduceMotion =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      if (reduceMotion) {
+        _controller.value = 1;
+      } else {
+        unawaited(_controller.forward(from: 0));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  double _lerp(num a, num b, double t) => a + (b - a) * t;
+
+  /// 1 → [_recedeScaleMin] → 1 (정점 [_recedePeak]).
+  double _recedeScale(double t) => t <= _recedePeak
+      ? _lerp(1, _recedeScaleMin, t / _recedePeak)
+      : _lerp(_recedeScaleMin, 1, (t - _recedePeak) / (1 - _recedePeak));
+
+  /// 0 → [_tiltRadians] → 0 (정점 [_recedePeak]).
+  double _recedeTilt(double t) => t <= _recedePeak
+      ? _lerp(0, _tiltRadians, t / _recedePeak)
+      : _lerp(_tiltRadians, 0, (t - _recedePeak) / (1 - _recedePeak));
 
   @override
   Widget build(BuildContext context) {
-    final open = deckOrder.last;
-    final peeks = deckOrder.sublist(0, deckOrder.length - 1);
-    final data = dataByRegion[open];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const peek = FilmTab.tabHeight;
+        final maxHeight = constraints.hasBoundedHeight
+            ? constraints.maxHeight
+            : 600.0;
+        final cardHeight = maxHeight - peek * (widget.deckOrder.length - 1);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final (index, region) in peeks.indexed) ...[
-          if (index != 0) const SizedBox(height: _peekGap),
-          FilmTab(
-            label: region.filmStripLabel,
-            opened: false,
-            onTap: () => onOpen(region),
-          ),
-        ],
-        const SizedBox(height: _peekGap),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            layoutBuilder: (currentChild, previousChildren) => Stack(
-              fit: StackFit.expand,
+        return AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final swapping = _incoming != null && _controller.value < 1;
+            return Stack(
               children: [
-                ...previousChildren,
-                if (currentChild != null) currentChild,
+                for (final region in widget.deckOrder)
+                  _card(
+                    region: region,
+                    peek: peek,
+                    cardHeight: cardHeight,
+                    t: _controller.value,
+                    swapping: swapping,
+                    locked: _controller.isAnimating,
+                  ),
               ],
-            ),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.03),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            ),
-            child: RegionFilmCard(
-              key: ValueKey<RegionCode>(open),
-              region: open,
-              status: data?.status ?? RegionLoadStatus.loading,
-              places: data?.places ?? const <PlaceListResponse>[],
-              onRetry: () => onRetry(open),
-              onExploreRegionRequested: onExploreRegionRequested,
-            ),
-          ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _card({
+    required RegionCode region,
+    required double peek,
+    required double cardHeight,
+    required double t,
+    required bool swapping,
+    required bool locked,
+  }) {
+    final open = region == widget.deckOrder.last;
+    final targetSlot = widget.deckOrder.indexOf(region);
+
+    var slot = targetSlot.toDouble();
+    var scale = 1.0;
+    var tilt = 0.0;
+
+    if (swapping) {
+      final fromSlot = _fromOrder.indexOf(region);
+      if (region == _incoming) {
+        // 위치는 물러나는 카드와 동시에 미끄러진다(프로토타입은 top 전환에
+        // 지연이 없어 두 카드가 t=0부터 교차한다). 스태거는 미세 팝만 늦춘다.
+        slot = _lerp(fromSlot, targetSlot, t);
+        final u = ((t - _staggerFraction) / (1 - _staggerFraction)).clamp(
+          0.0,
+          1.0,
+        );
+        scale = 1 + _advancePop * (1 - u);
+      } else if (region == _outgoing) {
+        // 물러나는 카드는 탭이 뒤로 눌리며 스택으로 밀려 들어간다.
+        slot = _lerp(fromSlot, targetSlot, t);
+        scale = _recedeScale(t);
+        tilt = _recedeTilt(t);
+      } else {
+        slot = fromSlot.toDouble(); // targetSlot과 동일 — 고정
+      }
+    }
+
+    return Positioned(
+      key: ValueKey<RegionCode>(region),
+      left: 0,
+      right: 0,
+      top: slot * peek,
+      height: cardHeight,
+      child: Transform(
+        // 프로토타입과 동일하게 원근 없는 정사영 — rotateX는 세로로 살짝
+        // 눌리는 효과만 낸다(하단 기준).
+        alignment: Alignment.bottomCenter,
+        transform: Matrix4.identity()
+          ..rotateX(tilt)
+          ..scaleByDouble(scale, scale, 1, 1),
+        child: RegionFilmCard(
+          region: region,
+          status:
+              widget.dataByRegion[region]?.status ?? RegionLoadStatus.loading,
+          places:
+              widget.dataByRegion[region]?.places ??
+              const <PlaceListResponse>[],
+          onRetry: () => widget.onRetry(region),
+          onExploreRegionRequested: widget.onExploreRegionRequested,
+          opened: open,
+          onTabTap: open || locked ? null : () => widget.onOpen(region),
         ),
-      ],
+      ),
     );
   }
 }

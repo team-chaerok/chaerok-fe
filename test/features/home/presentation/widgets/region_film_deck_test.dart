@@ -105,4 +105,41 @@ void main() {
     await tester.tap(find.text('다시 시도'));
     expect(retried, RegionCode.yesan);
   });
+
+  testWidgets('deckOrder가 바뀌면 전환 애니메이션이 재생되고 새 카드가 열린다', (tester) async {
+    var order = RegionCode.values.toList();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => RegionFilmDeck(
+              deckOrder: order,
+              dataByRegion: _dataFor(RegionLoadStatus.ready),
+              onOpen: (r) => setState(() {
+                final next = [...order];
+                final i = next.indexOf(r);
+                next[i] = next.last;
+                next[next.length - 1] = r;
+                order = next;
+              }),
+              onRetry: (_) {},
+              onExploreRegionRequested: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('예산'), findsOneWidget); // 예산 인트로 = 열림
+
+    await tester.tap(find.text('부여 필름롤'));
+    await tester.pump(); // 스왑 → 애니메이션 시작
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.hasRunningAnimations, isTrue); // 즉시 스왑이 아니라 전환 중
+
+    await tester.pumpAndSettle();
+    expect(find.text('부여'), findsOneWidget); // 부여 열림
+    expect(find.text('예산'), findsNothing); // 예산은 탭만
+    expect(find.text('예산 필름롤'), findsOneWidget); // 겹친 탭으로 내려옴
+  });
 }

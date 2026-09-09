@@ -18,8 +18,9 @@ class FilmTab extends StatelessWidget {
   final bool opened;
   final VoidCallback? onTap;
 
-  /// Figma 근사. 토큰 없음.
-  static const double _height = 40;
+  /// 탭 높이 겸 스택에서 겹친 탭이 아래로 밀리는 y 간격(프로토타입 peek=36).
+  /// 토큰 없음.
+  static const double tabHeight = 36;
 
   /// Figma 근사. 토큰 없음.
   static const double _labelSize = 16;
@@ -30,7 +31,7 @@ class FilmTab extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        height: _height,
+        height: tabHeight,
         padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
         decoration: BoxDecoration(
           color: opened
