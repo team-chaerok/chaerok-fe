@@ -123,7 +123,8 @@ class _LoginScreenState extends State<LoginScreen> {
     OAuthLoginResponse response,
   ) async {
     if (response.signupToken != null) {
-      await Navigator.pushReplacement(
+      // 로그인 화면을 스택에 남겨 회원가입 1단계에서 뒤로가기로 복귀할 수 있게 한다.
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => SignupScreen(signupToken: response.signupToken!),
