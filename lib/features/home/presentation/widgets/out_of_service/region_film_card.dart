@@ -3,19 +3,22 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_card_frame.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_place_strip.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/region/region_guide.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 
-enum RegionLoadStatus { loading, ready, error }
-
-/// 선택 지역 상세 패널. 상태에 따라 로딩/에러/빈값/본문을 그린다.
-class RegionDetailPanel extends StatelessWidget {
-  const RegionDetailPanel({
+/// 필름롤 스택에서 "열린" 카드. 상단 탭 + 지역 상세 본문을 필름 프레임
+/// ([FilmCardFrame]) 안에 담는다. 본문은 카드 내부에서 스크롤되며,
+/// [status]에 따라 로딩/에러/빈값/본문을 그린다.
+class RegionFilmCard extends StatelessWidget {
+  const RegionFilmCard({
     super.key,
     required this.region,
     required this.status,
@@ -32,6 +35,18 @@ class RegionDetailPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return FilmCardFrame(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilmTab(label: region.filmStripLabel, opened: true),
+          Expanded(child: _content()),
+        ],
+      ),
+    );
+  }
+
+  Widget _content() {
     switch (status) {
       case RegionLoadStatus.loading:
         return const Center(child: ChaerokLoadingIndicator());

@@ -2,70 +2,62 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
-import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 
-/// 충남 외 지역 홈 상단의 "필름롤" 아코디언. 4개 지역 헤더를 세로로 쌓고,
-/// 접힌 헤더를 탭하면 [onSelect]로 전환을 요청한다.
-/// 상세 패널은 이 위젯이 아니라 부모가 그린다.
-class RegionFilmStrip extends StatelessWidget {
-  const RegionFilmStrip({
+/// 필름롤 스택의 헤더 탭. 열린 카드의 탭([opened] == true)은 진하게 강조하고
+/// 펼침 아이콘을 붙인다. 겹쳐 쌓인 탭은 [onTap]으로 전환을 요청한다.
+class FilmTab extends StatelessWidget {
+  const FilmTab({
     super.key,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final RegionCode selected;
-  final ValueChanged<RegionCode> onSelect;
-
-  /// 헤더 사이 간격(겹치지 않게 살짝 띄운다). 토큰이 없어 raw 사용.
-  static const double _gap = 2;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final (index, region) in RegionCode.values.indexed) ...[
-          if (index != 0) const SizedBox(height: _gap),
-          _FilmRollHeader(
-            label: region.filmStripLabel,
-            isSelected: region == selected,
-            onTap: () => onSelect(region),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _FilmRollHeader extends StatelessWidget {
-  const _FilmRollHeader({
     required this.label,
-    required this.isSelected,
-    required this.onTap,
+    required this.opened,
+    this.onTap,
   });
 
   final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final bool opened;
+  final VoidCallback? onTap;
+
+  /// Figma 근사. 토큰 없음.
+  static const double _height = 40;
+
+  /// Figma 근사. 토큰 없음.
+  static const double _labelSize = 16;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        height: 34, // Figma 근사. 토큰 없음.
+        height: _height,
         padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
         decoration: BoxDecoration(
-          color: isSelected
+          color: opened
               ? ChaerokColors.primaryDark
               : ChaerokColors.primaryDark.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(ChaerokRadius.md),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(ChaerokRadius.lg),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 6, // Figma 근사. 토큰 없음.
+              offset: const Offset(0, 3), // Figma 근사. 토큰 없음.
+            ),
+          ],
         ),
         alignment: Alignment.centerLeft,
         child: Row(
           children: [
+            if (opened) ...[
+              const Icon(
+                Icons.keyboard_double_arrow_down_rounded,
+                size: 18, // Figma 근사. 토큰 없음.
+                color: Colors.white,
+              ),
+              const SizedBox(width: ChaerokSpacing.xs),
+            ],
             Expanded(
               child: Text(
                 label,
@@ -74,8 +66,8 @@ class _FilmRollHeader extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
                   fontWeight: FontWeight.w500,
-                  fontSize: 16, // Figma 근사. 토큰 없음.
-                  color: isSelected ? Colors.white : Colors.white70,
+                  fontSize: _labelSize,
+                  color: opened ? Colors.white : Colors.white70,
                 ),
               ),
             ),
