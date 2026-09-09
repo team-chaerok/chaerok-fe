@@ -11,11 +11,13 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     LocationVerificationResult.sessionCache = null;
     LocationVerificationResult.outOfServiceSessionCache = false;
+    LocationVerificationResult.qaLocationDirty = false;
   });
 
   tearDown(() {
     LocationVerificationResult.sessionCache = null;
     LocationVerificationResult.outOfServiceSessionCache = false;
+    LocationVerificationResult.qaLocationDirty = false;
   });
 
   testWidgets('조용한 위치 확인이 서비스 지역 외면 화면 전환 없이 OutOfServiceHomeView를 렌더한다', (

@@ -34,7 +34,8 @@ class MockLocationGate {
   /// 우선순위:
   /// 1. Test Mode가 특정 장소 좌표를 주입 중이면 그 좌표(방문 인증 대상 장소).
   /// 2. Test Mode "공주 진입/이탈" 상태면 공주 대표 지점 좌표.
-  /// 3. 그 외에는 마이/QA에서 선택한 지역·지점 좌표.
+  /// 3. QA에서 임의 좌표 모드를 켜고 위/경도를 입력했으면 그 좌표.
+  /// 4. 그 외에는 마이/QA에서 선택한 지역·지점 좌표.
   ///
   /// 방문 인증 게이트를 실제처럼 통과시키기 위해 `accuracy`는 0이 아니라
   /// [kMockGpsAccuracyMeters]를 쓴다.
@@ -52,6 +53,14 @@ class MockLocationGate {
     }
 
     final preferences = AppPreferences.instance;
+    if (await preferences.isMockCustomLocation()) {
+      final latitude = await preferences.getMockCustomLatitude();
+      final longitude = await preferences.getMockCustomLongitude();
+      if (latitude != null && longitude != null) {
+        return _mockPosition(latitude, longitude);
+      }
+    }
+
     final regionCodeName = await preferences.getMockRegionCodeName();
     final region = RegionCode.values.firstWhere(
       (value) => value.name == regionCodeName,

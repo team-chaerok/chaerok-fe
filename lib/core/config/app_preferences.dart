@@ -5,6 +5,9 @@ const _keyCurrentUserId = 'current_user_id';
 const _keyMockLocationEnabled = 'mock_location_enabled';
 const _keyMockRegionCode = 'mock_region_code';
 const _keyMockSpotIndex = 'mock_spot_index';
+const _keyMockUseCustomLocation = 'mock_use_custom_location';
+const _keyMockCustomLatitude = 'mock_custom_latitude';
+const _keyMockCustomLongitude = 'mock_custom_longitude';
 const _keyIsTester = 'is_tester';
 const _keyDebugOutOfServiceArea = 'debug_out_of_service_area';
 
@@ -65,9 +68,15 @@ class AppPreferences {
     return prefs.getString(_keyMockRegionCode);
   }
 
-  Future<void> setMockRegionCodeName(String regionCodeName) async {
+  /// [regionCodeName]이 null이면 저장 값을 지운다(미설정 → `MockLocationGate`가
+  /// 공주로 폴백). "테스트 상태 초기화"에서 사용.
+  Future<void> setMockRegionCodeName(String? regionCodeName) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyMockRegionCode, regionCodeName);
+    if (regionCodeName == null) {
+      await prefs.remove(_keyMockRegionCode);
+    } else {
+      await prefs.setString(_keyMockRegionCode, regionCodeName);
+    }
   }
 
   /// mock 위치가 가리킬 지점 인덱스(`mockLocationSpots[지역]` 기준). 저장된 값이
@@ -80,6 +89,44 @@ class AppPreferences {
   Future<void> setMockSpotIndex(int index) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyMockSpotIndex, index);
+  }
+
+  /// mock 위치가 지역/지점 테이블 대신 QA에서 직접 입력한 임의 좌표를 쓰는지
+  /// 여부. 서비스 지역 외 좌표까지 QA하기 위한 것으로, 저장된 값이 없으면 false다.
+  Future<bool> isMockCustomLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyMockUseCustomLocation) ?? false;
+  }
+
+  /// QA에서 입력한 임의 위도. 임의 좌표 모드가 꺼지면 null이다.
+  Future<double?> getMockCustomLatitude() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_keyMockCustomLatitude);
+  }
+
+  /// QA에서 입력한 임의 경도. 임의 좌표 모드가 꺼지면 null이다.
+  Future<double?> getMockCustomLongitude() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_keyMockCustomLongitude);
+  }
+
+  /// 임의 좌표 모드를 설정한다. [enabled]가 false면 좌표 값도 함께 지운다.
+  /// [enabled]가 true면 [latitude]/[longitude]가 모두 있어야 한다.
+  Future<void> setMockCustomLocation({
+    required bool enabled,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (enabled && latitude != null && longitude != null) {
+      await prefs.setBool(_keyMockUseCustomLocation, true);
+      await prefs.setDouble(_keyMockCustomLatitude, latitude);
+      await prefs.setDouble(_keyMockCustomLongitude, longitude);
+    } else {
+      await prefs.remove(_keyMockUseCustomLocation);
+      await prefs.remove(_keyMockCustomLatitude);
+      await prefs.remove(_keyMockCustomLongitude);
+    }
   }
 
   /// 서버가 내려준 테스트 계정 여부(`/api/users/me`의 `isTester`). release

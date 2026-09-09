@@ -64,6 +64,39 @@ void main() {
       expect(position.latitude, firstSpot.latitude);
       expect(position.longitude, firstSpot.longitude);
     });
+
+    test('임의 좌표 모드가 켜져 있으면 지역/지점 대신 그 좌표를 반환한다', () async {
+      await AppPreferences.instance.setMockRegionCodeName(
+        RegionCode.buyeo.name,
+      );
+      await AppPreferences.instance.setMockSpotIndex(1);
+      await AppPreferences.instance.setMockCustomLocation(
+        enabled: true,
+        latitude: 37.5547,
+        longitude: 126.9707,
+      );
+
+      final position = await MockLocationGate.currentMockPosition();
+
+      expect(position.latitude, 37.5547);
+      expect(position.longitude, 126.9707);
+      expect(position.accuracy, kMockGpsAccuracyMeters);
+    });
+
+    test('임의 좌표 모드지만 좌표가 없으면 지역/지점 좌표로 폴백한다', () async {
+      await AppPreferences.instance.setMockRegionCodeName(
+        RegionCode.buyeo.name,
+      );
+      await AppPreferences.instance.setMockSpotIndex(1);
+      // enabled=true지만 좌표 미지정 → AppPreferences가 비활성으로 저장한다.
+      await AppPreferences.instance.setMockCustomLocation(enabled: true);
+
+      final position = await MockLocationGate.currentMockPosition();
+      final expected = mockLocationSpots[RegionCode.buyeo]![1];
+
+      expect(position.latitude, expected.latitude);
+      expect(position.longitude, expected.longitude);
+    });
   });
 
   group('Test Mode 연동', () {
@@ -86,6 +119,35 @@ void main() {
     test('"공주 진입" 상태면 공주 대표 지점을 반환한다', () async {
       await AppPreferences.instance.setMockRegionCodeName(
         RegionCode.buyeo.name,
+      );
+      TestModeSession.instance.enterGongju();
+
+      final position = await MockLocationGate.currentMockPosition();
+      final gongjuAnchor = mockLocationSpots[RegionCode.gongju]!.first;
+
+      expect(position.latitude, gongjuAnchor.latitude);
+      expect(position.longitude, gongjuAnchor.longitude);
+    });
+
+    test('좌표 주입은 임의 좌표 모드보다 우선한다', () async {
+      await AppPreferences.instance.setMockCustomLocation(
+        enabled: true,
+        latitude: 37.5547,
+        longitude: 126.9707,
+      );
+      TestModeSession.instance.injectPlace(latitude: 36.5, longitude: 127.1);
+
+      final position = await MockLocationGate.currentMockPosition();
+
+      expect(position.latitude, 36.5);
+      expect(position.longitude, 127.1);
+    });
+
+    test('"공주 진입"은 임의 좌표 모드보다 우선한다', () async {
+      await AppPreferences.instance.setMockCustomLocation(
+        enabled: true,
+        latitude: 37.5547,
+        longitude: 126.9707,
       );
       TestModeSession.instance.enterGongju();
 
