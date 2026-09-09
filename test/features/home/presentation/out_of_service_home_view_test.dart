@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:chaerok/data/models/place_list_response.dart';
+import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
+import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of_service_home_view.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
@@ -48,6 +50,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('서산'), findsOneWidget);
     expect(find.text('S E O S A N'), findsOneWidget);
+  });
+
+  testWidgets('디자인에 없는 우상단 버튼 행(필름 모음/마이페이지)은 렌더하지 않는다', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    expect(find.byType(FilmCollectionButton), findsNothing);
+    expect(find.byType(MyPageButton), findsNothing);
+  });
+
+  testWidgets('겹친 탭 전환은 나머지 두 지역 탭 위치를 유지한다(스와프)', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('서산 필름롤'));
+    await tester.pumpAndSettle();
+
+    // 서산이 열리고 예산이 겹친 탭으로 내려온다.
+    expect(find.text('서산'), findsOneWidget); // 열린 카드 인트로 타이틀
+    expect(find.text('예산 필름롤'), findsOneWidget); // 예산은 이제 겹친 탭
+    // 공주·부여는 그대로 겹친 탭에 남는다.
+    expect(find.text('공주 필름롤'), findsOneWidget);
+    expect(find.text('부여 필름롤'), findsOneWidget);
   });
 
   testWidgets('fetcher가 느리면 로딩 인디케이터', (tester) async {
