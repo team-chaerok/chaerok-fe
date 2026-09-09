@@ -15,6 +15,7 @@ import 'package:chaerok/features/explore/data/bookmark_store.dart';
 import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_result.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:chaerok/shared/widgets/course_map_view.dart';
@@ -370,11 +371,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: const Text('코스 선택', style: ChaerokTypography.titleMedium),
-      ),
+      appBar: const ChaerokAppbar(title: '코스 선택'),
       body: Column(
         children: [
           Padding(

@@ -16,6 +16,7 @@ import 'package:chaerok/features/auth/data/google_auth_service.dart';
 import 'package:chaerok/features/auth/data/kakao_auth_service.dart';
 import 'package:chaerok/features/auth/presentation/login_screen.dart';
 import 'package:chaerok/features/settings/presentation/profile_edit_screen.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 
@@ -153,11 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: const Text('설정', style: ChaerokTypography.titleMedium),
-      ),
+      appBar: const ChaerokAppbar(title: '설정'),
       body: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: ChaerokSpacing.xxl,

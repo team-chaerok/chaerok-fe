@@ -8,6 +8,7 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/api_error.dart';
 import 'package:chaerok/data/models/update_nickname_request.dart';
 import 'package:chaerok/data/remote/users_api.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
 
@@ -96,11 +97,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: const Text('프로필 수정', style: ChaerokTypography.titleMedium),
-      ),
+      appBar: const ChaerokAppbar(title: '프로필 수정'),
       body: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: ChaerokSpacing.xxl,

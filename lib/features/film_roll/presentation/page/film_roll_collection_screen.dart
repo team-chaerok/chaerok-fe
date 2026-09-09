@@ -9,6 +9,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
+import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 
@@ -72,11 +73,7 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: AppBar(
-        backgroundColor: ChaerokColors.background,
-        elevation: 0,
-        title: const Text('필름 컬렉션', style: ChaerokTypography.titleMedium),
-      ),
+      appBar: const ChaerokAppbar(title: '필름 컬렉션'),
       body: _buildBody(),
     );
   }
