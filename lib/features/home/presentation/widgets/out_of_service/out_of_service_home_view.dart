@@ -6,8 +6,11 @@ import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/resolve_region_request.dart';
 import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
+import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
+import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_deck.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
+import 'package:chaerok/features/settings/presentation/test_card_screen.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 
@@ -124,18 +127,45 @@ class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
       body: SafeArea(
-        child: RegionFilmDeck(
-          deckOrder: _deckOrder,
-          dataByRegion: {
-            for (final region in RegionCode.values)
-              region: (
-                status: _cache[region]?.status ?? RegionLoadStatus.loading,
-                places: _cache[region]?.places ?? const <PlaceListResponse>[],
+        child: Column(
+          children: [
+            // 하단 네비에서 없앤 필름 모음·마이페이지로 가는 유일한 진입점.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const FilmCollectionButton(),
+                const MyPageButton(),
+                IconButton(
+                  onPressed: () => unawaited(
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const TestCardScreen(),
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.abc_outlined),
+                ),
+              ],
+            ),
+            Expanded(
+              child: RegionFilmDeck(
+                deckOrder: _deckOrder,
+                dataByRegion: {
+                  for (final region in RegionCode.values)
+                    region: (
+                      status:
+                          _cache[region]?.status ?? RegionLoadStatus.loading,
+                      places:
+                          _cache[region]?.places ?? const <PlaceListResponse>[],
+                    ),
+                },
+                onOpen: _onOpenRegion,
+                onRetry: (region) =>
+                    unawaited(_ensureLoaded(region, force: true)),
+                onExploreRegionRequested: widget.onExploreRegionRequested,
               ),
-          },
-          onOpen: _onOpenRegion,
-          onRetry: (region) => unawaited(_ensureLoaded(region, force: true)),
-          onExploreRegionRequested: widget.onExploreRegionRequested,
+            ),
+          ],
         ),
       ),
     );

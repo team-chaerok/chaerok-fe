@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:chaerok/data/models/place_list_response.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/shared/region/region_code.dart';
@@ -47,6 +46,10 @@ class _RegionFilmDeckState extends State<RegionFilmDeck>
   static const double _tiltRadians = 15 * math.pi / 180; // 뒤로 눕는 각
   static const double _staggerFraction = 170 / 320; // 수신 카드 진입 지연 비율
   static const double _advancePop = (1 - _recedeScaleMin) * 0.45; // 수신 카드 미세 팝
+
+  /// 겹친 카드가 아래로 밀리는 y 간격. 폴더 탭(36) + 사진 슬라이스가 보이도록
+  /// 탭 높이보다 넉넉히 준다. 토큰 없음.
+  static const double _peek = 96;
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -102,7 +105,7 @@ class _RegionFilmDeckState extends State<RegionFilmDeck>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const peek = FilmTab.tabHeight;
+        const peek = _peek;
         final maxHeight = constraints.hasBoundedHeight
             ? constraints.maxHeight
             : 600.0;

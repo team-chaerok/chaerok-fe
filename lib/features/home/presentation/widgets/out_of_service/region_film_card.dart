@@ -7,6 +7,8 @@ import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_c
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_palette.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_photo.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_place_strip.dart';
 import 'package:chaerok/shared/region/region_code.dart';
@@ -45,19 +47,42 @@ class RegionFilmCard extends StatelessWidget {
   /// 겹친 탭을 눌렀을 때. 열린 카드는 null.
   final VoidCallback? onTabTap;
 
+  /// 겹친 카드 본문 오른쪽 위에 깔리는 지역 사진 스트립 크기. 폴더 탭이
+  /// 튀어나오는 높이([FilmTab.tabHeight]) 아래, 즉 본문 영역에 놓아 폴더
+  /// 클리핑에 잘리지 않게 한다. 열린 카드에는 없다. 토큰 없음.
+  static const double _photoStripWidth = 88;
+  static const double _photoStripHeight = 148;
+
   @override
   Widget build(BuildContext context) {
     return FilmCardFrame(
       elevated: opened,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      folderTop: true,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          FilmTab(
-            label: region.filmStripLabel,
-            opened: opened,
-            onTap: onTabTap,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilmTab(
+                label: region.filmStripLabel,
+                opened: opened,
+                color: region.filmTabColor,
+                onTap: onTabTap,
+              ),
+              Expanded(child: opened ? _content() : const SizedBox.shrink()),
+            ],
           ),
-          Expanded(child: opened ? _content() : const SizedBox.shrink()),
+          // 열린 카드는 본문이 꽉 차므로 사진 스트립을 두지 않는다. 겹쳐서
+          // 탭 + 사진 슬라이스만 보이는 카드에서만 본문 오른쪽 위에 깐다.
+          if (!opened)
+            Positioned(
+              top: FilmTab.tabHeight,
+              right: 0,
+              width: _photoStripWidth,
+              height: _photoStripHeight,
+              child: IgnorePointer(child: RegionFilmPhoto(region: region)),
+            ),
         ],
       ),
     );
@@ -114,34 +139,55 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: ChaerokSpacing.xxl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
-            child: _RegionIntro(region: region),
+    return ColoredBox(
+      // 지역 색을 본문 바탕에 아주 옅게 깐다. 인트로 텍스트가 어두운색이라
+      // alpha는 낮게 유지한다(진하게 하려면 이 값을 올린다).
+      color: region.filmTabColor.withValues(alpha: 0.08),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: ChaerokSpacing.xxl),
+        child: Container(
+          decoration: BoxDecoration(color: region.filmTabColor),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: ChaerokColors.background,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(ChaerokRadius.lg),
+                topRight: Radius.circular(ChaerokRadius.lg),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ChaerokSpacing.md,
+                  ),
+                  child: _RegionIntro(region: region),
+                ),
+                const SizedBox(height: ChaerokSpacing.md),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ChaerokSpacing.md,
+                  ),
+                  child: _HashtagRow(tags: region.guide.hashtags),
+                ),
+                const SizedBox(height: ChaerokSpacing.lg),
+                RegionCarousel(places: places),
+                const SizedBox(height: ChaerokSpacing.lg),
+                RecommendedCourseBanner(
+                  region: region,
+                  onTap: () => onExploreRegionRequested(region),
+                ),
+                const SizedBox(height: ChaerokSpacing.xl),
+                RegionPlaceStrip(
+                  region: region,
+                  places: places,
+                  onSeeAll: () => onExploreRegionRequested(region),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: ChaerokSpacing.md),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
-            child: _HashtagRow(tags: region.guide.hashtags),
-          ),
-          const SizedBox(height: ChaerokSpacing.lg),
-          RegionCarousel(places: places),
-          const SizedBox(height: ChaerokSpacing.lg),
-          RecommendedCourseBanner(
-            region: region,
-            onTap: () => onExploreRegionRequested(region),
-          ),
-          const SizedBox(height: ChaerokSpacing.xl),
-          RegionPlaceStrip(
-            region: region,
-            places: places,
-            onSeeAll: () => onExploreRegionRequested(region),
-          ),
-        ],
+        ),
       ),
     );
   }
