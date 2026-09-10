@@ -1,9 +1,8 @@
 import 'package:chaerok/data/models/place_list_response.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/folder_card_shape.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_card.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_photo.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_place_strip.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
@@ -144,21 +143,20 @@ void main() {
       expect(find.text('예산 필름롤'), findsOneWidget);
     });
 
-    testWidgets('열린 카드에는 사진 스트립을 두지 않는다', (tester) async {
+    testWidgets('열린 카드에는 지역 사진 자리를 두지 않는다', (tester) async {
       await tester.pumpWidget(host(status: RegionLoadStatus.ready));
-      expect(find.byType(RegionFilmPhoto), findsNothing);
+      expect(find.byKey(RegionFilmCard.photoSlotKey), findsNothing);
     });
 
-    testWidgets('겹친 탭 카드는 본문 오른쪽 위에 지역 사진 스트립을 렌더한다', (tester) async {
+    testWidgets('겹친 탭 카드는 본문 오른쪽 위에 지역 사진 자리를 렌더한다', (tester) async {
       await tester.pumpWidget(
         host(status: RegionLoadStatus.ready, opened: false),
       );
-      // 에셋이 아직 없어도 폴백(지역색 블록)으로 그려진다.
-      expect(find.byType(RegionFilmPhoto), findsOneWidget);
-      final rect = tester.getRect(find.byType(RegionFilmPhoto));
+      expect(find.byKey(RegionFilmCard.photoSlotKey), findsOneWidget);
+      final rect = tester.getRect(find.byKey(RegionFilmCard.photoSlotKey));
       final cardRect = tester.getRect(find.byType(RegionFilmCard));
-      // 폴더 탭 높이만큼 내려온 본문 영역 상단에 붙는다(폴더 클리핑에 안 잘리게).
-      expect(rect.top, closeTo(cardRect.top + FilmTab.tabHeight, 1));
+      // 폴더 탭 돌출 높이만큼 내려온 본문 영역 상단에 붙는다(폴더 클리핑에 안 잘리게).
+      expect(rect.top, closeTo(cardRect.top + FolderCardClipper.cardTop, 1));
       expect(rect.right, lessThanOrEqualTo(cardRect.right)); // 오른쪽에 있다
       expect(rect.left, greaterThan(cardRect.center.dx)); // 왼쪽 절반은 비운다
     });

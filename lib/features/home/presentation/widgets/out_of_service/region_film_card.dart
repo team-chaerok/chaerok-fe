@@ -3,8 +3,7 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_card_frame.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/folder_card_shape.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_palette.dart';
@@ -21,12 +20,10 @@ const BorderRadius _bodyTopRadius = BorderRadius.vertical(
   top: Radius.circular(ChaerokRadius.lg),
 );
 
-/// 필름롤 스택의 카드 한 장. 상단 탭 + 지역 상세 본문을 필름 프레임
-/// ([FilmCardFrame]) 안에 담는다. 본문은 카드 내부에서 스크롤되며,
-/// [status]에 따라 로딩/에러/빈값/본문을 그린다.
-///
-/// [opened]가 맨 앞(열린) 카드 여부다. 겹쳐서 가려지는 카드는 [opened]를
-/// false로 줘 탭만 그리고, 그 탭을 누르면 [onTabTap]으로 전환을 요청한다.
+/// 필름롤 스택의 폴더 탭 카드 한 장([FolderCardClipper]로 클리핑).
+/// [opened]면 탭 아래 본문 영역에 [RegionDetailBody]를, 아니면 지역 사진을
+/// 오른쪽 위에 깐다. 탭(왼쪽 위)에는 "{지역} 필름롤" 라벨만 얹는다.
+/// 탭 여부에 따른 터치 처리는 부모([RegionFilmDeck])가 카드 전체를 감싼다.
 class RegionFilmCard extends StatelessWidget {
   const RegionFilmCard({
     super.key,
@@ -36,7 +33,6 @@ class RegionFilmCard extends StatelessWidget {
     required this.onRetry,
     required this.onExploreRegionRequested,
     this.opened = true,
-    this.onTabTap,
   });
 
   final RegionCode region;
@@ -45,61 +41,76 @@ class RegionFilmCard extends StatelessWidget {
   final VoidCallback onRetry;
   final ValueChanged<RegionCode> onExploreRegionRequested;
 
-  /// 스택 맨 앞(열린) 카드인지. 탭 강조·펼침 아이콘·그림자에 반영되고,
-  /// false면 본문 없이 탭만 그린다(뒤에서 가려지는 카드).
+  /// 스택 맨 앞(열린) 카드인지. false면 본문 대신 지역 사진만 얹는다.
   final bool opened;
 
-  /// 겹친 탭을 눌렀을 때. 열린 카드는 null.
-  final VoidCallback? onTabTap;
+  /// 겹친 카드 오른쪽 위 지역 사진 자리 크기. 폴더 탭이 튀어나오는 높이
+  /// ([FolderCardClipper.cardTop]) 아래, 즉 본문 영역에 둔다. 토큰 없음.
+  static const double _photoWidth = 150;
+  static const double _photoHeight = 80;
 
-  /// 겹친 카드 본문 오른쪽 위에 깔리는 지역 사진 스트립 크기. 폴더 탭이
-  /// 튀어나오는 높이([FilmTab.tabHeight]) 아래, 즉 본문 영역에 놓아 폴더
-  /// 클리핑에 잘리지 않게 한다. 열린 카드에는 없다. 토큰 없음.
-  static const double _photoStripWidth = 88;
-  static const double _photoStripHeight = 148;
+  /// 지역 사진 자리 위젯의 key(테스트/추후 교체용).
+  static const Key photoSlotKey = Key('regionFilmPhotoSlot');
+
+  /// 탭 라벨 위치. 토큰 없음.
+  static const double _labelTop = 6;
 
   @override
   Widget build(BuildContext context) {
-    return FilmCardFrame(
-      elevated: opened,
-      folderTop: true,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FilmTab(
-                label: region.filmStripLabel,
-                opened: opened,
-                color: region.filmTabColor,
-                onTap: onTabTap,
+    return CustomPaint(
+      painter: FolderCardShadowPainter(elevation: opened ? 8 : 3),
+      child: ClipPath(
+        clipper: const FolderCardClipper(),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: region.filmTabColor),
+            if (opened)
+              Positioned(
+                top: FolderCardClipper.cardTop,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: ColoredBox(
+                  color: ChaerokColors.primaryLight,
+                  child: RegionDetailBody(
+                    region: region,
+                    status: status,
+                    places: places,
+                    onRetry: onRetry,
+                    onExploreRegionRequested: onExploreRegionRequested,
+                  ),
+                ),
+              )
+            else
+              // 에셋(assets/images/regions/{region}.webp)이 아직 없으면
+              // RegionFilmPhoto가 지역색 블록으로 폴백한다.
+              Positioned(
+                top: FolderCardClipper.cardTop,
+                right: 0,
+                width: _photoWidth,
+                height: _photoHeight,
+                child: RegionFilmPhoto(key: photoSlotKey, region: region),
               ),
-              Expanded(child: opened ? _content() : const SizedBox.shrink()),
-            ],
-          ),
-          // 열린 카드는 본문이 꽉 차므로 사진 스트립을 두지 않는다. 겹쳐서
-          // 탭 + 사진 슬라이스만 보이는 카드에서만 본문 오른쪽 위에 깐다.
-          if (!opened)
             Positioned(
-              top: FilmTab.tabHeight,
-              right: 0,
-              width: _photoStripWidth,
-              height: _photoStripHeight,
-              child: IgnorePointer(child: RegionFilmPhoto(region: region)),
+              left: ChaerokSpacing.md,
+              top: _labelTop,
+              child: Text(
+                region.filmStripLabel,
+                style: TextStyle(
+                  fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16, // Figma 근사. 토큰 없음.
+                  color: opened ? Colors.white : Colors.white70,
+                ),
+              ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
-
-  Widget _content() => RegionDetailBody(
-    region: region,
-    status: status,
-    places: places,
-    onRetry: onRetry,
-    onExploreRegionRequested: onExploreRegionRequested,
-  );
 }
 
 /// 열린 필름롤 카드의 본문. [status]에 따라 로딩/에러/빈값/상세를 그린다.
@@ -248,6 +259,7 @@ class _RegionIntro extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: ChaerokSpacing.lg),
         Text(
           guide.romanized,
           style: ChaerokTypography.caption.copyWith(
@@ -255,12 +267,11 @@ class _RegionIntro extends StatelessWidget {
             letterSpacing: 2,
           ),
         ),
-        const SizedBox(height: ChaerokSpacing.xxs),
         Text(
           region.displayName,
           style: const TextStyle(
             fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
-            fontWeight: FontWeight.w600, // pubspec Jeongnimsaji-L
+            fontWeight: FontWeight.w500, // pubspec Jeongnimsaji-L
             fontSize: 36, // Figma 36px 타이틀. 토큰 없음.
             color: ChaerokColors.primaryDark,
           ),

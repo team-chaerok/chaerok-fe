@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:chaerok/data/models/place_list_response.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/folder_card_shape.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/shared/region/region_code.dart';
@@ -47,9 +48,11 @@ class _RegionFilmDeckState extends State<RegionFilmDeck>
   static const double _staggerFraction = 170 / 320; // 수신 카드 진입 지연 비율
   static const double _advancePop = (1 - _recedeScaleMin) * 0.45; // 수신 카드 미세 팝
 
-  /// 겹친 카드가 아래로 밀리는 y 간격. 폴더 탭(36) + 사진 슬라이스가 보이도록
-  /// 탭 높이보다 넉넉히 준다. 토큰 없음.
-  static const double _peek = 96;
+  /// 겹친 카드가 아래로 밀리는 y 간격 = 폴더 탭 돌출 높이.
+  static const double _peek = FolderCardClipper.cardTop;
+
+  /// 뒤 카드일수록 좌우로 더 좁아지는 폭(슬롯당).
+  static const double _hInsetStep = 4;
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -116,6 +119,7 @@ class _RegionFilmDeckState extends State<RegionFilmDeck>
           builder: (context, _) {
             final swapping = _incoming != null && _controller.value < 1;
             return Stack(
+              clipBehavior: Clip.none,
               children: [
                 for (final region in widget.deckOrder)
                   _card(
@@ -170,10 +174,13 @@ class _RegionFilmDeckState extends State<RegionFilmDeck>
       }
     }
 
+    // 뒤 카드일수록 좌우로 좁아진다. slot이 소수여도 부드럽게 이어진다.
+    final hInset = (widget.deckOrder.length - 1 - slot) * _hInsetStep;
+
     return Positioned(
       key: ValueKey<RegionCode>(region),
-      left: 0,
-      right: 0,
+      left: hInset,
+      right: hInset,
       top: slot * peek,
       height: cardHeight,
       child: Transform(
@@ -183,17 +190,19 @@ class _RegionFilmDeckState extends State<RegionFilmDeck>
         transform: Matrix4.identity()
           ..rotateX(tilt)
           ..scaleByDouble(scale, scale, 1, 1),
-        child: RegionFilmCard(
-          region: region,
-          status:
-              widget.dataByRegion[region]?.status ?? RegionLoadStatus.loading,
-          places:
-              widget.dataByRegion[region]?.places ??
-              const <PlaceListResponse>[],
-          onRetry: () => widget.onRetry(region),
-          onExploreRegionRequested: widget.onExploreRegionRequested,
-          opened: open,
-          onTabTap: open || locked ? null : () => widget.onOpen(region),
+        child: GestureDetector(
+          onTap: open || locked ? null : () => widget.onOpen(region),
+          child: RegionFilmCard(
+            region: region,
+            status:
+                widget.dataByRegion[region]?.status ?? RegionLoadStatus.loading,
+            places:
+                widget.dataByRegion[region]?.places ??
+                const <PlaceListResponse>[],
+            onRetry: () => widget.onRetry(region),
+            onExploreRegionRequested: widget.onExploreRegionRequested,
+            opened: open,
+          ),
         ),
       ),
     );

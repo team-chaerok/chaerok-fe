@@ -10,7 +10,6 @@ import 'package:chaerok/features/home/presentation/widgets/film_collection_butto
 import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_deck.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
-import 'package:chaerok/features/settings/presentation/test_card_screen.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 
@@ -130,22 +129,9 @@ class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
         child: Column(
           children: [
             // 하단 네비에서 없앤 필름 모음·마이페이지로 가는 유일한 진입점.
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const FilmCollectionButton(),
-                const MyPageButton(),
-                IconButton(
-                  onPressed: () => unawaited(
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const TestCardScreen(),
-                      ),
-                    ),
-                  ),
-                  icon: const Icon(Icons.abc_outlined),
-                ),
-              ],
+              children: [FilmCollectionButton(), MyPageButton()],
             ),
             Expanded(
               child: RegionFilmDeck(
