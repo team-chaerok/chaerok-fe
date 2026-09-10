@@ -16,6 +16,11 @@ import 'package:chaerok/shared/region/region_guide.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 
+/// 스크롤되는 본문(크림 영역) 상단 좌우 모서리 반경.
+const BorderRadius _bodyTopRadius = BorderRadius.vertical(
+  top: Radius.circular(ChaerokRadius.lg),
+);
+
 /// 필름롤 스택의 카드 한 장. 상단 탭 + 지역 상세 본문을 필름 프레임
 /// ([FilmCardFrame]) 안에 담는다. 본문은 카드 내부에서 스크롤되며,
 /// [status]에 따라 로딩/에러/빈값/본문을 그린다.
@@ -88,12 +93,58 @@ class RegionFilmCard extends StatelessWidget {
     );
   }
 
+  Widget _content() => RegionDetailBody(
+    region: region,
+    status: status,
+    places: places,
+    onRetry: onRetry,
+    onExploreRegionRequested: onExploreRegionRequested,
+  );
+}
+
+/// 열린 필름롤 카드의 본문. [status]에 따라 로딩/에러/빈값/상세를 그린다.
+/// 프레임·탭 없이 본문만 담당하므로 다른 컨테이너 안에서도 재사용할 수 있다.
+class RegionDetailBody extends StatelessWidget {
+  const RegionDetailBody({
+    super.key,
+    required this.region,
+    required this.status,
+    required this.places,
+    required this.onRetry,
+    required this.onExploreRegionRequested,
+  });
+
+  final RegionCode region;
+  final RegionLoadStatus status;
+  final List<PlaceListResponse> places;
+  final VoidCallback onRetry;
+  final ValueChanged<RegionCode> onExploreRegionRequested;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      // 배경(오버스크롤로 당겼을 때 드러나는 색) = 폴더 카드 색. 여긴 라운드 없음.
+      decoration: BoxDecoration(color: region.filmTabColor),
+      child: _content(),
+    );
+  }
+
+  /// 로딩/에러/빈값 상태를 감싸는 크림 표면. 스크롤되는 본문과 똑같이 상단
+  /// 좌우 모서리만 [_bodyTopRadius]로 둥글게.
+  Widget _surface({required Widget child}) => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: ChaerokColors.primaryLight,
+      borderRadius: _bodyTopRadius,
+    ),
+    child: Center(child: child),
+  );
+
   Widget _content() {
     switch (status) {
       case RegionLoadStatus.loading:
-        return const Center(child: ChaerokLoadingIndicator());
+        return _surface(child: const ChaerokLoadingIndicator());
       case RegionLoadStatus.error:
-        return Center(
+        return _surface(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -110,8 +161,8 @@ class RegionFilmCard extends StatelessWidget {
         );
       case RegionLoadStatus.ready:
         if (places.isEmpty) {
-          return const Center(
-            child: Text(
+          return _surface(
+            child: const Text(
               '이 지역의 장소 정보가 없어요',
               style: ChaerokTypography.bodyMedium,
             ),
@@ -139,53 +190,46 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      // 지역 색을 본문 바탕에 아주 옅게 깐다. 인트로 텍스트가 어두운색이라
-      // alpha는 낮게 유지한다(진하게 하려면 이 값을 올린다).
-      color: region.filmTabColor.withValues(alpha: 0.08),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: ChaerokSpacing.xxl),
-        child: Container(
-          decoration: BoxDecoration(color: region.filmTabColor),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: ChaerokColors.background,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(ChaerokRadius.lg),
-                topRight: Radius.circular(ChaerokRadius.lg),
+    return SingleChildScrollView(
+      // 크림 바탕은 스크롤 내용과 함께 움직인다. 아래로 당기면 그 뒤의
+      // 지역 색이 드러난다(RegionDetailBody 참고). 상단 좌우만 라운드.
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: ChaerokColors.primaryLight,
+          borderRadius: _bodyTopRadius,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: ChaerokSpacing.xxl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ChaerokSpacing.md,
+                ),
+                child: _RegionIntro(region: region),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ChaerokSpacing.md,
-                  ),
-                  child: _RegionIntro(region: region),
+              const SizedBox(height: ChaerokSpacing.md),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ChaerokSpacing.md,
                 ),
-                const SizedBox(height: ChaerokSpacing.md),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ChaerokSpacing.md,
-                  ),
-                  child: _HashtagRow(tags: region.guide.hashtags),
-                ),
-                const SizedBox(height: ChaerokSpacing.lg),
-                RegionCarousel(places: places),
-                const SizedBox(height: ChaerokSpacing.lg),
-                RecommendedCourseBanner(
-                  region: region,
-                  onTap: () => onExploreRegionRequested(region),
-                ),
-                const SizedBox(height: ChaerokSpacing.xl),
-                RegionPlaceStrip(
-                  region: region,
-                  places: places,
-                  onSeeAll: () => onExploreRegionRequested(region),
-                ),
-              ],
-            ),
+                child: _HashtagRow(tags: region.guide.hashtags),
+              ),
+              const SizedBox(height: ChaerokSpacing.lg),
+              RegionCarousel(places: places),
+              const SizedBox(height: ChaerokSpacing.lg),
+              RecommendedCourseBanner(
+                region: region,
+                onTap: () => onExploreRegionRequested(region),
+              ),
+              const SizedBox(height: ChaerokSpacing.xl),
+              RegionPlaceStrip(
+                region: region,
+                places: places,
+                onSeeAll: () => onExploreRegionRequested(region),
+              ),
+            ],
           ),
         ),
       ),
