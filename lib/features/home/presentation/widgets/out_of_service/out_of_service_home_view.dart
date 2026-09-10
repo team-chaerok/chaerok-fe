@@ -8,8 +8,8 @@ import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/data/remote/regions_api.dart';
 import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_detail_panel.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_strip.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_deck.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 
@@ -31,7 +31,8 @@ Future<int> defaultRegionIdResolver(RegionCode region) async {
 }
 
 /// 충청남도 외 지역 사용자에게 보여주는 홈 화면.
-/// 상단 필름롤 아코디언으로 4개 지역을 전환하며 지역별 장소를 둘러본다.
+/// 상단 필름롤 스택([RegionFilmDeck])에서 4개 지역을 전환하며 지역별 장소를
+/// 둘러본다. 열린 카드가 뷰포트를 채우고, 나머지 지역은 위에 탭만 겹친다.
 class OutOfServiceHomeView extends StatefulWidget {
   const OutOfServiceHomeView({
     super.key,
@@ -51,8 +52,11 @@ class OutOfServiceHomeView extends StatefulWidget {
 class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
   static const _tag = 'OutOfServiceHomeView';
 
-  /// Figma 기본 노출 지역(15-521).
-  RegionCode _selected = RegionCode.yesan;
+  /// 필름롤 덱 순서. 맨 뒤 원소가 "열린" 카드이고, 나머지는 위에 탭만 겹친다.
+  /// 초기값은 Figma 기준(공주·부여·서산 탭 + 예산 열림 = `RegionCode.values` 순서).
+  List<RegionCode> _deckOrder = RegionCode.values.toList();
+
+  RegionCode get _open => _deckOrder.last;
 
   final Map<RegionCode, _RegionData> _cache = {};
 
@@ -63,7 +67,7 @@ class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
   @override
   void initState() {
     super.initState();
-    unawaited(_ensureLoaded(_selected));
+    unawaited(_ensureLoaded(_open));
   }
 
   Future<void> _ensureLoaded(RegionCode region, {bool force = false}) async {
@@ -104,35 +108,46 @@ class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
     }
   }
 
-  void _onSelect(RegionCode region) {
-    if (region == _selected) return;
-    setState(() => _selected = region);
+  /// 겹친 탭 탭 → 그 지역과 현재 열린 지역의 덱 슬롯을 스위치한다.
+  /// 나머지 두 지역의 위치는 유지된다.
+  void _onOpenRegion(RegionCode region) {
+    if (region == _open) return;
+    final next = [..._deckOrder];
+    final tappedIndex = next.indexOf(region);
+    final openIndex = next.length - 1;
+    next[tappedIndex] = next[openIndex];
+    next[openIndex] = region;
+    setState(() => _deckOrder = next);
     unawaited(_ensureLoaded(region));
   }
 
   @override
   Widget build(BuildContext context) {
-    final data =
-        _cache[_selected] ??
-        const _RegionData(status: RegionLoadStatus.loading);
-
     return Scaffold(
       backgroundColor: ChaerokColors.background,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 하단 네비에서 없앤 필름 모음·마이페이지로 가는 유일한 진입점.
             const Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [FilmCollectionButton(), MyPageButton()],
             ),
-            RegionFilmStrip(selected: _selected, onSelect: _onSelect),
             Expanded(
-              child: RegionDetailPanel(
-                region: _selected,
-                status: data.status,
-                places: data.places,
-                onRetry: () => _ensureLoaded(_selected, force: true),
+              child: RegionFilmDeck(
+                deckOrder: _deckOrder,
+                dataByRegion: {
+                  for (final region in RegionCode.values)
+                    region: (
+                      status:
+                          _cache[region]?.status ?? RegionLoadStatus.loading,
+                      places:
+                          _cache[region]?.places ?? const <PlaceListResponse>[],
+                    ),
+                },
+                onOpen: _onOpenRegion,
+                onRetry: (region) =>
+                    unawaited(_ensureLoaded(region, force: true)),
                 onExploreRegionRequested: widget.onExploreRegionRequested,
               ),
             ),

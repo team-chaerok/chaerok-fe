@@ -69,7 +69,7 @@ class RegionPlaceStrip extends StatelessWidget {
         ),
         const SizedBox(height: ChaerokSpacing.sm),
         SizedBox(
-          height: 150, // 이미지 81 + 텍스트 2줄. Figma 근사, 토큰 없음.
+          height: 150,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
@@ -109,15 +109,30 @@ class _PlaceCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(ChaerokRadius.lg),
-                topRight: Radius.circular(ChaerokRadius.lg),
+            DecoratedBox(
+              // 그림자는 클리핑 밖에 있어야 잘리지 않는다(ClipRRect는 자식을 자름).
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(ChaerokRadius.lg),
+                  topRight: Radius.circular(ChaerokRadius.lg),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 10,
+                  ),
+                ],
               ),
-              child: SizedBox(
-                height: RegionPlaceStrip._imageHeight,
-                width: double.infinity,
-                child: PlaceImage(imageUrl: place.firstImageUrl, mood: mood),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(ChaerokRadius.lg),
+                  topRight: Radius.circular(ChaerokRadius.lg),
+                ),
+                child: SizedBox(
+                  height: RegionPlaceStrip._imageHeight,
+                  width: double.infinity,
+                  child: PlaceImage(imageUrl: place.firstImageUrl, mood: mood),
+                ),
               ),
             ),
             const SizedBox(height: ChaerokSpacing.xxs),
