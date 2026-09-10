@@ -52,11 +52,11 @@ void main() {
     expect(find.text('S E O S A N'), findsOneWidget);
   });
 
-  testWidgets('디자인에 없는 우상단 버튼 행(필름 모음/마이페이지)은 렌더하지 않는다', (tester) async {
+  testWidgets('우측 상단에 필름 모음·마이페이지 진입 버튼을 노출한다', (tester) async {
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    expect(find.byType(FilmCollectionButton), findsNothing);
-    expect(find.byType(MyPageButton), findsNothing);
+    expect(find.byType(FilmCollectionButton), findsOneWidget);
+    expect(find.byType(MyPageButton), findsOneWidget);
   });
 
   testWidgets('겹친 탭 전환은 나머지 두 지역 탭 위치를 유지한다(스와프)', (tester) async {

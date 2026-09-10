@@ -1,7 +1,9 @@
 import 'package:chaerok/data/models/place_list_response.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/film_tab.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_card.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_photo.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_load_status.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_place_strip.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
@@ -119,6 +121,7 @@ void main() {
     Widget host({
       required RegionLoadStatus status,
       List<PlaceListResponse> places = const [],
+      bool opened = true,
       VoidCallback? onRetry,
       ValueChanged<RegionCode>? onExplore,
     }) {
@@ -128,6 +131,7 @@ void main() {
             region: RegionCode.yesan,
             status: status,
             places: places,
+            opened: opened,
             onRetry: onRetry ?? () {},
             onExploreRegionRequested: onExplore ?? (_) {},
           ),
@@ -138,6 +142,25 @@ void main() {
     testWidgets('열린 카드는 지역 필름롤 탭 라벨을 보여준다', (tester) async {
       await tester.pumpWidget(host(status: RegionLoadStatus.loading));
       expect(find.text('예산 필름롤'), findsOneWidget);
+    });
+
+    testWidgets('열린 카드에는 사진 스트립을 두지 않는다', (tester) async {
+      await tester.pumpWidget(host(status: RegionLoadStatus.ready));
+      expect(find.byType(RegionFilmPhoto), findsNothing);
+    });
+
+    testWidgets('겹친 탭 카드는 본문 오른쪽 위에 지역 사진 스트립을 렌더한다', (tester) async {
+      await tester.pumpWidget(
+        host(status: RegionLoadStatus.ready, opened: false),
+      );
+      // 에셋이 아직 없어도 폴백(지역색 블록)으로 그려진다.
+      expect(find.byType(RegionFilmPhoto), findsOneWidget);
+      final rect = tester.getRect(find.byType(RegionFilmPhoto));
+      final cardRect = tester.getRect(find.byType(RegionFilmCard));
+      // 폴더 탭 높이만큼 내려온 본문 영역 상단에 붙는다(폴더 클리핑에 안 잘리게).
+      expect(rect.top, closeTo(cardRect.top + FilmTab.tabHeight, 1));
+      expect(rect.right, lessThanOrEqualTo(cardRect.right)); // 오른쪽에 있다
+      expect(rect.left, greaterThan(cardRect.center.dx)); // 왼쪽 절반은 비운다
     });
 
     testWidgets('loading이면 인디케이터', (tester) async {
