@@ -68,19 +68,24 @@ class RegionPlaceStrip extends StatelessWidget {
           ),
         ),
         const SizedBox(height: ChaerokSpacing.sm),
-        SizedBox(
-          height: 150,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
-            itemCount: visible.length,
-            separatorBuilder: (_, _) =>
-                const SizedBox(width: ChaerokSpacing.sm),
-            itemBuilder: (context, index) => _PlaceCard(
-              place: visible[index],
-              mood: PlacePlaceholderMood
-                  .values[index % PlacePlaceholderMood.values.length],
-              onTap: onSeeAll,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: SizedBox(
+            height: 150,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChaerokSpacing.md,
+              ),
+              itemCount: visible.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(width: ChaerokSpacing.sm),
+              itemBuilder: (context, index) => _PlaceCard(
+                place: visible[index],
+                mood: PlacePlaceholderMood
+                    .values[index % PlacePlaceholderMood.values.length],
+                onTap: onSeeAll,
+              ),
             ),
           ),
         ),
@@ -104,26 +109,27 @@ class _PlaceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
+      child: Container(
         width: RegionPlaceStrip._cardWidth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DecoratedBox(
-              // 그림자는 클리핑 밖에 있어야 잘리지 않는다(ClipRRect는 자식을 자름).
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(ChaerokRadius.lg),
-                  topRight: Radius.circular(ChaerokRadius.lg),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 10,
-                  ),
-                ],
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: DecoratedBox(
+          // 카드와 배경이 같은 색이라 경계가 안 보여, 카드 전체(이미지+텍스트)에
+          // 드롭 섀도우를 얹어 구분한다. 그림자는 클리핑 밖에 있어야 잘리지
+          // 않으므로 ClipRRect 바깥(카드 전체를 감싸는 이 DecoratedBox)에 둔다.
+          decoration: BoxDecoration(
+            color: ChaerokColors.primaryLight,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 10,
               ),
-              child: ClipRRect(
+            ],
+            borderRadius: BorderRadius.circular(ChaerokRadius.lg),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(ChaerokRadius.lg),
                   topRight: Radius.circular(ChaerokRadius.lg),
@@ -134,38 +140,38 @@ class _PlaceCard extends StatelessWidget {
                   child: PlaceImage(imageUrl: place.firstImageUrl, mood: mood),
                 ),
               ),
-            ),
-            const SizedBox(height: ChaerokSpacing.xxs),
-            Row(
-              children: [
-                const Icon(
-                  Icons.place,
-                  size: ChaerokSpacing.sm,
-                  color: ChaerokColors.primaryDark,
-                ),
-                const SizedBox(width: 2), // 아이콘-텍스트 최소 간격. 토큰 없음.
-                Expanded(
-                  child: Text(
-                    place.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: ChaerokTypography.caption.copyWith(
-                      fontWeight: FontWeight.w700,
+              const SizedBox(height: ChaerokSpacing.xxs),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.place,
+                    size: ChaerokSpacing.sm,
+                    color: ChaerokColors.primaryDark,
+                  ),
+                  const SizedBox(width: 2), // 아이콘-텍스트 최소 간격. 토큰 없음.
+                  Expanded(
+                    child: Text(
+                      place.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ChaerokTypography.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            Text(
-              PlaceExternalCategory.displayLabel(place.categoryDetail),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: ChaerokTypography.caption.copyWith(
-                color: ChaerokColors.textSecondary,
-                fontSize: 10, // Figma 8px 근사, 가독성 위해 10. 토큰 없음.
+                ],
               ),
-            ),
-          ],
+              Text(
+                PlaceExternalCategory.displayLabel(place.categoryDetail),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ChaerokTypography.caption.copyWith(
+                  color: ChaerokColors.textSecondary,
+                  fontSize: 10, // Figma 8px 근사, 가독성 위해 10. 토큰 없음.
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
