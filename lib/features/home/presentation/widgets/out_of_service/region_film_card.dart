@@ -102,7 +102,11 @@ class RegionFilmCard extends StatelessWidget {
                   fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
                   fontWeight: FontWeight.w500,
                   fontSize: 16, // Figma 근사. 토큰 없음.
-                  color: opened ? Colors.white : Colors.white70,
+                  // 예산은 탭 배경이 밝은 크림색이라 흰 라벨이 안 읽혀
+                  // 어두운 올리브로 고정한다. 나머지는 어두운 탭 위 흰색.
+                  color: region == RegionCode.yesan
+                      ? const Color(0xFF45523D)
+                      : (opened ? Colors.white : Colors.white70),
                 ),
               ),
             ),
