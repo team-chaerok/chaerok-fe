@@ -49,6 +49,13 @@ class RegionFilmCard extends StatelessWidget {
   static const double _photoWidth = 150;
   static const double _photoHeight = 80;
 
+  /// 폴더 탭 구멍 크기.
+  static const double _punchingWidth = 6;
+  static const double _punchingHeight = 6;
+
+  /// 구멍 사이 간격, 사진 자리 상단에서 첫 구멍까지의 간격. 토큰 없음.
+  static const double _punchingGap = 6;
+
   /// 지역 사진 자리 위젯의 key(테스트/추후 교체용).
   static const Key photoSlotKey = Key('regionFilmPhotoSlot');
 
@@ -84,7 +91,25 @@ class RegionFilmCard extends StatelessWidget {
                   ),
                 ),
               )
-            else
+            else ...[
+              // 사진 자리 바로 왼쪽에 세로로 늘어선 폴더 탭 구멍 3개(필름
+              // 퍼포레이션 느낌). 상단·구멍 사이 간격 모두 6. 토큰 없음.
+              const Positioned(
+                top: FolderCardClipper.cardTop,
+                right: _photoWidth + _punchingWidth,
+                width: _punchingWidth,
+                height: _photoHeight,
+                child: Column(
+                  children: [
+                    SizedBox(height: _punchingGap),
+                    _PunchHole(),
+                    SizedBox(height: _punchingGap),
+                    _PunchHole(),
+                    SizedBox(height: _punchingGap),
+                    _PunchHole(),
+                  ],
+                ),
+              ),
               // 에셋(assets/images/regions/{region}.webp)이 아직 없으면
               // RegionFilmPhoto가 지역색 블록으로 폴백한다.
               Positioned(
@@ -94,6 +119,7 @@ class RegionFilmCard extends StatelessWidget {
                 height: _photoHeight,
                 child: RegionFilmPhoto(key: photoSlotKey, region: region),
               ),
+            ],
             Positioned(
               left: ChaerokSpacing.md,
               top: _labelTop,
@@ -112,6 +138,31 @@ class RegionFilmCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 폴더 탭 구멍 하나(필름 퍼포레이션). [RegionFilmCard]가 세로로 3개
+/// 늘어놓는다. 이너 섀도우 Figma 스펙: radius 1, Offset(0, 4), Blur 4, black 10%.
+class _PunchHole extends StatelessWidget {
+  const _PunchHole();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: RegionFilmCard._punchingWidth,
+      height: RegionFilmCard._punchingHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.all(Radius.circular(1)),
+        child: CustomPaint(
+          foregroundPainter: RectInnerShadowPainter(
+            offset: Offset(0, 4),
+            blur: 4,
+            color: Color(0x1A000000),
+          ),
+          child: ColoredBox(color: ChaerokColors.primaryLight),
         ),
       ),
     );

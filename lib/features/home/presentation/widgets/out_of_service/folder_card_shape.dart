@@ -117,3 +117,57 @@ class FolderCardInnerShadowPainter extends CustomPainter {
   @override
   bool shouldRepaint(FolderCardInnerShadowPainter oldDelegate) => false;
 }
+
+/// 사각형(캔버스 전체 크기)에 이너 섀도우를 그리는 범용 페인터.
+/// [FolderCardInnerShadowPainter]와 같은 기법(형상 바깥 영역을 오프셋·블러)을
+/// 임의의 offset/blur/color로 재사용하려는 작은 사각 요소용. 모서리가 아주
+/// 작게 둥근 경우([ClipRRect]로 외부에서 클리핑) 반경 차이는 무시할 만해
+/// 내부적으로는 직각 사각형으로 계산한다.
+class RectInnerShadowPainter extends CustomPainter {
+  const RectInnerShadowPainter({
+    required this.offset,
+    required this.blur,
+    required this.color,
+  });
+
+  final Offset offset;
+  final double blur;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    canvas.save();
+    canvas.clipRect(rect);
+
+    final outside = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(
+        Rect.fromLTRB(
+          -size.width,
+          -size.height,
+          size.width * 2,
+          size.height * 2,
+        ),
+      )
+      ..addRect(rect);
+
+    canvas.drawPath(
+      outside.shift(offset),
+      Paint()
+        ..color = color
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          Shadow.convertRadiusToSigma(blur),
+        ),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant RectInnerShadowPainter oldDelegate) =>
+      oldDelegate.offset != offset ||
+      oldDelegate.blur != blur ||
+      oldDelegate.color != color;
+}
