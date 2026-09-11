@@ -27,4 +27,12 @@ void main() {
       expect(path, endsWith('.webp'));
     }
   });
+
+  test('필터 에셋 경로는 지역별로 다르고 filters 폴더를 가리킨다', () {
+    final paths = {for (final r in RegionCode.values) r.filmFilterAsset};
+    expect(paths.length, RegionCode.values.length);
+    for (final path in paths) {
+      expect(path, startsWith('assets/images/filters/'));
+    }
+  });
 }

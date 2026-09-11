@@ -26,4 +26,14 @@ extension RegionFilmPalette on RegionCode {
     RegionCode.seosan => 'assets/images/regions/seosan.webp',
     RegionCode.yesan => 'assets/images/regions/yesan.webp',
   };
+
+  /// 지역별 필름 질감(그레인·라이트 리크) 오버레이 에셋 경로.
+  /// [RegionFilmPhoto]가 [filmPhotoAsset] 위에 [BlendMode.overlay]로 얹어
+  /// 지역별 색감을 낸다.
+  String get filmFilterAsset => switch (this) {
+    RegionCode.gongju => 'assets/images/filters/gongju-filter.png',
+    RegionCode.buyeo => 'assets/images/filters/buyeo-filter.png',
+    RegionCode.seosan => 'assets/images/filters/seosan-filter.jpg',
+    RegionCode.yesan => 'assets/images/filters/yesan-filter.jpg',
+  };
 }
