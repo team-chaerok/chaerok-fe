@@ -58,7 +58,8 @@ class RegionFilmCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: FolderCardShadowPainter(elevation: opened ? 8 : 3),
+      painter: const FolderCardShadowPainter(),
+      foregroundPainter: const FolderCardInnerShadowPainter(),
       child: ClipPath(
         clipper: const FolderCardClipper(),
         clipBehavior: Clip.antiAlias,

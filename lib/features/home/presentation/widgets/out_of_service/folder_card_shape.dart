@@ -46,23 +46,74 @@ class FolderCardClipper extends CustomClipper<Path> {
 }
 
 /// 폴더 카드 외곽선을 따라 드롭 섀도우를 그린다([ClipPath]는 그림자를
-/// 만들지 않으므로 별도로 얹는다).
+/// 만들지 않으므로 별도로 얹는다). Figma 스펙: Offset(0, -2), Blur 16,
+/// black 8%. 모든 카드(열림/겹침)에 동일하게 적용한다.
 class FolderCardShadowPainter extends CustomPainter {
-  const FolderCardShadowPainter({this.elevation = 3});
+  const FolderCardShadowPainter();
 
-  final double elevation;
+  static const Offset _offset = Offset(0, -2);
+  static const double _blur = 16;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawShadow(
-      const FolderCardClipper().getClip(size),
-      Colors.black,
-      elevation,
-      false,
+    final path = const FolderCardClipper().getClip(size);
+    canvas.drawPath(
+      path.shift(_offset),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.08)
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          Shadow.convertRadiusToSigma(_blur),
+        ),
     );
   }
 
   @override
-  bool shouldRepaint(FolderCardShadowPainter oldDelegate) =>
-      oldDelegate.elevation != elevation;
+  bool shouldRepaint(FolderCardShadowPainter oldDelegate) => false;
+}
+
+/// 폴더 카드 안쪽 상단 모서리에 얹는 이너 섀도우.
+/// Figma 스펙: Offset(0, 1), Blur 1, white 25%. 카드 형상으로 클립한 뒤
+/// "형상 바깥" 영역을 오프셋·블러해 그려 가장자리 안쪽으로만 번지게 한다.
+class FolderCardInnerShadowPainter extends CustomPainter {
+  const FolderCardInnerShadowPainter();
+
+  static const Offset _offset = Offset(0, 1);
+  static const double _blur = 1;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = const FolderCardClipper().getClip(size);
+
+    canvas.save();
+    canvas.clipPath(path);
+
+    // 큰 사각형 XOR 카드 형상 = 형상 바깥 영역. 이걸 오프셋·블러해 그리면
+    // 클립 덕분에 가장자리 안쪽으로 번진 부분만 남아 이너 섀도우가 된다.
+    final outside = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(
+        Rect.fromLTRB(
+          -size.width,
+          -size.height,
+          size.width * 2,
+          size.height * 2,
+        ),
+      )
+      ..addPath(path, Offset.zero);
+
+    canvas.drawPath(
+      outside.shift(_offset),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.25)
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          Shadow.convertRadiusToSigma(_blur),
+        ),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(FolderCardInnerShadowPainter oldDelegate) => false;
 }
