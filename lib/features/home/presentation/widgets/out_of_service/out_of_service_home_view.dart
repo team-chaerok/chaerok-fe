@@ -134,21 +134,38 @@ class _OutOfServiceHomeViewState extends State<OutOfServiceHomeView> {
               children: [FilmCollectionButton(), MyPageButton()],
             ),
             Expanded(
-              child: RegionFilmDeck(
-                deckOrder: _deckOrder,
-                dataByRegion: {
-                  for (final region in RegionCode.values)
-                    region: (
-                      status:
-                          _cache[region]?.status ?? RegionLoadStatus.loading,
-                      places:
-                          _cache[region]?.places ?? const <PlaceListResponse>[],
+              // 덱을 위로 16만큼 당기면서, 그만큼 아래로도 늘려 실제 카드
+              // 높이가 줄지 않게 한다(Transform은 크기는 그대로라 밑에 빈
+              // 공간이 남았을 것). Stack + 음수 top/bottom으로 박스 자체를
+              // 위아래 16씩 더 키운다. 토큰 없음.
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    top: -16,
+                    bottom: -16,
+                    left: 0,
+                    right: 0,
+                    child: RegionFilmDeck(
+                      deckOrder: _deckOrder,
+                      dataByRegion: {
+                        for (final region in RegionCode.values)
+                          region: (
+                            status:
+                                _cache[region]?.status ??
+                                RegionLoadStatus.loading,
+                            places:
+                                _cache[region]?.places ??
+                                const <PlaceListResponse>[],
+                          ),
+                      },
+                      onOpen: _onOpenRegion,
+                      onRetry: (region) =>
+                          unawaited(_ensureLoaded(region, force: true)),
+                      onExploreRegionRequested: widget.onExploreRegionRequested,
                     ),
-                },
-                onOpen: _onOpenRegion,
-                onRetry: (region) =>
-                    unawaited(_ensureLoaded(region, force: true)),
-                onExploreRegionRequested: widget.onExploreRegionRequested,
+                  ),
+                ],
               ),
             ),
           ],
