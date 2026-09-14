@@ -13,7 +13,6 @@ import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
 import 'package:chaerok/features/settings/presentation/settings_screen.dart';
 import 'package:chaerok/features/test_mode/presentation/test_mode_panel_screen.dart';
-import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -88,7 +87,6 @@ class _MyScreenState extends State<MyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: const ChaerokAppbar(title: '마이'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(ChaerokSpacing.md),
         child: Column(
