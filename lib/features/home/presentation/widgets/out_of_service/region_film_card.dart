@@ -3,7 +3,7 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
-import 'package:chaerok/features/home/presentation/widgets/out_of_service/folder_card_shape.dart';
+import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/recommended_course_banner.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_carousel.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_palette.dart';
@@ -20,10 +20,10 @@ const BorderRadius _bodyTopRadius = BorderRadius.vertical(
   top: Radius.circular(ChaerokRadius.lg),
 );
 
-/// 필름롤 스택의 폴더 탭 카드 한 장([FolderCardClipper]로 클리핑).
-/// [opened]면 탭 아래 본문 영역에 [RegionDetailBody]를, 아니면 지역 사진을
-/// 오른쪽 위에 깐다. 탭(왼쪽 위)에는 "{지역} 필름롤" 라벨만 얹는다.
-/// 탭 여부에 따른 터치 처리는 부모([RegionFilmDeck])가 카드 전체를 감싼다.
+/// 필름롤 스택의 폴더 탭 카드 한 장 — 지역 데이터를 공통 [FolderCard] 틀에
+/// 채워 넣는 얇은 어댑터. [opened]면 탭 아래 본문 영역에 [RegionDetailBody]를,
+/// 아니면 지역 사진을 오른쪽 위에 깐다. 탭(왼쪽 위)에는 "{지역} 필름롤" 라벨만
+/// 얹는다. 탭 여부에 따른 터치 처리는 부모([RegionFilmDeck])가 카드 전체를 감싼다.
 class RegionFilmCard extends StatelessWidget {
   const RegionFilmCard({
     super.key,
@@ -44,69 +44,26 @@ class RegionFilmCard extends StatelessWidget {
   /// 스택 맨 앞(열린) 카드인지. false면 본문 대신 지역 사진만 얹는다.
   final bool opened;
 
-  /// 겹친 카드 오른쪽 위 지역 사진 자리 크기. 폴더 탭이 튀어나오는 높이
-  /// ([FolderCardClipper.cardTop]) 아래, 즉 본문 영역에 둔다. 토큰 없음.
-  static const double _photoWidth = 150;
-  static const double _photoHeight = 80;
-
   /// 지역 사진 자리 위젯의 key(테스트/추후 교체용).
   static const Key photoSlotKey = Key('regionFilmPhotoSlot');
 
-  /// 탭 라벨 위치. 토큰 없음.
-  static const double _labelTop = 6;
-
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: FolderCardShadowPainter(elevation: opened ? 8 : 3),
-      child: ClipPath(
-        clipper: const FolderCardClipper(),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            ColoredBox(color: region.filmTabColor),
-            if (opened)
-              Positioned(
-                top: FolderCardClipper.cardTop,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: ColoredBox(
-                  color: ChaerokColors.primaryLight,
-                  child: RegionDetailBody(
-                    region: region,
-                    status: status,
-                    places: places,
-                    onRetry: onRetry,
-                    onExploreRegionRequested: onExploreRegionRequested,
-                  ),
-                ),
-              )
-            else
-              // 에셋(assets/images/regions/{region}.webp)이 아직 없으면
-              // RegionFilmPhoto가 지역색 블록으로 폴백한다.
-              Positioned(
-                top: FolderCardClipper.cardTop,
-                right: 0,
-                width: _photoWidth,
-                height: _photoHeight,
-                child: RegionFilmPhoto(key: photoSlotKey, region: region),
-              ),
-            Positioned(
-              left: ChaerokSpacing.md,
-              top: _labelTop,
-              child: Text(
-                region.filmStripLabel,
-                style: TextStyle(
-                  fontFamily: ChaerokTypography.jeongnimsajiFontFamily,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16, // Figma 근사. 토큰 없음.
-                  color: opened ? Colors.white : Colors.white70,
-                ),
-              ),
-            ),
-          ],
+    return FolderCard(
+      color: region.filmTabColor,
+      label: region.filmStripLabel,
+      opened: opened,
+      // 에셋(assets/images/regions/{region}.webp)이 아직 없으면 RegionFilmPhoto가
+      // 지역색 블록으로 폴백한다.
+      closedPreview: RegionFilmPhoto(key: photoSlotKey, region: region),
+      openedBody: ColoredBox(
+        color: ChaerokColors.primaryLight,
+        child: RegionDetailBody(
+          region: region,
+          status: status,
+          places: places,
+          onRetry: onRetry,
+          onExploreRegionRequested: onExploreRegionRequested,
         ),
       ),
     );
