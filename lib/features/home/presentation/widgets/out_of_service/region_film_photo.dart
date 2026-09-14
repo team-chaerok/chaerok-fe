@@ -15,7 +15,7 @@ class RegionFilmPhoto extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: const BorderRadius.only(
-        topRight: Radius.circular(ChaerokRadius.xl),
+        topRight: Radius.circular(ChaerokRadius.lg),
       ),
       child: Image.asset(
         region.filmPhotoAsset,
