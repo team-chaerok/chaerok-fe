@@ -9,7 +9,6 @@ import 'package:chaerok/features/explore/presentation/explore_screen.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
-import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/home_dashboard_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/home_bottom_navigation.dart';
@@ -94,12 +93,9 @@ class _MainTabScreenState extends State<MainTabScreen> {
       }
 
       if (nextPlace == null) {
-        // 코스 미선택 또는 전체 방문 완료 - 필름롤 상세에서 다음 행동을 안내한다.
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => FilmRollScreen(filmRollId: recovered.id),
-          ),
-        );
+        // 코스 미선택 또는 전체 방문 완료 - 코스 선택/현상 등 다음 행동은
+        // 채록길 탭(FilmRollProgressView)이 이미 보여주므로 그리로 이동한다.
+        _onExploreRequested();
         return;
       }
 

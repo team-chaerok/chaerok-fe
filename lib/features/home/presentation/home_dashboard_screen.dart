@@ -15,7 +15,6 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
-import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
@@ -293,8 +292,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   }
 
   /// 서비스 지역 확인 직후, 활성 필름롤이 없으면 해당 지역으로 자동 진입해
-  /// 코스 선택 화면까지 이어준다. 이미 진행중이면 진행 화면으로, 현상
-  /// 대기중이면 현상 대기 화면으로 바로 연결한다(`ResolveFilmRollEntryUseCase`).
+  /// 코스 선택 화면까지 이어준다(`ResolveFilmRollEntryUseCase`). 이미 진행중/
+  /// 현상 대기중이면 화면을 더 push하지 않고 그대로 둔다 — 진행 상태는 홈
+  /// 자체(사진 갤러리)가, 방문 인증/현상은 채록길 탭이 보여준다.
   Future<void> _autoConnectFilmRollEntry(
     LocationVerificationResult result,
   ) async {
@@ -314,15 +314,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
         );
         if (!mounted) return;
       }
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FilmRollScreen(
-            filmRollId: decision.filmRoll.id,
-            regionId: result.region.regionId,
-          ),
-        ),
-      );
+      // 홈 화면 자체가 진행중 필름롤을 사진 갤러리(RegionPhotoGallery)로 보여주므로,
+      // 채록길 탭(FilmRollProgressView)과 역할이 겹치는 FilmRollScreen은 더 이상
+      // push하지 않는다. finally의 refresh()가 방금 반영된 코스/장소를 읽어온다.
     } on UnsupportedRegionException {
       // 서비스 미지원 지역 — 자동 진입 없이 기존 "필름롤 시작하기" 카드로 폴백.
     } catch (e, st) {
@@ -428,6 +422,8 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
 
       if (recovered != null) {
         unawaited(_loadFilmRollPhotos(recovered.id));
+        unawaited(_loadFilmRollPlaces(recovered.id));
+        unawaited(_backfillPlaceImages(recovered.id));
       }
       final locationResult = _locationResult;
       if (locationResult != null) {
@@ -451,6 +447,38 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     }
   }
 
+  /// 갤러리 필름스트립(장소 단위 칸)에 쓸 이 필름롤의 장소 목록을 조회한다.
+  /// [_loadNearbyPlaces]/[_backfillPlaceImages]도 부수적으로 같은 상태를
+  /// 갱신하지만 각각 위치 인증 완료·백필 성공 여부에 걸려있어 항상 도는
+  /// 경로가 아니다 — 필름스트립이 장소 목록에 전적으로 의존하게 된 뒤로는
+  /// 이 경로가 실패/지연되면 필름스트립 전체가 빈 상태로 보이는 문제가
+  /// 있었다. 그래서 필름롤이 복구될 때마다 무조건 한 번 더 직접 읽어온다.
+  Future<void> _loadFilmRollPlaces(String filmRollId) async {
+    try {
+      final places = await FilmRollModule.instance.filmRollPlaceRepository
+          .findByFilmRoll(filmRollId);
+      if (!mounted) return;
+      setState(() => _filmRollPlaces = places);
+    } catch (e, st) {
+      log('필름롤 장소 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
+  }
+
+  /// [SelectCourseUseCase]의 이미지 보충 기능 이전에 이미 코스가 확정된
+  /// 필름롤은 장소 이미지가 계속 비어있다. 홈 진입 시 한 번 소급 보충하고,
+  /// 갤러리("가 볼 장소" 미리보기)가 바로 반영하도록 장소 목록을 다시 읽는다.
+  /// 이미 이미지가 있는 장소는 건드리지 않아 여러 번 호출해도 안전하다.
+  Future<void> _backfillPlaceImages(String filmRollId) async {
+    try {
+      await FilmRollModule.instance.backfillPlaceImages(filmRollId);
+    } catch (e, st) {
+      log('장소 이미지 소급 보충 실패', name: _tag, error: e, stackTrace: st);
+      return;
+    }
+    if (!mounted) return;
+    await _loadFilmRollPlaces(filmRollId);
+  }
+
   /// 위치 인증으로 확인된 지역에 대한 로컬 필름롤을 찾거나 새로 생성해 진입한다.
   Future<void> _onStartFilmRollTap() async {
     final locationResult = _locationResult;
@@ -467,13 +495,12 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
         regionId: locationResult.region.regionId,
       );
       if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FilmRollScreen(
-            filmRollId: filmRoll.id,
-            regionId: locationResult.region.regionId,
-          ),
-        ),
+      // 새로 만든 필름롤은 아직 코스가 없으므로 코스 선택으로 바로 이어준다.
+      // 이후 진행 상태는 FilmRollScreen이 아니라 홈의 사진 갤러리가 보여준다.
+      await pushCourseSelectionAndConfirm(
+        context,
+        filmRollId: filmRoll.id,
+        regionId: locationResult.region.regionId,
       );
       if (!mounted) return;
       await refresh();
@@ -542,6 +569,7 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
                   isAutoConnectingFilmRoll: _isAutoConnectingFilmRoll,
                   isEnteringFilmRoll: _isEnteringFilmRoll,
                   onStartFilmRollTap: _onStartFilmRollTap,
+                  onVisitCompleted: refresh,
                 ),
               ),
             ),
@@ -624,6 +652,7 @@ class _RegionHomeBody extends StatelessWidget {
     required this.isAutoConnectingFilmRoll,
     required this.isEnteringFilmRoll,
     required this.onStartFilmRollTap,
+    required this.onVisitCompleted,
   });
 
   final String? userNickname;
@@ -637,6 +666,10 @@ class _RegionHomeBody extends StatelessWidget {
   final bool isEnteringFilmRoll;
   final VoidCallback onStartFilmRollTap;
 
+  /// 갤러리에서 미방문 장소를 카메라로 인증하고 돌아오면, 최신 방문/사진
+  /// 상태를 다시 읽어오도록 호출하는 콜백(`HomeDashboardScreenState.refresh`).
+  final Future<void> Function() onVisitCompleted;
+
   /// 홈 콘텐츠 공통 좌우 패딩.
   static const _contentPadding = EdgeInsets.symmetric(
     horizontal: ChaerokSpacing.xl,
@@ -649,8 +682,10 @@ class _RegionHomeBody extends StatelessWidget {
       return ColoredBox(
         color: ChaerokColors.background,
         child: RegionPhotoGallery(
+          filmRollId: recoveredFilmRoll!.id,
           photos: filmRollPhotos,
           places: filmRollPlaces,
+          onVisitCompleted: onVisitCompleted,
         ),
       );
     }

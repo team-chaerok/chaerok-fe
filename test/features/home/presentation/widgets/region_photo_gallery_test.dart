@@ -1,5 +1,7 @@
+import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/region_photo_gallery.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +9,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// 존재하지 않는 파일 경로를 넘기면 `Image.file`이 비동기로 실패하고
 /// errorBuilder(회색 슬롯)로 폴백한다 — 실제 이미지 디코딩은 검증 대상이
 /// 아니므로 렌더/탭 동작 검증에는 이 폴백 경로로도 충분하다.
-FilmRollPlace _place(String id, {required String category}) => FilmRollPlace(
+FilmRollPlace _place(
+  String id, {
+  required String category,
+  int visitOrder = 0,
+  bool isVisited = true,
+}) => FilmRollPlace(
   id: id,
   filmRollId: 'fr1',
   name: '장소 $id',
@@ -15,8 +22,8 @@ FilmRollPlace _place(String id, {required String category}) => FilmRollPlace(
   category: category,
   latitude: 36.0,
   longitude: 127.0,
-  visitOrder: 0,
-  isVisited: true,
+  visitOrder: visitOrder,
+  isVisited: isVisited,
   photoCount: 1,
 );
 
@@ -36,10 +43,32 @@ FilmRollPhoto _photo(
   isSynced: false,
 );
 
+/// 필름스트립 썸네일(원본이 아닌) `Image.file` 경로만 순서대로 뽑는다.
+List<String> _thumbnailPaths(WidgetTester tester) => tester
+    .widgetList<Image>(find.byType(Image))
+    .map((image) => (image.image as FileImage).file.path)
+    .where((path) => path.contains('-thumb.jpg'))
+    .toList();
+
+/// 큰 사진(원본) `Image.file` 경로. 없으면(미리보기/플레이스홀더 상태) null.
+String? _heroImagePath(WidgetTester tester) => tester
+    .widgetList<Image>(find.byType(Image))
+    .map((image) => (image.image as FileImage).file.path)
+    .where((path) => path.contains('-original.jpg'))
+    .firstOrNull;
+
+/// 아직 인증(촬영) 전인 필름스트립 빈 프레임(연한 회색 ColoredBox) 찾기.
+final Finder _unvisitedTileFinder = find.byWidgetPredicate(
+  (widget) => widget is ColoredBox && widget.color == ChaerokColors.border,
+);
+
 void main() {
+  // 관광지(p-tour)만 사진 2장(가장 최근 photo-2), 식당(p-food)은 1장(photo-3),
+  // 카페(p-cafe)는 아직 인증 전(사진 없음) — 필름스트립은 장소 3칸이어야 한다.
   final places = [
-    _place('p-tour', category: 'HERITAGE'),
-    _place('p-food', category: 'RESTAURANT'),
+    _place('p-tour', category: 'HERITAGE', visitOrder: 0),
+    _place('p-food', category: 'RESTAURANT', visitOrder: 1),
+    _place('p-cafe', category: 'CAFE', visitOrder: 2, isVisited: false),
   ];
 
   final photos = [
@@ -63,13 +92,21 @@ void main() {
     ),
   ];
 
-  Widget host() => MaterialApp(
+  Widget host({
+    List<FilmRollPhoto>? overridePhotos,
+    List<FilmRollPlace>? overridePlaces,
+  }) => MaterialApp(
     home: Scaffold(
-      body: RegionPhotoGallery(photos: photos, places: places),
+      body: RegionPhotoGallery(
+        filmRollId: 'fr1',
+        photos: overridePhotos ?? photos,
+        places: overridePlaces ?? places,
+        onVisitCompleted: () async {},
+      ),
     ),
   );
 
-  testWidgets('기본 카테고리는 관광지이고, 카운터는 전체 사진 수/최대치를 보여준다', (tester) async {
+  testWidgets('태그(관광지/식당/카페)는 항상 보여지고, 카운터는 전체 사진 수/최대치를 보여준다', (tester) async {
     await tester.pumpWidget(host());
 
     expect(find.text('관광지'), findsOneWidget);
@@ -79,31 +116,104 @@ void main() {
     expect(find.text('지역 내 최대 24장'), findsOneWidget);
   });
 
-  testWidgets('필름스트립은 활성 카테고리(관광지) 사진만 sequence 순으로 보여준다', (tester) async {
+  testWidgets('필름스트립 칸은 사진이 아니라 코스 장소 단위다 — 관광지→식당→카페 순, 인증한 장소는 사진을 보여준다', (
+    tester,
+  ) async {
     await tester.pumpWidget(host());
 
-    // 관광지로 분류되는 사진은 photo-1, photo-2 두 장뿐이라 필름스트립에는
-    // 그 두 장만 렌더된다(총 사진 수는 여전히 3으로 카운터에 표시).
-    expect(find.byType(Image), findsNWidgets(3)); // 큰 사진 1 + 필름스트립 2
+    // 관광지는 가장 최근 사진(photo-2), 식당은 photo-3이 대표 썸네일로
+    // 뜨고, 아직 인증 전인 카페는 사진 타일이 없다(대신 빈 프레임).
+    expect(_thumbnailPaths(tester), [
+      '/tmp/photo-2-thumb.jpg',
+      '/tmp/photo-3-thumb.jpg',
+    ]);
+    expect(_unvisitedTileFinder, findsOneWidget);
   });
 
-  testWidgets('카테고리 칩을 누르면 필름스트립이 해당 카테고리로 필터링된다', (tester) async {
+  testWidgets('필름스트립에서 인증된 다른 장소를 고르면 큰 사진이 그 장소 사진으로 바뀐다', (tester) async {
     await tester.pumpWidget(host());
-    expect(find.byType(Image), findsNWidgets(3)); // 큰 사진 1 + 관광지 2
+
+    // 기본은 관광지 최근 사진(photo-2)이 큰 사진 자리에 있다.
+    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
+
+    // 필름스트립에서 식당(photo-3) 타일을 고른다.
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is FileImage &&
+            (widget.image as FileImage).file.path == '/tmp/photo-3-thumb.jpg',
+      ),
+    );
+    await tester.pump();
+
+    expect(_heroImagePath(tester), '/tmp/photo-3-original.jpg');
+  });
+
+  testWidgets('아직 인증하지 않은 장소 타일을 누르면 그 장소를 인증하는 카메라 화면이 열린다', (tester) async {
+    await tester.pumpWidget(host());
+
+    await tester.tap(_unvisitedTileFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final pushed = tester.widget<VisitCaptureScreen>(
+      find.byType(VisitCaptureScreen),
+    );
+    expect(pushed.filmRollId, 'fr1');
+    expect(pushed.filmRollPlaceId, 'p-cafe');
+  });
+
+  testWidgets('태그는 버튼이 아니라서 눌러도 선택 상태가 바뀌지 않는다', (tester) async {
+    await tester.pumpWidget(host());
+    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
 
     await tester.tap(find.text('식당'));
     await tester.pump();
 
-    // 식당 카테고리는 photo-3 한 장뿐 → 큰 사진 1 + 필름스트립 1.
-    expect(find.byType(Image), findsNWidgets(2));
+    // 태그를 눌러도 큰 사진은 여전히 기본(관광지) 최근 사진 그대로다.
+    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
   });
 
-  testWidgets('사진이 없는 카테고리를 선택하면 안내 문구를 보여준다', (tester) async {
+  testWidgets('필름스트립은 내용과 무관하게 항상 검은 필름 띠(스프라켓 구멍) 안에 놓인다', (tester) async {
     await tester.pumpWidget(host());
 
-    await tester.tap(find.text('카페'));
-    await tester.pump();
+    // 인증된 장소가 있는 정상 상태에서도 필름 띠 틀 자체는 항상 렌더된다 —
+    // 예전엔 사진이 있으면 이 틀 없이 사진만 맨몸으로 떴던 회귀가 있었다.
+    expect(find.byKey(const ValueKey('filmStripFrame')), findsOneWidget);
+  });
 
-    expect(find.text('이 카테고리에는 아직 사진이 없어요'), findsOneWidget);
+  testWidgets('코스에 담긴 장소가 하나도 없어도 필름 띠 틀은 그대로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      host(overridePhotos: const [], overridePlaces: const []),
+    );
+
+    expect(find.byKey(const ValueKey('filmStripFrame')), findsOneWidget);
+  });
+
+  testWidgets(
+    '기본 카테고리(관광지)에 찍은 사진이 없으면 큰 사진 자리에 코스에 담긴 관광지 장소를 "가 볼 장소"로 미리 보여준다',
+    (tester) async {
+      final photosWithoutTourism = [
+        _photo(
+          'photo-3',
+          placeId: 'p-food',
+          sequence: 1,
+          takenAt: DateTime(2026, 1, 1, 11),
+        ),
+      ];
+      await tester.pumpWidget(host(overridePhotos: photosWithoutTourism));
+
+      expect(find.textContaining('가 볼 장소'), findsOneWidget);
+      expect(find.textContaining('장소 p-tour'), findsOneWidget);
+    },
+  );
+
+  testWidgets('기본 카테고리(관광지)에 찍은 사진이 있으면 장소 미리보기 대신 실제 사진을 보여준다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    expect(find.textContaining('가 볼 장소'), findsNothing);
   });
 }
