@@ -1,4 +1,6 @@
 import 'package:chaerok/data/models/course_place_response.dart';
+import 'package:chaerok/data/models/place_category.dart';
+import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/course_candidate_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,6 +119,29 @@ void main() {
       ),
       throwsA(isA<InvalidCoursePlaceException>()),
     );
+  });
+
+  test('fromExplorePlace: ExplorePlace.imageUrl이 그대로 옮겨진다', () {
+    const explorePlace = ExplorePlace(
+      title: '테스트 장소',
+      address: '주소',
+      latitude: 37.1,
+      longitude: 127.1,
+      categoryGroup: PlaceCategoryGroup.tourism,
+      categoryGroupWire: 'TOURISM',
+      categoryDetail: PlaceCategoryDetail.heritage,
+      categoryDetailLabel: '역사',
+      source: 'TOUR_API',
+      identityKey: 'key',
+      imageUrl: 'https://example.com/photo.jpg',
+    );
+
+    final place = CourseCandidatePlace.fromExplorePlace(
+      explorePlace,
+      visitOrder: 0,
+    );
+
+    expect(place.imageUrl, 'https://example.com/photo.jpg');
   });
 
   test('경계값(latitude 90, longitude 180)은 유효한 좌표로 보존된다', () {

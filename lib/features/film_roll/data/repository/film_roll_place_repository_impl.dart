@@ -82,4 +82,12 @@ class FilmRollPlaceRepositoryImpl implements FilmRollPlaceRepository {
       FilmRollPlacesCompanion(visitSyncedAt: Value(at)),
     );
   }
+
+  @override
+  Future<void> updateImageUrl(String filmRollPlaceId, String imageUrl) {
+    return _placeDs.update(
+      filmRollPlaceId,
+      FilmRollPlacesCompanion(imageUrl: Value(imageUrl)),
+    );
+  }
 }
