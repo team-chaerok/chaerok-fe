@@ -64,6 +64,7 @@ class CourseCandidatePlace {
       latitude: place.latitude,
       longitude: place.longitude,
       visitOrder: visitOrder,
+      imageUrl: place.imageUrl,
     );
   }
 
@@ -103,4 +104,19 @@ class CourseCandidatePlace {
   final double longitude;
   final String? imageUrl;
   final int visitOrder;
+
+  /// 추천 코스 응답엔 이미지가 없어 나중에(장소 상세 API로) 보충할 때 쓴다.
+  CourseCandidatePlace copyWith({String? imageUrl}) {
+    return CourseCandidatePlace(
+      serverPlaceId: serverPlaceId,
+      externalPlaceId: externalPlaceId,
+      name: name,
+      address: address,
+      category: category,
+      latitude: latitude,
+      longitude: longitude,
+      visitOrder: visitOrder,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
+  }
 }

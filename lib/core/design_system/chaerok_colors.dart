@@ -8,7 +8,8 @@ class ChaerokColors {
   static const Color primaryLight = Color(0xFFF7F6F1);
 
   static const Color sageLight = Color(0xFFDCE6D1);
-  static const Color skyBlue = Color(0xFFD7E5F6);
+  static const Color skyBlue = Color(0xFF74849F);
+  static const Color softBrown = Color(0xFF47423F);
 
   static const Color background = Color(0xFFFAF6EF);
   static const Color surface = Color(0xFFF7F6F2);

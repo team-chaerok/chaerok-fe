@@ -119,6 +119,7 @@ void main() {
   group('RegionFilmCard', () {
     Widget host({
       required RegionLoadStatus status,
+      RegionCode region = RegionCode.yesan,
       List<PlaceListResponse> places = const [],
       bool opened = true,
       VoidCallback? onRetry,
@@ -127,7 +128,7 @@ void main() {
       return MaterialApp(
         home: Scaffold(
           body: RegionFilmCard(
-            region: RegionCode.yesan,
+            region: region,
             status: status,
             places: places,
             opened: opened,
@@ -141,6 +142,20 @@ void main() {
     testWidgets('열린 카드는 지역 필름롤 탭 라벨을 보여준다', (tester) async {
       await tester.pumpWidget(host(status: RegionLoadStatus.loading));
       expect(find.text('예산 필름롤'), findsOneWidget);
+    });
+
+    testWidgets('예산 카드는 탭 배경이 밝아 라벨을 어두운 색(0xFF45523D)으로 강제한다', (tester) async {
+      await tester.pumpWidget(host(status: RegionLoadStatus.loading));
+      final label = tester.widget<Text>(find.text('예산 필름롤'));
+      expect(label.style?.color, const Color(0xFF45523D));
+    });
+
+    testWidgets('예산 외 지역은 기존처럼 흰 라벨을 쓴다', (tester) async {
+      await tester.pumpWidget(
+        host(status: RegionLoadStatus.loading, region: RegionCode.seosan),
+      );
+      final label = tester.widget<Text>(find.text('서산 필름롤'));
+      expect(label.style?.color, Colors.white);
     });
 
     testWidgets('열린 카드에는 지역 사진 자리를 두지 않는다', (tester) async {

@@ -1,25 +1,6 @@
 /// 홈 대시보드/채록길 카드 위젯이 소비하는 표시 전용 뷰 데이터.
 /// 도메인 엔티티(`FilmRoll`, `PlaceListResponse` 등)를 화면에서 이 타입으로
 /// 매핑해 사용한다.
-class FilmRollSummaryData {
-  const FilmRollSummaryData({
-    required this.name,
-    required this.capturedCount,
-    required this.totalCount,
-    this.photoThumbnailPaths = const [],
-  });
-
-  final String name;
-  final int capturedCount;
-  final int totalCount;
-
-  /// 최근 촬영 사진 미리보기 캐러셀에 노출할 썸네일 경로(최신순).
-  final List<String> photoThumbnailPaths;
-
-  double get progress =>
-      totalCount <= 0 ? 0.0 : (capturedCount / totalCount).clamp(0.0, 1.0);
-}
-
 class RecommendedPlaceSummaryData {
   const RecommendedPlaceSummaryData({
     required this.name,

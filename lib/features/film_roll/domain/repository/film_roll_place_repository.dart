@@ -19,4 +19,8 @@ abstract class FilmRollPlaceRepository {
 
   /// 방문이 서버에 반영됐음을 기록한다.
   Future<void> markVisitSynced(String filmRollPlaceId, {required DateTime at});
+
+  /// 코스 확정 시점엔 없었던(추천 코스 응답에 이미지가 없어서) 대표 사진을
+  /// 나중에(장소 상세 API 등으로) 찾아 채운다.
+  Future<void> updateImageUrl(String filmRollPlaceId, String imageUrl);
 }

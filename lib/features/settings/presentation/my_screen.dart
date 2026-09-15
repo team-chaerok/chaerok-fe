@@ -20,7 +20,12 @@ import 'package:flutter/material.dart';
 /// 마이 탭: 프로필 요약, 설정 진입점, 그리고(비공개 테스트/디버그 빌드이거나
 /// 서버가 테스트 계정으로 내려준 경우) Test Mode(QA) 패널 진입점을 보여준다.
 class MyScreen extends StatefulWidget {
-  const MyScreen({super.key});
+  const MyScreen({super.key, this.showAppBar = true});
+
+  /// 충남 외 지역 홈([MyPageButton])처럼 별도 화면으로 push될 때는 뒤로가기용
+  /// 앱바가 필요하지만, 충남 홈 카드 탭에 인라인으로 얹힐 때는 탭 라벨이 이미
+  /// 제목 역할을 하므로 false로 감춘다.
+  final bool showAppBar;
 
   @override
   State<MyScreen> createState() => _MyScreenState();
@@ -88,7 +93,7 @@ class _MyScreenState extends State<MyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: const ChaerokAppbar(title: '마이'),
+      appBar: widget.showAppBar ? const ChaerokAppbar(title: '마이') : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(ChaerokSpacing.md),
         child: Column(

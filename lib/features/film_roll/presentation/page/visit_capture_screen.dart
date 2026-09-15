@@ -6,6 +6,7 @@ import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_shutter_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_switch_button.dart';
@@ -69,6 +70,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   static const _bodyQuarterTurns = 1;
 
   int _photoCount = 0;
+  FilmRollPlace? _place;
 
   List<double> get _availableZoomLevels => _zoomLevelCandidates
       .where((zoom) => zoom >= _minZoom && zoom <= _maxZoom)
@@ -83,6 +85,20 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initializeCamera());
     unawaited(_loadPhotoCount());
+    unawaited(_loadPlace());
+  }
+
+  /// 지금 인증 중인 장소 이름을 안내 문구로 보여주기 위해 조회한다. 실패해도
+  /// 촬영 자체는 계속할 수 있어야 하므로 예외는 삼킨다(안내만 생략).
+  Future<void> _loadPlace() async {
+    try {
+      final place = await FilmRollModule.instance.filmRollPlaceRepository
+          .findById(widget.filmRollPlaceId);
+      if (!mounted) return;
+      setState(() => _place = place);
+    } catch (e, st) {
+      log('장소 정보 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
   }
 
   /// 플래시 모드를 적용하되, 미지원 렌즈/기기에서 던지는 예외는 삼켜 카메라
@@ -348,6 +364,18 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
             onFlashToggle: _onFlashToggle,
             onClose: () => Navigator.of(context).maybePop(),
           ),
+          if (_place != null) ...[
+            const SizedBox(height: ChaerokSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${_place!.name} 인증하기',
+                style: ChaerokTypography.bodyMedium.copyWith(
+                  color: ChaerokColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: ChaerokSpacing.lg),
           Expanded(
             child: Row(

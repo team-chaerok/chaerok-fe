@@ -1,5 +1,19 @@
 /// 필름롤을 지원하는 4개 지역(공주시/부여군/서산시/예산군).
-enum RegionCode { gongju, buyeo, seosan, yesan }
+enum RegionCode {
+  gongju,
+  buyeo,
+  seosan,
+  yesan;
+
+  /// 행정구역명(예: "공주시")으로 [RegionCode]를 역으로 찾는다. 매칭되는
+  /// 지역이 없으면 null(서비스 4개 지역 밖의 값이 들어온 경우).
+  static RegionCode? fromCityCountyName(String cityCountyName) {
+    for (final region in RegionCode.values) {
+      if (region.cityCountyName == cityCountyName) return region;
+    }
+    return null;
+  }
+}
 
 /// [RegionCode]의 행정구역명·표시명·필름롤 제목을 제공하는 extension.
 extension RegionCodeX on RegionCode {
