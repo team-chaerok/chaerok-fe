@@ -52,6 +52,7 @@ class RegionFilmCard extends StatelessWidget {
     return FolderCard(
       color: region.filmTabColor,
       label: region.filmStripLabel,
+      labelColor: region.filmLabelColor,
       opened: opened,
       // 에셋(assets/images/regions/{region}.webp)이 아직 없으면 RegionFilmPhoto가
       // 지역색 블록으로 폴백한다.

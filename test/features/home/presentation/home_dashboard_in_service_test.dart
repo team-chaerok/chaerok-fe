@@ -1,9 +1,12 @@
 import 'package:chaerok/data/models/region_response.dart';
 import 'package:chaerok/features/home/presentation/home_dashboard_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
+import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/my_page_button.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_palette.dart';
 import 'package:chaerok/features/location/data/location_verification_result.dart';
 import 'package:chaerok/features/settings/presentation/my_screen.dart';
+import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -96,6 +99,33 @@ void main() {
     expect(find.text('공주시 필름롤'), findsOneWidget);
     expect(find.text('지난여행'), findsOneWidget); // 겹친 탭
     expect(find.text('마이페이지'), findsOneWidget); // 겹친 탭
+  });
+
+  testWidgets('현재여행지역 카드 색은 실제 지역(공주)의 필름롤 색을 쓴다', (tester) async {
+    final key = GlobalKey<HomeDashboardScreenState>();
+    await pumpVerifiedHome(tester, key);
+
+    final regionCard = tester.widget<FolderCard>(
+      find.ancestor(
+        of: find.text('공주시 필름롤'),
+        matching: find.byType(FolderCard),
+      ),
+    );
+    expect(regionCard.color, RegionCode.gongju.filmTabColor);
+  });
+
+  testWidgets('공주는 예산이 아니므로 라벨 색이 기본(흰색)으로 유지된다', (tester) async {
+    final key = GlobalKey<HomeDashboardScreenState>();
+    await pumpVerifiedHome(tester, key);
+
+    final regionCard = tester.widget<FolderCard>(
+      find.ancestor(
+        of: find.text('공주시 필름롤'),
+        matching: find.byType(FolderCard),
+      ),
+    );
+    expect(regionCard.labelColor, RegionCode.gongju.filmLabelColor);
+    expect(regionCard.labelColor, isNull); // FolderCard 기본값(흰색)으로 위임
   });
 
   testWidgets('헤더에 필름/마이페이지 아이콘 버튼이 없다(기능이 카드 탭으로 흡수됨)', (tester) async {

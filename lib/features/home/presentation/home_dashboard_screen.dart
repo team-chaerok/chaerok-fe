@@ -24,6 +24,7 @@ import 'package:chaerok/features/home/presentation/nearby_place_recorder.dart';
 import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_card_deck.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of_service_home_view.dart';
+import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_palette.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/region_photo_gallery.dart';
 import 'package:chaerok/features/home/presentation/widgets/weather_card.dart';
@@ -501,6 +502,19 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
       );
     }
 
+    // 현재 위치 인증으로 확인된 지역의 필름롤 색·라벨 색(충남 외 지역 홈과 동일
+    // 팔레트/규칙). 4개 지역 밖의 값이거나 위치 인증 전이면 배경색+검정 라벨로
+    // 폴백한다.
+    final regionCode = _locationResult != null
+        ? RegionCode.fromCityCountyName(_locationResult!.region.cityCountyName)
+        : null;
+    final regionColor = regionCode?.filmTabColor ?? ChaerokColors.background;
+    // filmLabelColor의 null은 "이 지역은 기본(흰색)을 쓴다"는 의도적 값이라
+    // regionCode 자체가 없을 때(위치 인증 전/4개 지역 밖)만 검정으로 폴백한다.
+    final regionLabelColor = regionCode == null
+        ? const Color(0xFF000000)
+        : regionCode.filmLabelColor;
+
     return Scaffold(
       backgroundColor: ChaerokColors.background,
       body: SafeArea(
@@ -509,24 +523,26 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
           onOpen: _onOpenTab,
           cardBuilder: (context, tab, opened) => switch (tab) {
             HomeCardTab.region => FolderCard(
-              color: ChaerokColors.background,
+              color: regionColor,
               label: _locationResult != null
                   ? '${_locationResult!.region.cityCountyName} 필름롤'
                   : '필름롤',
-              labelColor: const Color(0xFF000000),
+              labelColor: regionLabelColor,
               opened: opened,
-              closedPreview: const ColoredBox(color: ChaerokColors.background),
-              openedBody: _RegionHomeBody(
-                userNickname: _user?.nickname,
-                locationResult: _locationResult,
-                weather: _weather,
-                recoveredFilmRoll: _recoveredFilmRoll,
-                filmRollPhotos: _filmRollPhotos,
-                filmRollPlaces: _filmRollPlaces,
-                nearbyPlaces: _nearbyPlaces,
-                isAutoConnectingFilmRoll: _isAutoConnectingFilmRoll,
-                isEnteringFilmRoll: _isEnteringFilmRoll,
-                onStartFilmRollTap: _onStartFilmRollTap,
+              closedPreview: ColoredBox(color: regionColor),
+              openedBody: _RoundedOpenedBody(
+                child: _RegionHomeBody(
+                  userNickname: _user?.nickname,
+                  locationResult: _locationResult,
+                  weather: _weather,
+                  recoveredFilmRoll: _recoveredFilmRoll,
+                  filmRollPhotos: _filmRollPhotos,
+                  filmRollPlaces: _filmRollPlaces,
+                  nearbyPlaces: _nearbyPlaces,
+                  isAutoConnectingFilmRoll: _isAutoConnectingFilmRoll,
+                  isEnteringFilmRoll: _isEnteringFilmRoll,
+                  onStartFilmRollTap: _onStartFilmRollTap,
+                ),
               ),
             ),
             HomeCardTab.filmArchive => FolderCard(
@@ -534,8 +550,8 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
               label: '지난여행',
               opened: opened,
               closedPreview: const ColoredBox(color: ChaerokColors.skyBlue),
-              openedBody: const _PlaceholderCardBody(
-                text: '지난여행 화면은 곧 만나볼 수 있어요',
+              openedBody: const _RoundedOpenedBody(
+                child: _PlaceholderCardBody(text: '지난여행 화면은 곧 만나볼 수 있어요'),
               ),
             ),
             HomeCardTab.myPage => FolderCard(
@@ -543,7 +559,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
               label: '마이페이지',
               opened: opened,
               closedPreview: const ColoredBox(color: ChaerokColors.softBrown),
-              openedBody: const MyScreen(),
+              openedBody: const _RoundedOpenedBody(
+                child: MyScreen(showAppBar: false),
+              ),
             ),
           },
         ),
@@ -718,6 +736,25 @@ class _RegionHomeBody extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 열린 카드 본문 상단 좌우만 [ChaerokRadius.lg]로 둥글게 — 충남 외 지역 홈의
+/// 크림 영역(`region_film_card.dart`의 `_bodyTopRadius`)과 동일한 값·처리.
+/// 충남 홈 세 탭(현재여행지역/지난여행/마이페이지) 본문이 공통으로 쓴다.
+class _RoundedOpenedBody extends StatelessWidget {
+  const _RoundedOpenedBody({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(ChaerokRadius.lg),
+      ),
+      child: child,
     );
   }
 }
