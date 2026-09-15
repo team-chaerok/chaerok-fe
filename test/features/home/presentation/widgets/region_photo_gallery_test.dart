@@ -62,6 +62,11 @@ final Finder _unvisitedTileFinder = find.byWidgetPredicate(
   (widget) => widget is ColoredBox && widget.color == ChaerokColors.border,
 );
 
+/// 필름스트립 칸 위 카테고리 태그(라벨 텍스트)의 글자 색 — 선택된 칸은
+/// 흰 글자(초록 배경), 아니면 textSecondary(연한 배경)다.
+Color? _tagTextColor(WidgetTester tester, String label) =>
+    tester.widget<Text>(find.text(label)).style?.color;
+
 void main() {
   // 관광지(p-tour)만 사진 2장(가장 최근 photo-2), 식당(p-food)은 1장(photo-3),
   // 카페(p-cafe)는 아직 인증 전(사진 없음) — 필름스트립은 장소 3칸이어야 한다.
@@ -106,7 +111,9 @@ void main() {
     ),
   );
 
-  testWidgets('태그(관광지/식당/카페)는 항상 보여지고, 카운터는 전체 사진 수/최대치를 보여준다', (tester) async {
+  testWidgets('카테고리 태그는 필름스트립 각 칸 위에 개별로 뜨고, 카운터는 전체 사진 수/최대치를 보여준다', (
+    tester,
+  ) async {
     await tester.pumpWidget(host());
 
     expect(find.text('관광지'), findsOneWidget);
@@ -164,15 +171,25 @@ void main() {
     expect(pushed.filmRollPlaceId, 'p-cafe');
   });
 
-  testWidgets('태그는 버튼이 아니라서 눌러도 선택 상태가 바뀌지 않는다', (tester) async {
+  testWidgets('필름스트립에서 사진을 고르면 그 칸의 카테고리 태그만 초록(선택) 색으로 바뀐다', (tester) async {
     await tester.pumpWidget(host());
-    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
 
-    await tester.tap(find.text('식당'));
+    // 기본은 관광지 최근 사진(photo-2)이 선택돼 있어 관광지 태그만 흰 글자다.
+    expect(_tagTextColor(tester, '관광지'), Colors.white);
+    expect(_tagTextColor(tester, '식당'), ChaerokColors.textSecondary);
+
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is FileImage &&
+            (widget.image as FileImage).file.path == '/tmp/photo-3-thumb.jpg',
+      ),
+    );
     await tester.pump();
 
-    // 태그를 눌러도 큰 사진은 여전히 기본(관광지) 최근 사진 그대로다.
-    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
+    expect(_tagTextColor(tester, '식당'), Colors.white);
+    expect(_tagTextColor(tester, '관광지'), ChaerokColors.textSecondary);
   });
 
   testWidgets('필름스트립은 내용과 무관하게 항상 검은 필름 띠(스프라켓 구멍) 안에 놓인다', (tester) async {

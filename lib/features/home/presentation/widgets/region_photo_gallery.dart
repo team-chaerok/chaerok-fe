@@ -36,8 +36,8 @@ const Map<PlaceCategoryGroup, String> _categoryLabels = {
 /// 순으로 코스에 담긴 장소를 한 칸씩 보여준다 — 인증(촬영) 완료한 장소는 그
 /// 사진을, 아직 안 간 장소는 빈 칸을 보여주고 탭하면 그 장소를 인증하는
 /// 카메라 화면으로 이어진다. 위쪽 큰 사진은 그중 고른(또는 기본값인 관광지의
-/// 가장 최근) 사진을 보여준다. 카테고리 태그는 버튼이 아니라, 지금 보여주는
-/// 사진의 카테고리에 맞춰 켜지는 표시등이다.
+/// 가장 최근) 사진을 보여준다. 카테고리 태그는 버튼이 아니라 각 칸 중앙 위에
+/// 개별로 뜨며, 그 칸이 지금 큰 사진으로 보여주는 사진이면 초록색으로 켜진다.
 class RegionPhotoGallery extends StatefulWidget {
   const RegionPhotoGallery({
     super.key,
@@ -183,31 +183,11 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
         _findById(_selectedPhotoId) ??
         _mostRecentOf(_photosFor(_defaultCategory));
     final previewPlace = selected == null ? _placeFor(_defaultCategory) : null;
-    // 태그는 버튼이 아니라 지금 보여주는 사진의 카테고리를 가리키는 표시등 —
-    // 고른 사진이 없으면 기본 카테고리가 켜진다.
-    final displayCategory = selected == null
-        ? _defaultCategory
-        : _categoryByPlaceId[selected.filmRollPlaceId] ?? _defaultCategory;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _HeroPhoto(photo: selected, previewPlace: previewPlace),
-        const SizedBox(height: ChaerokSpacing.sm),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.md),
-          child: Row(
-            children: [
-              for (final category in _categoryChips) ...[
-                _CategoryChip(
-                  label: _categoryLabels[category]!,
-                  selected: category == displayCategory,
-                ),
-                const SizedBox(width: ChaerokSpacing.xs),
-              ],
-            ],
-          ),
-        ),
         const SizedBox(height: ChaerokSpacing.sm),
         _FilmStrip(
           places: _placesByCategoryOrder,
@@ -327,32 +307,37 @@ class _HeroPhoto extends StatelessWidget {
   }
 }
 
-/// 관광지/식당/카페 태그 — 버튼이 아니라, 지금 큰 사진으로 보여주는 카테고리를
-/// 가리키는 표시등이다(눌러도 아무 동작 없음).
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({required this.label, required this.selected});
+/// 필름스트립 각 칸 위에 뜨는 카테고리 태그. 그 칸이 지금 큰 사진으로 보여주는
+/// 사진(선택된 상태)이면 초록색으로 켜진다 — 사진 테두리 대신 이 태그 색이
+/// 선택 표시를 대신한다.
+class _CategoryTag extends StatelessWidget {
+  const _CategoryTag({required this.label, required this.selected});
 
   final String label;
   final bool selected;
 
+  static const double _height = 20;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: ChaerokSpacing.sm,
-        vertical: ChaerokSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: selected ? ChaerokColors.primary : ChaerokColors.surface,
-        borderRadius: BorderRadius.circular(ChaerokRadius.sm),
-        border: Border.all(
-          color: selected ? ChaerokColors.primary : ChaerokColors.border,
-        ),
-      ),
-      child: Text(
-        label,
-        style: ChaerokTypography.bodyMedium.copyWith(
-          color: selected ? Colors.white : ChaerokColors.textSecondary,
+    return SizedBox(
+      height: _height,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: ChaerokSpacing.xs,
+            vertical: 2,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? ChaerokColors.primary : ChaerokColors.surface,
+            borderRadius: BorderRadius.circular(ChaerokRadius.sm),
+          ),
+          child: Text(
+            label,
+            style: ChaerokTypography.caption.copyWith(
+              color: selected ? Colors.white : ChaerokColors.textSecondary,
+            ),
+          ),
         ),
       ),
     );
@@ -362,8 +347,10 @@ class _CategoryChip extends StatelessWidget {
 /// 필름스트립 — 칸 하나하나가 코스 장소 하나하나에 대응한다. 인증(촬영)
 /// 완료한 장소는 그 사진을, 아직 안 간 장소는 빈 프레임을 보여준다. 검은
 /// 필름 띠 위아래에 스프라켓 구멍을 두르는 틀은 내용과 무관하게 항상
-/// 유지한다(Figma node 37:1828 "빈 필름" 모양을 그대로 따른다).
-class _FilmStrip extends StatelessWidget {
+/// 유지한다(Figma node 37:1828 "빈 필름" 모양을 그대로 따른다). 카테고리
+/// 태그는 이 검은 틀 밖, 각 칸 중앙 바로 위에 별도 줄로 떠 있고(선택된 칸은
+/// 초록색), 필름스트립을 옆으로 넘기면 같이 따라 움직인다.
+class _FilmStrip extends StatefulWidget {
   const _FilmStrip({
     required this.places,
     required this.photoForPlace,
@@ -376,57 +363,126 @@ class _FilmStrip extends StatelessWidget {
   final String? selectedPhotoId;
   final void Function(FilmRollPlace place, FilmRollPhoto? photo) onTap;
 
+  @override
+  State<_FilmStrip> createState() => _FilmStripState();
+}
+
+class _FilmStripState extends State<_FilmStrip> {
   static const double _itemWidth = 118;
   static const double _itemHeight = 88;
   static const double _itemGap = ChaerokSpacing.sm;
   static const double _itemRadius = 2;
   static const double _edgeHeight = 4;
+  static const double _tagGap = ChaerokSpacing.xxs;
+
+  final _tagScrollController = ScrollController();
+  final _photoScrollController = ScrollController();
+  bool _isSyncingScroll = false;
 
   @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      key: const ValueKey('filmStripFrame'),
-      color: ChaerokColors.cameraBlack,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: _edgeHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const _FilmSprocketRow(),
-            const SizedBox(height: ChaerokSpacing.xxs),
-            SizedBox(height: _itemHeight, child: _buildFrames()),
-            const SizedBox(height: ChaerokSpacing.xxs),
-            const _FilmSprocketRow(),
-          ],
-        ),
-      ),
+  void initState() {
+    super.initState();
+    _tagScrollController.addListener(
+      () => _syncScroll(_tagScrollController, _photoScrollController),
+    );
+    _photoScrollController.addListener(
+      () => _syncScroll(_photoScrollController, _tagScrollController),
     );
   }
 
-  Widget _buildFrames() {
-    if (places.isEmpty) return const SizedBox.shrink();
+  /// 태그 줄과 사진 줄이 같은 칸 너비/간격을 쓰므로 스크롤 오프셋을 그대로
+  /// 맞춰도 나란히 정렬된다. 한쪽이 다른 쪽을 갱신하다가 다시 리스너를
+  /// 트리거해 무한루프에 빠지지 않도록 플래그로 막는다.
+  void _syncScroll(ScrollController from, ScrollController to) {
+    if (_isSyncingScroll || !from.hasClients || !to.hasClients) return;
+    final target = from.offset.clamp(
+      to.position.minScrollExtent,
+      to.position.maxScrollExtent,
+    );
+    if (target == to.offset) return;
+    _isSyncingScroll = true;
+    to.jumpTo(target);
+    _isSyncingScroll = false;
+  }
+
+  @override
+  void dispose() {
+    _tagScrollController.dispose();
+    _photoScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: _CategoryTag._height, child: _buildTags()),
+        const SizedBox(height: _tagGap),
+        ColoredBox(
+          key: const ValueKey('filmStripFrame'),
+          color: ChaerokColors.cameraBlack,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: _edgeHeight),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _FilmSprocketRow(),
+                const SizedBox(height: ChaerokSpacing.xxs),
+                SizedBox(height: _itemHeight, child: _buildPhotos()),
+                const SizedBox(height: ChaerokSpacing.xxs),
+                const _FilmSprocketRow(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTags() {
+    if (widget.places.isEmpty) return const SizedBox.shrink();
     return ListView.separated(
+      controller: _tagScrollController,
       padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
       scrollDirection: Axis.horizontal,
-      itemCount: places.length,
+      itemCount: widget.places.length,
       separatorBuilder: (_, _) => const SizedBox(width: _itemGap),
       itemBuilder: (context, index) {
-        final place = places[index];
-        final photo = photoForPlace(place);
-        final isSelected = photo != null && photo.id == selectedPhotoId;
+        final place = widget.places[index];
+        final photo = widget.photoForPlace(place);
+        final isSelected = photo != null && photo.id == widget.selectedPhotoId;
+        final category = resolvePlaceCategoryGroup(place.category);
+        return SizedBox(
+          width: _itemWidth,
+          child: _CategoryTag(
+            label: _categoryLabels[category] ?? '',
+            selected: isSelected,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPhotos() {
+    if (widget.places.isEmpty) return const SizedBox.shrink();
+    return ListView.separated(
+      controller: _photoScrollController,
+      padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
+      scrollDirection: Axis.horizontal,
+      itemCount: widget.places.length,
+      separatorBuilder: (_, _) => const SizedBox(width: _itemGap),
+      itemBuilder: (context, index) {
+        final place = widget.places[index];
+        final photo = widget.photoForPlace(place);
         return GestureDetector(
-          onTap: () => onTap(place, photo),
-          child: Container(
-            width: _itemWidth,
-            height: _itemHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_itemRadius),
-              border: isSelected
-                  ? Border.all(color: ChaerokColors.primaryDark, width: 2)
-                  : null,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_itemRadius),
+          onTap: () => widget.onTap(place, photo),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(_itemRadius),
+            child: SizedBox(
+              width: _itemWidth,
+              height: _itemHeight,
               child: photo != null
                   ? Image.file(
                       File(photo.thumbnailPath),
