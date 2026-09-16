@@ -57,6 +57,11 @@ dependencies:
   drift_db_viewer: ^2.1.0
   flutter_svg: ^2.3.0
 
+  # 필름롤 현상 결과(릴스) 재생/저장/공유
+  video_player: ^2.9.2
+  gal: ^2.3.1
+  share_plus: ^10.1.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
