@@ -43,17 +43,25 @@ FilmRollPhoto _photo(
   isSynced: false,
 );
 
+/// 큰 사진은 디코딩 메모리를 줄이려고 `cacheHeight`를 줘서 `FileImage`가
+/// `ResizeImage`로 한 번 더 감싸진다 — 어느 쪽이든 실제 `FileImage`까지
+/// 벗겨서 파일 경로를 얻는다.
+String _filePath(ImageProvider provider) {
+  final inner = provider is ResizeImage ? provider.imageProvider : provider;
+  return (inner as FileImage).file.path;
+}
+
 /// 필름스트립 썸네일(원본이 아닌) `Image.file` 경로만 순서대로 뽑는다.
 List<String> _thumbnailPaths(WidgetTester tester) => tester
     .widgetList<Image>(find.byType(Image))
-    .map((image) => (image.image as FileImage).file.path)
+    .map((image) => _filePath(image.image))
     .where((path) => path.contains('-thumb.jpg'))
     .toList();
 
 /// 큰 사진(원본) `Image.file` 경로. 없으면(미리보기/플레이스홀더 상태) null.
 String? _heroImagePath(WidgetTester tester) => tester
     .widgetList<Image>(find.byType(Image))
-    .map((image) => (image.image as FileImage).file.path)
+    .map((image) => _filePath(image.image))
     .where((path) => path.contains('-original.jpg'))
     .firstOrNull;
 
@@ -157,6 +165,35 @@ void main() {
     expect(_heroImagePath(tester), '/tmp/photo-3-original.jpg');
   });
 
+  testWidgets('필름스트립 카테고리 태그를 눌러도 사진 타일과 동일하게 큰 사진이 바뀐다', (tester) async {
+    await tester.pumpWidget(host());
+
+    // 기본은 관광지 최근 사진(photo-2)이 큰 사진 자리에 있다.
+    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
+
+    // 필름스트립 위 "식당" 태그를 누른다(사진 타일이 아니라 태그).
+    await tester.tap(find.text('식당'));
+    await tester.pump();
+
+    expect(_heroImagePath(tester), '/tmp/photo-3-original.jpg');
+    expect(_tagTextColor(tester, '식당'), Colors.white);
+  });
+
+  testWidgets('아직 인증하지 않은 장소의 태그를 눌러도 카메라로 이어지지 않고 큰 사진만 그 장소로 넘어간다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    await tester.tap(find.text('카페'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(VisitCaptureScreen), findsNothing);
+    expect(_heroImagePath(tester), isNull);
+    expect(find.textContaining('가 볼 장소 · 장소 p-cafe'), findsOneWidget);
+    expect(_tagTextColor(tester, '카페'), Colors.white);
+  });
+
   testWidgets('아직 인증하지 않은 장소 타일을 누르면 그 장소를 인증하는 카메라 화면이 열린다', (tester) async {
     await tester.pumpWidget(host());
 
@@ -232,5 +269,30 @@ void main() {
     await tester.pumpWidget(host());
 
     expect(find.textContaining('가 볼 장소'), findsNothing);
+  });
+
+  testWidgets('큰 사진을 좌우로 스와이프하면 코스 순서(관광지→식당→카페)대로 넘어가고 태그 선택도 같이 바뀐다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+
+    expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
+    expect(_tagTextColor(tester, '관광지'), Colors.white);
+
+    await tester.fling(find.byType(PageView), const Offset(-600, 0), 1000);
+    await tester.pumpAndSettle();
+
+    expect(_heroImagePath(tester), '/tmp/photo-3-original.jpg');
+    expect(_tagTextColor(tester, '식당'), Colors.white);
+    expect(_tagTextColor(tester, '관광지'), ChaerokColors.textSecondary);
+
+    await tester.fling(find.byType(PageView), const Offset(-600, 0), 1000);
+    await tester.pumpAndSettle();
+
+    // 아직 인증 전인 카페 차례 — 사진 대신 "가 볼 장소" 미리보기로 넘어간다.
+    expect(_heroImagePath(tester), isNull);
+    expect(find.textContaining('가 볼 장소 · 장소 p-cafe'), findsOneWidget);
+    expect(_tagTextColor(tester, '카페'), Colors.white);
+    expect(_tagTextColor(tester, '식당'), ChaerokColors.textSecondary);
   });
 }
