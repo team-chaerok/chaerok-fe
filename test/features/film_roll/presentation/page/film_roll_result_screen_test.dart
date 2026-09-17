@@ -68,6 +68,73 @@ void main() {
     expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
   });
 
+  testWidgets('대표 사진을 좌우로 스와이프하면 sequence 오름차순(코스 순서)으로 전환된다', (tester) async {
+    final result = FilmRollResultResponse(
+      filmRollId: 900,
+      status: 'COMPLETED',
+      totalPhotoCount: 3,
+      processedPhotoCount: 3,
+      // 역순으로 내려와도 sequence 기준으로 재정렬돼야 한다.
+      filteredPhotos: [
+        FilteredPhotoResponse(
+          photoId: 3,
+          sequence: 3,
+          downloadUrl: 'https://example.com/cafe.jpg',
+          downloadUrlExpiresAt: DateTime(2026, 9, 15, 13),
+        ),
+        FilteredPhotoResponse(
+          photoId: 1,
+          sequence: 1,
+          downloadUrl: 'https://example.com/tourism.jpg',
+          downloadUrlExpiresAt: DateTime(2026, 9, 15, 13),
+        ),
+        FilteredPhotoResponse(
+          photoId: 2,
+          sequence: 2,
+          downloadUrl: 'https://example.com/food.jpg',
+          downloadUrlExpiresAt: DateTime(2026, 9, 15, 13),
+        ),
+      ],
+      completedAt: DateTime(2026, 9, 15, 12),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FilmRollResultScreen(
+          filmRoll: _filmRoll(),
+          initialResult: result,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('1/3'), findsOneWidget);
+
+    String currentPageImageUrl() {
+      final image = tester.widget<Image>(
+        find.descendant(
+          of: find.byType(PageView),
+          matching: find.byType(Image),
+        ),
+      );
+      return (image.image as NetworkImage).url;
+    }
+
+    expect(currentPageImageUrl(), 'https://example.com/tourism.jpg');
+
+    await tester.fling(find.byType(PageView), const Offset(-600, 0), 1000);
+    await tester.pumpAndSettle();
+
+    expect(find.text('2/3'), findsOneWidget);
+    expect(currentPageImageUrl(), 'https://example.com/food.jpg');
+
+    await tester.fling(find.byType(PageView), const Offset(-600, 0), 1000);
+    await tester.pumpAndSettle();
+
+    expect(find.text('3/3'), findsOneWidget);
+    expect(currentPageImageUrl(), 'https://example.com/cafe.jpg');
+  });
+
   testWidgets('릴스가 없으면 저장/공유 버튼이 비활성화된다', (tester) async {
     const result = FilmRollResultResponse(
       filmRollId: 900,

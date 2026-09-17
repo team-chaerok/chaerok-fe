@@ -47,6 +47,9 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   String? _errorMessage;
   FilmRollResultResponse? _result;
 
+  final PageController _representativePageController = PageController();
+  int _representativePageIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +58,12 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     } else {
       unawaited(_fetchResult());
     }
+  }
+
+  @override
+  void dispose() {
+    _representativePageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchResult() async {
@@ -192,8 +201,8 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       return const SizedBox.shrink();
     }
 
-    final photos = result.filteredPhotos;
-    final representative = photos.isEmpty ? null : photos.first;
+    final photos = [...result.filteredPhotos]
+      ..sort((a, b) => a.sequence.compareTo(b.sequence));
     final previewPhotos = photos.take(3).toList();
 
     return SingleChildScrollView(
@@ -203,7 +212,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
         children: [
           _buildHeader(),
           const SizedBox(height: ChaerokSpacing.md),
-          _buildRepresentativeImage(representative),
+          _buildRepresentativeImage(photos),
           const SizedBox(height: ChaerokSpacing.sm),
           _buildStatsRow(result),
           const SizedBox(height: ChaerokSpacing.xl),
@@ -213,7 +222,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
           const SizedBox(height: ChaerokSpacing.xl),
           _buildSectionTitle('오늘의 릴스'),
           const SizedBox(height: ChaerokSpacing.sm),
-          _buildReelCard(result.reel, representative),
+          _buildReelCard(result.reel, photos.isEmpty ? null : photos.first),
           const SizedBox(height: ChaerokSpacing.xl),
           _buildActionButtons(result),
         ],
@@ -241,19 +250,62 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
-  Widget _buildRepresentativeImage(FilteredPhotoResponse? representative) {
+  /// 코스 순서([FilteredPhotoResponse.sequence] 오름차순)대로 좌우 스와이프되는
+  /// 대표 사진. 관광지 → 식당 → 카페 순으로 방문·촬영되므로 정렬된 목록을
+  /// 그대로 넘기면 스와이프 순서가 코스 순서와 일치한다.
+  Widget _buildRepresentativeImage(List<FilteredPhotoResponse> photos) {
+    final pageCount = photos.isEmpty ? 1 : photos.length;
+    final safeIndex = _representativePageIndex >= pageCount
+        ? pageCount - 1
+        : _representativePageIndex;
+
     return AspectRatio(
       aspectRatio: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(ChaerokRadius.lg),
-        child: representative == null
-            ? const ColoredBox(color: ChaerokColors.sageLight)
-            : Image.network(
-                representative.downloadUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const ColoredBox(color: ChaerokColors.sageLight),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            PageView.builder(
+              controller: _representativePageController,
+              itemCount: pageCount,
+              onPageChanged: (i) =>
+                  setState(() => _representativePageIndex = i),
+              itemBuilder: (context, i) {
+                if (photos.isEmpty) {
+                  return const ColoredBox(color: ChaerokColors.sageLight);
+                }
+                return Image.network(
+                  photos[i].downloadUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const ColoredBox(color: ChaerokColors.sageLight),
+                );
+              },
+            ),
+            if (photos.length > 1)
+              Positioned(
+                right: ChaerokSpacing.sm,
+                bottom: ChaerokSpacing.sm,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ChaerokSpacing.xs,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(ChaerokRadius.sm),
+                  ),
+                  child: Text(
+                    '${safeIndex + 1}/$pageCount',
+                    style: ChaerokTypography.caption.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
+          ],
+        ),
       ),
     );
   }
