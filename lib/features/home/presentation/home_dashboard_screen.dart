@@ -423,7 +423,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
       if (recovered != null) {
         unawaited(_loadFilmRollPhotos(recovered.id));
         unawaited(_loadFilmRollPlaces(recovered.id));
-        unawaited(_backfillPlaceImages(recovered.id));
+        unawaited(
+          _backfillPlaceImages(recovered.id, regionId: recovered.regionId),
+        );
       }
       final locationResult = _locationResult;
       if (locationResult != null) {
@@ -468,9 +470,12 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   /// 필름롤은 장소 이미지가 계속 비어있다. 홈 진입 시 한 번 소급 보충하고,
   /// 갤러리("가 볼 장소" 미리보기)가 바로 반영하도록 장소 목록을 다시 읽는다.
   /// 이미 이미지가 있는 장소는 건드리지 않아 여러 번 호출해도 안전하다.
-  Future<void> _backfillPlaceImages(String filmRollId) async {
+  Future<void> _backfillPlaceImages(String filmRollId, {int? regionId}) async {
     try {
-      await FilmRollModule.instance.backfillPlaceImages(filmRollId);
+      await FilmRollModule.instance.backfillPlaceImages(
+        filmRollId,
+        regionId: regionId,
+      );
     } catch (e, st) {
       log('장소 이미지 소급 보충 실패', name: _tag, error: e, stackTrace: st);
       return;
