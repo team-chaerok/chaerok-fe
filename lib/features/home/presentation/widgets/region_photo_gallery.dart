@@ -14,6 +14,7 @@ import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
+import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
 import 'package:flutter/material.dart';
 
@@ -191,6 +192,20 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     await widget.onVisitCompleted();
   }
 
+  /// 큰 사진을 탭했을 때 그 칸이 가리키는 장소의 상세 정보를 바텀시트로
+  /// 보여준다. 인증 여부와 무관하게 열리며, 촬영한 사진이 있으면 그 사진들을
+  /// 함께 보여준다([PlaceDetailSheet] 참고).
+  Future<void> _showPlaceDetailSheet(FilmRollPlace place) {
+    final placePhotos = widget.photos
+        .where((photo) => photo.filmRollPlaceId == place.id)
+        .toList();
+    return showPlaceDetailSheet(
+      context,
+      place: PlaceDetailSheetPlace.fromFilmRollPlace(place),
+      photos: placePhotos,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final orderedPlaces = _placesByCategoryOrder;
@@ -282,7 +297,10 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
                   return const ColoredBox(color: ChaerokColors.surface);
                 }
                 final place = places[i];
-                return _heroSlide(context, _photoForPlace(place), place);
+                return GestureDetector(
+                  onTap: () => _showPlaceDetailSheet(place),
+                  child: _heroSlide(context, _photoForPlace(place), place),
+                );
               },
             ),
           ),
@@ -303,8 +321,9 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
                 '가 볼 장소 · ${previewPlace.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ChaerokTypography.caption.copyWith(
-                  color: ChaerokColors.textSecondary,
+                style: ChaerokTypography.bodyMedium.copyWith(
+                  color: ChaerokColors.textPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
