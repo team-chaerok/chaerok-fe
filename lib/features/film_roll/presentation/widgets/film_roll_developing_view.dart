@@ -12,6 +12,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/develop_film_roll_use_
 import 'package:chaerok/features/film_roll/domain/usecase/watch_film_roll_result_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_screen.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
 
 /// 채록길 탭의 현상 대기 모드 본문.
@@ -42,7 +43,7 @@ class FilmRollDevelopingView extends StatefulWidget {
   State<FilmRollDevelopingView> createState() => _FilmRollDevelopingViewState();
 }
 
-enum _DevelopingPhase { waiting, failed, expired }
+enum _DevelopingPhase { waiting, failed, expired, pollError }
 
 class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
   static const _tag = 'FilmRollDevelopingView';
@@ -91,8 +92,23 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
       _onResult,
       onError: (Object e, StackTrace st) {
         log('현상 결과 폴링 실패', name: _tag, error: e, stackTrace: st);
+        if (!mounted) return;
+        setState(() {
+          _phase = _DevelopingPhase.pollError;
+          _failure = null;
+        });
       },
     );
+  }
+
+  /// 폴링 실패 후 "다시 시도"를 누르면 대기 상태로 되돌리고 처음부터 다시
+  /// 현상 요청 + 결과 폴링을 시작한다.
+  void _retryAfterPollError() {
+    setState(() {
+      _phase = _DevelopingPhase.waiting;
+      _failure = null;
+    });
+    unawaited(_startDevelopment());
   }
 
   Future<void> _onResult(FilmRollResultResponse result) async {
@@ -145,14 +161,21 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
           _buildStatusCard(),
           const SizedBox(height: ChaerokSpacing.lg),
           Text(
-            _phase == _DevelopingPhase.waiting
-                ? '서로 다른 관광 유형 방문과 촬영한 사진으로 현상이 진행돼요.'
-                : '현상 결과를 다시 확인하려면 필름 컬렉션에서 확인해 주세요.',
+            switch (_phase) {
+              _DevelopingPhase.waiting => '서로 다른 관광 유형 방문과 촬영한 사진으로 현상이 진행돼요.',
+              _DevelopingPhase.pollError => '네트워크 상태를 확인하고 다시 시도해 주세요.',
+              _DevelopingPhase.failed ||
+              _DevelopingPhase.expired => '현상 결과를 다시 확인하려면 필름 컬렉션에서 확인해 주세요.',
+            },
             style: ChaerokTypography.bodyMedium.copyWith(
               color: ChaerokColors.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
+          if (_phase == _DevelopingPhase.pollError) ...[
+            const SizedBox(height: ChaerokSpacing.md),
+            ChaerokButton(text: '다시 시도', onPressed: _retryAfterPollError),
+          ],
         ],
       ),
     );
@@ -192,6 +215,7 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
       _DevelopingPhase.waiting => Icons.hourglass_bottom,
       _DevelopingPhase.failed => Icons.error_outline,
       _DevelopingPhase.expired => Icons.cancel_outlined,
+      _DevelopingPhase.pollError => Icons.wifi_off_outlined,
     };
   }
 
@@ -200,6 +224,7 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
       _DevelopingPhase.waiting => '현상 진행 중이에요',
       _DevelopingPhase.failed => '릴스 생성에 실패했어요',
       _DevelopingPhase.expired => '결과 보관 기간이 지났어요',
+      _DevelopingPhase.pollError => '결과를 불러오지 못했어요',
     };
   }
 }
