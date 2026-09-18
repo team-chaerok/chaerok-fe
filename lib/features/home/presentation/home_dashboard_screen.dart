@@ -15,6 +15,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
@@ -74,6 +75,10 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   // 같은 화면의 수동 "필름롤 시작하기" 버튼이 동시에 눌려 내비게이션이
   // 중복 push되는 것을 막기 위한 플래그.
   bool _isAutoConnectingFilmRoll = false;
+
+  // 진행중 필름롤은 있지만 코스를 아직 선택하지 않은 상태에서, 갤러리 대신
+  // 뜨는 "코스를 선택해주세요" 카드의 버튼이 연타되지 않도록 막는 플래그.
+  bool _isSelectingCourseFromGallery = false;
 
   // 탭 재진입·카메라 종료·앱 포그라운드 복귀로 [refresh]가 겹쳐 불릴 때,
   // 진행 중인 조회에 나중 요청을 합류시키기 위한 상태. 나중 요청을 그냥
@@ -525,6 +530,30 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     }
   }
 
+  /// 진행중 필름롤은 있지만 코스를 아직 선택하지 않았을 때(예: 코스 선택
+  /// 화면에서 뒤로가기로 빠져나온 경우) 갤러리 대신 뜨는 안내 카드의 버튼에서
+  /// 호출한다. 채록길 탭의 [FilmRollProgressView._onSelectCourseTap]과 같은
+  /// 목적지(코스 선택 화면)로 이어준다.
+  Future<void> _onSelectCourseForRecoveredFilmRollTap() async {
+    final filmRoll = _recoveredFilmRoll;
+    if (filmRoll == null || _isSelectingCourseFromGallery) return;
+    final regionId = filmRoll.regionId ?? _locationResult?.region.regionId;
+    if (regionId == null) return;
+
+    setState(() => _isSelectingCourseFromGallery = true);
+    try {
+      await pushCourseSelectionAndConfirm(
+        context,
+        filmRollId: filmRoll.id,
+        regionId: regionId,
+      );
+      if (!mounted) return;
+      await refresh();
+    } finally {
+      if (mounted) setState(() => _isSelectingCourseFromGallery = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isOutOfService) {
@@ -573,7 +602,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
                   nearbyPlaces: _nearbyPlaces,
                   isAutoConnectingFilmRoll: _isAutoConnectingFilmRoll,
                   isEnteringFilmRoll: _isEnteringFilmRoll,
+                  isSelectingCourse: _isSelectingCourseFromGallery,
                   onStartFilmRollTap: _onStartFilmRollTap,
+                  onSelectCourseTap: _onSelectCourseForRecoveredFilmRollTap,
                   onVisitCompleted: refresh,
                 ),
               ),
@@ -656,7 +687,9 @@ class _RegionHomeBody extends StatelessWidget {
     required this.nearbyPlaces,
     required this.isAutoConnectingFilmRoll,
     required this.isEnteringFilmRoll,
+    required this.isSelectingCourse,
     required this.onStartFilmRollTap,
+    required this.onSelectCourseTap,
     required this.onVisitCompleted,
   });
 
@@ -669,7 +702,13 @@ class _RegionHomeBody extends StatelessWidget {
   final List<RecommendedPlaceSummaryData> nearbyPlaces;
   final bool isAutoConnectingFilmRoll;
   final bool isEnteringFilmRoll;
+
+  /// 진행중 필름롤은 있지만 코스 미선택일 때 뜨는 안내 카드의 버튼 로딩 상태.
+  final bool isSelectingCourse;
   final VoidCallback onStartFilmRollTap;
+
+  /// 코스 미선택 안내 카드의 "추천 코스 선택하기" 버튼 콜백.
+  final VoidCallback onSelectCourseTap;
 
   /// 갤러리에서 미방문 장소를 카메라로 인증하고 돌아오면, 최신 방문/사진
   /// 상태를 다시 읽어오도록 호출하는 콜백(`HomeDashboardScreenState.refresh`).
@@ -683,7 +722,27 @@ class _RegionHomeBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 필름롤이 진행중이면 사진 갤러리로 전체를 대체한다(헤더/날씨/근처 장소 없음).
+    // 단, 코스를 아직 선택하지 않았다면(예: 코스 선택 화면에서 뒤로가기로
+    // 빠져나온 경우) 빈 갤러리 대신 코스 선택으로 이어주는 안내 카드를 보여준다
+    // — 채록길 탭의 FilmRollProgressView.hasCourse 분기와 동일한 목적.
     if (recoveredFilmRoll != null) {
+      if (recoveredFilmRoll!.isDeveloping) {
+        return ColoredBox(
+          color: ChaerokColors.background,
+          child: FilmRollDevelopingView(filmRoll: recoveredFilmRoll!),
+        );
+      }
+      if (recoveredFilmRoll!.selectedCourseId == null) {
+        return ColoredBox(
+          color: ChaerokColors.background,
+          child: Center(
+            child: Padding(
+              padding: _contentPadding,
+              child: _buildNeedsCourseSelectionCard(),
+            ),
+          ),
+        );
+      }
       return ColoredBox(
         color: ChaerokColors.background,
         child: RegionPhotoGallery(
@@ -773,6 +832,42 @@ class _RegionHomeBody extends StatelessWidget {
             isEnabled: locationResult != null && !isAutoConnectingFilmRoll,
             isLoading: isEnteringFilmRoll || isAutoConnectingFilmRoll,
             onPressed: onStartFilmRollTap,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 진행중 필름롤은 있지만 코스를 아직 선택하지 않았을 때 빈 갤러리 대신
+  /// 보여주는 안내 카드 — 채록길 탭의 "추천 코스 선택하기" 버튼과 동일한
+  /// 문구/목적지를 쓴다.
+  Widget _buildNeedsCourseSelectionCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ChaerokSpacing.lg),
+      decoration: BoxDecoration(
+        color: ChaerokColors.surface,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+        border: Border.all(color: ChaerokColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('필름롤', style: ChaerokTypography.bodyMedium),
+          const SizedBox(height: ChaerokSpacing.xs),
+          Text(
+            '코스를 아직 선택하지 않았어요. 코스를 선택하고 채록을 시작해보세요.',
+            style: ChaerokTypography.bodyMedium.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: ChaerokSpacing.sm),
+          ChaerokButton(
+            text: '추천 코스 선택하기',
+            isEnabled: !isSelectingCourse,
+            isLoading: isSelectingCourse,
+            onPressed: onSelectCourseTap,
           ),
         ],
       ),
