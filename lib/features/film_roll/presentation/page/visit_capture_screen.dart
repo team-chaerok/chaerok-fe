@@ -8,6 +8,7 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/camera_bottom_pattern.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_shutter_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_switch_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_top_bar.dart';
@@ -305,13 +306,19 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.primaryLight,
-      // 앱 인터페이스는 세로. 이 화면만 본문 전체를 회전시켜 가로로 보이게 한다.
-      body: SafeArea(
-        child: RotatedBox(
-          key: const ValueKey('capture-body-rotator'),
-          quarterTurns: _bodyQuarterTurns,
-          child: _buildBody(),
-        ),
+      body: Stack(
+        children: [
+          // 실제 화면(회전 전) 좌표계 기준 장식 패턴이므로 RotatedBox 바깥에 둔다.
+          const Positioned.fill(child: CameraBottomPattern()),
+          // 앱 인터페이스는 세로. 이 화면만 본문 전체를 회전시켜 가로로 보이게 한다.
+          SafeArea(
+            child: RotatedBox(
+              key: const ValueKey('capture-body-rotator'),
+              quarterTurns: _bodyQuarterTurns,
+              child: _buildBody(),
+            ),
+          ),
+        ],
       ),
     );
   }
