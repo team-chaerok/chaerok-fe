@@ -4,7 +4,6 @@ import 'package:chaerok/data/remote/places_api.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
-import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 
 const _tag = 'BackfillPlaceImagesUseCase';
 
@@ -36,28 +35,21 @@ Future<Map<String, String>> defaultExternalPlaceImageFetcher(
   }
 }
 
-/// 카카오 이미지 검색(다음 검색 API)으로 [placeName]의 대표 사진을 찾는다.
-/// Kakao Local(장소 검색) API 자체가 사진을 제공하지 않는 Kakao 소스 장소를
-/// 위한 최종 폴백 — 키워드 검색 결과라 정확히 그 장소의 사진이라는 보장은
-/// 없다.
-Future<String?> defaultKakaoImageSearchFetcher(String placeName) {
-  return KakaoLocalApiService.searchPlaceImage(placeName);
-}
-
 /// [SelectCourseUseCase]의 이미지 보충 기능이 생기기 전에 이미 코스가 확정된
 /// 필름롤은 장소에 [FilmRollPlace.imageUrl]이 계속 비어있다. 홈 진입 시 한 번,
 /// 서버 DB 장소([FilmRollPlace.serverPlaceId] 있음)는 장소 상세 API로, 외부
 /// (TourAPI/Kakao) 전용 장소([FilmRollPlace.externalPlaceId] 있음)는 같은
 /// 지역의 외부 장소 목록으로 소급 보충한다. 그래도 남은 장소(Kakao Local로만
-/// 들어와 애초에 사진이 없는 장소 등)는 장소명으로 카카오 이미지 검색을
-/// 최종 폴백으로 시도한다. 이미 이미지가 있는 장소는 건드리지 않으므로,
-/// 여러 번 호출해도 매번 남은 것만 다시 시도한다(멱등).
+/// 들어와 애초에 사진이 없는 장소 등)는 채우지 않고 카테고리별 기본
+/// 일러스트([PlaceImage])로 남긴다 — 장소명 키워드 검색(카카오 이미지 검색)은
+/// 실제 그 장소 사진이라는 보장이 없어 검증할 방법이 없으므로 쓰지 않는다.
+/// 이미 이미지가 있는 장소는 건드리지 않으므로, 여러 번 호출해도 매번 남은
+/// 것만 다시 시도한다(멱등).
 class BackfillPlaceImagesUseCase {
   const BackfillPlaceImagesUseCase(
     this._placeRepository, {
     this.placeImageFetcher = defaultPlaceImageFetcher,
     this.externalPlaceImageFetcher = defaultExternalPlaceImageFetcher,
-    this.kakaoImageSearchFetcher = defaultKakaoImageSearchFetcher,
   });
 
   final FilmRollPlaceRepository _placeRepository;
@@ -70,11 +62,8 @@ class BackfillPlaceImagesUseCase {
   final Future<Map<String, String>> Function(int regionId)
   externalPlaceImageFetcher;
 
-  /// 장소명 기반 카카오 이미지 검색 seam.
-  final Future<String?> Function(String placeName) kakaoImageSearchFetcher;
-
   /// [regionId]가 없으면(필름롤이 아직 서버와 동기화되지 않은 경우 등) 외부
-  /// 장소 보충은 건너뛴다 — 서버 장소 보충·카카오 검색 폴백에는 영향 없다.
+  /// 장소 보충은 건너뛴다 — 서버 장소 보충에는 영향 없다.
   Future<void> call(String filmRollId, {int? regionId}) async {
     final places = await _placeRepository.findByFilmRoll(filmRollId);
 
@@ -90,22 +79,11 @@ class BackfillPlaceImagesUseCase {
         )
         .toList();
 
-    final serverResultsFuture = Future.wait(
-      serverTargets.map(_backfillFromServer),
-    );
-    final externalResultsFuture = regionId != null && externalTargets.isNotEmpty
-        ? _backfillFromExternal(regionId, externalTargets)
-        : Future.value(const <String>{});
-
-    final filledIds = <String>{
-      ...(await serverResultsFuture).whereType<String>(),
-      ...(await externalResultsFuture),
-    };
-
-    final kakaoTargets = places.where(
-      (place) => place.imageUrl == null && !filledIds.contains(place.id),
-    );
-    await Future.wait(kakaoTargets.map(_backfillFromKakaoSearch));
+    await Future.wait([
+      ...serverTargets.map(_backfillFromServer),
+      if (regionId != null && externalTargets.isNotEmpty)
+        _backfillFromExternal(regionId, externalTargets),
+    ]);
   }
 
   Future<String?> _backfillFromServer(FilmRollPlace place) async {
@@ -151,20 +129,5 @@ class BackfillPlaceImagesUseCase {
       }),
     );
     return filledIds;
-  }
-
-  Future<void> _backfillFromKakaoSearch(FilmRollPlace place) async {
-    try {
-      final imageUrl = await kakaoImageSearchFetcher(place.name);
-      if (imageUrl == null) return;
-      await _placeRepository.updateImageUrl(place.id, imageUrl);
-    } catch (e, st) {
-      log(
-        '카카오 이미지 검색 보충 실패(placeId=${place.id})',
-        name: _tag,
-        error: e,
-        stackTrace: st,
-      );
-    }
   }
 }

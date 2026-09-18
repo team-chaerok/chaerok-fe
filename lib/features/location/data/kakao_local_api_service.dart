@@ -63,28 +63,4 @@ class KakaoLocalApiService {
       return null;
     }
   }
-
-  /// 장소명으로 카카오 이미지 검색(다음 검색 API)을 해 첫 번째 결과의 이미지
-  /// URL을 반환한다. 키워드 검색 결과라 그 장소의 실제 사진이라는 보장은
-  /// 없다 — Kakao Local API 자체가 장소 사진을 제공하지 않아 쓰는 보완책.
-  /// 결과가 없거나 실패하면 null을 반환한다.
-  static Future<String?> searchPlaceImage(String query) async {
-    try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        '/v2/search/image',
-        queryParameters: {'query': query, 'size': 1},
-      );
-
-      final documents = response.data?['documents'] as List<dynamic>?;
-      if (documents == null || documents.isEmpty) return null;
-
-      final first = documents.first as Map<String, dynamic>;
-      final imageUrl = first['image_url'] as String?;
-      if (imageUrl != null && imageUrl.isNotEmpty) return imageUrl;
-      return first['thumbnail_url'] as String?;
-    } catch (e, st) {
-      log('카카오 이미지 검색 실패(query=$query)', name: _tag, error: e, stackTrace: st);
-      return null;
-    }
-  }
 }

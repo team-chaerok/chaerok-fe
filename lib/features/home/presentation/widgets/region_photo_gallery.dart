@@ -357,7 +357,7 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     }
     return PlaceImage(
       imageUrl: previewPlace.imageUrl,
-      mood: PlacePlaceholderMood.forest,
+      mood: moodForCategory(resolvePlaceCategoryGroup(previewPlace.category)),
     );
   }
 }

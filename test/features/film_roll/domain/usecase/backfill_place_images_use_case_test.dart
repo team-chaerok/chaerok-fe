@@ -43,10 +43,6 @@ FilmRollPlace _place({
   imageUrl: imageUrl,
 );
 
-/// 대부분의 테스트는 카카오 이미지 검색 폴백까지 도달시키고 싶지 않으므로,
-/// 기본값은 항상 null(검색 결과 없음)을 반환하는 no-op으로 둔다.
-Future<String?> _noKakaoFallback(String placeName) async => null;
-
 void main() {
   test('serverPlaceId가 있고 이미지가 없는 장소만 보충한다', () async {
     final repository = _StubFilmRollPlaceRepository([
@@ -57,7 +53,6 @@ void main() {
     final useCase = BackfillPlaceImagesUseCase(
       repository,
       placeImageFetcher: (placeId) async => 'https://img/$placeId.jpg',
-      kakaoImageSearchFetcher: _noKakaoFallback,
     );
 
     await useCase.call('fr-1');
@@ -76,7 +71,6 @@ void main() {
         fetchCount++;
         return 'x';
       },
-      kakaoImageSearchFetcher: _noKakaoFallback,
     );
 
     await useCase.call('fr-1');
@@ -85,20 +79,18 @@ void main() {
     expect(repository.updatedImageUrls, isEmpty);
   });
 
-  test('fetcher가 null을 반환하면 카카오 이미지 검색으로 폴백한다', () async {
+  test('fetcher가 null을 반환하면 그 장소는 채우지 않는다(검증 불가한 검색 폴백을 쓰지 않는다)', () async {
     final repository = _StubFilmRollPlaceRepository([
       _place(id: 'p1', serverPlaceId: 1, name: '제민천'),
     ]);
     final useCase = BackfillPlaceImagesUseCase(
       repository,
       placeImageFetcher: (placeId) async => null,
-      kakaoImageSearchFetcher: (placeName) async =>
-          placeName == '제민천' ? 'https://kakao-img/1.jpg' : null,
     );
 
     await useCase.call('fr-1');
 
-    expect(repository.updatedImageUrls, {'p1': 'https://kakao-img/1.jpg'});
+    expect(repository.updatedImageUrls, isEmpty);
   });
 
   test('한 장소의 보충이 예외로 실패해도 나머지는 계속 보충한다', () async {
@@ -112,7 +104,6 @@ void main() {
         if (placeId == 1) throw Exception('network error');
         return 'https://img/$placeId.jpg';
       },
-      kakaoImageSearchFetcher: _noKakaoFallback,
     );
 
     await useCase.call('fr-1');
@@ -132,14 +123,12 @@ void main() {
         regionIdsQueried.add(regionId);
         return {'tour-1': 'https://img/tour-1.jpg'};
       },
-      kakaoImageSearchFetcher: _noKakaoFallback,
     );
 
     await useCase.call('fr-1', regionId: 10);
 
     expect(regionIdsQueried, [10]);
-    // p2는 외부 목록에 이미지가 없어 카카오 폴백까지 가지만, 폴백도
-    // null이라 최종적으로 채워지지 않는다.
+    // p2는 외부 목록에 이미지가 없어 채워지지 않는다(검증 불가한 검색 폴백 없음).
     expect(repository.updatedImageUrls, {'p1': 'https://img/tour-1.jpg'});
   });
 
@@ -154,7 +143,6 @@ void main() {
         fetchCount++;
         return {'tour-1': 'https://img/tour-1.jpg'};
       },
-      kakaoImageSearchFetcher: _noKakaoFallback,
     );
 
     await useCase.call('fr-1');
@@ -163,70 +151,17 @@ void main() {
     expect(repository.updatedImageUrls, isEmpty);
   });
 
-  test(
-    'serverPlaceId/externalPlaceId 어느 쪽으로도 못 채운 장소는 장소명으로 카카오 이미지 검색을 시도한다',
-    () async {
-      final repository = _StubFilmRollPlaceRepository([
-        _place(id: 'p1', externalPlaceId: 'kakao-1', name: '너티트릿츠'),
-      ]);
-      final queriedNames = <String>[];
-      final useCase = BackfillPlaceImagesUseCase(
-        repository,
-        externalPlaceImageFetcher: (regionId) async => const {}, // TourAPI엔 없음
-        kakaoImageSearchFetcher: (placeName) async {
-          queriedNames.add(placeName);
-          return 'https://kakao-img/nutty.jpg';
-        },
-      );
-
-      await useCase.call('fr-1', regionId: 10);
-
-      expect(queriedNames, ['너티트릿츠']);
-      expect(repository.updatedImageUrls, {
-        'p1': 'https://kakao-img/nutty.jpg',
-      });
-    },
-  );
-
-  test('외부 목록에서 이미 채워진 장소는 카카오 이미지 검색을 다시 시도하지 않는다', () async {
+  test('serverPlaceId/externalPlaceId 어느 쪽으로도 못 채운 장소는 채우지 않는다', () async {
     final repository = _StubFilmRollPlaceRepository([
-      _place(id: 'p1', externalPlaceId: 'tour-1', name: '제민천'),
+      _place(id: 'p1', externalPlaceId: 'kakao-1', name: '너티트릿츠'),
     ]);
-    var kakaoQueryCount = 0;
     final useCase = BackfillPlaceImagesUseCase(
       repository,
-      externalPlaceImageFetcher: (regionId) async => {
-        'tour-1': 'https://img/tour-1.jpg',
-      },
-      kakaoImageSearchFetcher: (placeName) async {
-        kakaoQueryCount++;
-        return 'https://kakao-img/should-not-be-used.jpg';
-      },
+      externalPlaceImageFetcher: (regionId) async => const {}, // TourAPI엔 없음
     );
 
     await useCase.call('fr-1', regionId: 10);
 
-    expect(kakaoQueryCount, 0);
-    expect(repository.updatedImageUrls, {'p1': 'https://img/tour-1.jpg'});
-  });
-
-  test('카카오 이미지 검색이 예외로 실패해도 나머지 장소는 계속 보충한다', () async {
-    final repository = _StubFilmRollPlaceRepository([
-      _place(id: 'p1', name: '실패장소'),
-      _place(id: 'p2', name: '성공장소'),
-    ]);
-    final useCase = BackfillPlaceImagesUseCase(
-      repository,
-      kakaoImageSearchFetcher: (placeName) async {
-        if (placeName == '실패장소') throw Exception('network error');
-        return 'https://kakao-img/success.jpg';
-      },
-    );
-
-    await useCase.call('fr-1');
-
-    expect(repository.updatedImageUrls, {
-      'p2': 'https://kakao-img/success.jpg',
-    });
+    expect(repository.updatedImageUrls, isEmpty);
   });
 }

@@ -601,7 +601,7 @@ class _PlaceDetailSheetState extends State<PlaceDetailSheet> {
                   )
                 : PlaceImage(
                     imageUrl: place.imageUrl ?? _detail?.firstImageUrl,
-                    mood: PlacePlaceholderMood.forest,
+                    mood: moodForCategory(place.categoryGroup),
                   ),
           ),
           if (hasLocalPhotos && _sortedPhotos.length > 1)
