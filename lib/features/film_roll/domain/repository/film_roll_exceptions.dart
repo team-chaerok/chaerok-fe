@@ -42,3 +42,15 @@ class ExitNotSyncedException implements Exception {
   String toString() =>
       'ExitNotSyncedException: 서버와 동기화되지 않아 지역 이탈을 확정할 수 없습니다.';
 }
+
+/// 이 계정에 이탈 처리되지 않은 다른 활성 필름롤이 서버에 이미 있어(clientFilmRollId가
+/// 다름) 지금 필름롤을 서버에 생성/연결할 수 없을 때 발생하는 예외. [ExitNotSyncedException]과
+/// 달리 재시도로 해결되지 않는 영구적인 상태이므로 화면에서 구분해 안내해야 한다.
+class ActiveFilmRollConflictException implements Exception {
+  const ActiveFilmRollConflictException();
+
+  @override
+  String toString() =>
+      'ActiveFilmRollConflictException: 이탈 처리되지 않은 다른 활성 필름롤이 있어 '
+      '지역 이탈을 확정할 수 없습니다.';
+}

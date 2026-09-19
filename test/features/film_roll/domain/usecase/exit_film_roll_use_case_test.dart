@@ -177,6 +177,26 @@ void main() {
     expect(result.isDeveloping, isTrue);
   });
 
+  test('다른 활성 필름롤에 막히면(blockedByOtherActiveFilmRoll) '
+      'ActiveFilmRollConflictException을 던진다', () async {
+    final repo = _FakeFilmRollRepository(_filmRoll());
+    final sync = _FakeSyncService(
+      result: const FilmRollSyncResult(blockedByOtherActiveFilmRoll: true),
+    );
+    final useCase = ExitFilmRollUseCase(
+      filmRollRepository: repo,
+      syncService: sync,
+      exitFilmRoll: (_) async => throw StateError('호출되면 안 됨'),
+    );
+
+    await expectLater(
+      useCase.call(repo.filmRoll),
+      throwsA(isA<ActiveFilmRollConflictException>()),
+    );
+    expect(repo.markDevelopingCalls, isEmpty);
+    expect(repo.markExpiredCalls, isEmpty);
+  });
+
   test('동기화 후에도 serverFilmRollId가 없으면 ExitNotSyncedException을 던진다', () async {
     final repo = _FakeFilmRollRepository(_filmRoll());
     final useCase = ExitFilmRollUseCase(

@@ -31,7 +31,9 @@ class ExitFilmRollUseCase {
   final FilmRollSyncService _syncService;
   final Future<FilmRollExitResponse> Function(int) _exitFilmRoll;
 
-  /// 서버 필름롤 ID가 없으면 [ExitNotSyncedException]을 던진다.
+  /// 서버 필름롤 ID가 없으면 [ExitNotSyncedException]을, 이 계정에 이탈 처리되지
+  /// 않은 다른 활성 필름롤이 있어 확보 자체가 불가능하면 [ActiveFilmRollConflictException]을
+  /// 던진다.
   Future<ExitFilmRollResult> call(FilmRoll filmRoll) async {
     final serverFilmRollId = await _ensureServerFilmRollId(filmRoll);
     if (serverFilmRollId == null) {
@@ -79,6 +81,9 @@ class ExitFilmRollUseCase {
       filmRoll.id,
       skipRegionCheck: true,
     );
+    if (syncResult.blockedByOtherActiveFilmRoll) {
+      throw const ActiveFilmRollConflictException();
+    }
     if (syncResult.hasError) return null;
 
     final existing = filmRoll.serverFilmRollId;
