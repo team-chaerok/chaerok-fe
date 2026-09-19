@@ -11,12 +11,18 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
+import 'package:chaerok/features/film_roll/domain/visit_verification.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/guidance_card.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/visit_gate_message.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
+import 'package:chaerok/features/location/data/location_permission_service.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 const _tag = 'RegionPhotoGallery';
 
@@ -46,6 +52,8 @@ class RegionPhotoGallery extends StatefulWidget {
     required this.photos,
     required this.places,
     required this.onVisitCompleted,
+    this.currentPosition,
+    @visibleForTesting this.debugFetchCurrentPosition,
   });
 
   /// 인증 카메라([VisitCaptureScreen])를 열 때 필요한 이 필름롤의 id.
@@ -61,6 +69,18 @@ class RegionPhotoGallery extends StatefulWidget {
   /// 사진 상태를 다시 읽어와야 이 위젯도 갱신된 [photos]/[places]를 받는다.
   final Future<void> Function() onVisitCompleted;
 
+  /// 홈 화면이 마지막으로 확인한 위치(예: 위치 인증 시점 좌표) — 안내 카드가
+  /// 탭 전에 보여줄 상태 문구를 여기서 평가한다. null이면 탭 전까지 항상
+  /// "현재 위치를 확인하는 중이에요"로 보인다. 실제 인증 가부(탭 시 동작)는
+  /// 항상 탭 시점에 새로 조회한 좌표를 기준으로 판단하므로 이 값이 낡아도
+  /// 안전하다.
+  final Position? currentPosition;
+
+  /// 테스트에서 실제 위치 서비스 대신 결과를 주입하기 위한 훅
+  /// (`HomeDashboardScreen.debugRunLocationVerification`과 동일한 패턴).
+  @visibleForTesting
+  final Future<Position?> Function()? debugFetchCurrentPosition;
+
   @override
   State<RegionPhotoGallery> createState() => _RegionPhotoGalleryState();
 }
@@ -74,6 +94,14 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
   /// 탭·큰 사진 좌우 스와이프 둘 다 이 값을 갱신하는 단일 소스다.
   late int _heroIndex;
   late final PageController _heroController;
+
+  /// 탭 시점에 새로 조회한 좌표. 안내 카드는 이 값이 있으면 [widget.currentPosition]
+  /// 대신 이 값으로 상태 문구를 다시 평가한다.
+  Position? _refreshedPosition;
+  bool _isVerifyingLocation = false;
+
+  Position? get _effectivePosition =>
+      _refreshedPosition ?? widget.currentPosition;
 
   @override
   void initState() {
@@ -162,15 +190,72 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
   }
 
   /// 필름스트립 칸을 탭했을 때: 이미 인증(촬영)한 장소면 그 사진을 큰 사진
-  /// 자리로 선택하고, 아직 안 간 장소면 카메라를 열어 바로 인증하게 한다.
-  /// 위치(GPS)는 확인하지 않는다 — 카메라 화면 자체가 "이 장소를 인증
-  /// 중"이라는 안내를 보여준다.
+  /// 자리로 선택하고, 아직 안 간 장소면 [_onVerifyTap]으로 방문 인증을
+  /// 시도한다("다음 장소" 카드의 CTA와 동일한 게이트를 거친다).
   Future<void> _onPlaceTileTap(
     FilmRollPlace place,
     FilmRollPhoto? photo,
   ) async {
     if (photo != null) {
       _jumpHeroTo(place);
+      return;
+    }
+    await _onVerifyTap(place);
+  }
+
+  Future<Position?> _fetchCurrentPosition() {
+    final override = widget.debugFetchCurrentPosition;
+    return override != null
+        ? override()
+        : LocationPermissionService.getCurrentPosition();
+  }
+
+  /// 방문 순서상 아직 인증하지 않은 첫 장소. 없으면(모두 인증) null.
+  FilmRollPlace? get _nextPlace {
+    final ordered = [...widget.places]
+      ..sort((a, b) => a.visitOrder.compareTo(b.visitOrder));
+    for (final place in ordered) {
+      if (!place.isVisited) return place;
+    }
+    return null;
+  }
+
+  /// 자유 촬영 사진을 귀속시킬 대상 — 인증된 장소 중 가장 최근에 인증된 곳.
+  FilmRollPlace? get _mostRecentlyVisitedPlace {
+    final visited = widget.places.where((place) => place.isVisited).toList()
+      ..sort(
+        (a, b) =>
+            (a.visitedAt ?? DateTime(0)).compareTo(b.visitedAt ?? DateTime(0)),
+      );
+    return visited.isEmpty ? null : visited.last;
+  }
+
+  /// "다음 장소" 카드의 CTA와 필름스트립 미방문 칸 탭이 공유하는 인증 시도
+  /// 핸들러. 탭 시점에 새로 좌표를 조회해 게이트를 평가하고, 통과 못하면
+  /// 카메라를 열지 않고 안내 문구만 스낵바로 보여준다.
+  Future<void> _onVerifyTap(FilmRollPlace place) async {
+    if (_isVerifyingLocation) return;
+
+    setState(() => _isVerifyingLocation = true);
+    final Position? position;
+    try {
+      position = await _fetchCurrentPosition();
+    } finally {
+      if (mounted) setState(() => _isVerifyingLocation = false);
+    }
+    if (!mounted) return;
+    if (position != null) setState(() => _refreshedPosition = position);
+
+    final gate = evaluateVisitGate(
+      position: position,
+      placeLatitude: place.latitude,
+      placeLongitude: place.longitude,
+      alreadyVisited: place.isVisited,
+    );
+    if (!gate.canVerify) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(gate.message)));
       return;
     }
 
@@ -203,6 +288,98 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     await widget.onVisitCompleted();
   }
 
+  /// "자유 촬영" 카드의 CTA — 이미 인증된 장소이므로 게이트 없이 바로 카메라를
+  /// 열고, 반환 후 동기화는 하되 [FilmRollModule.completeVisit]은 호출하지
+  /// 않는다(중복 인증 방지).
+  Future<void> _onFreeCaptureTap(FilmRollPlace place) async {
+    final captured = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => VisitCaptureScreen(
+          filmRollId: widget.filmRollId,
+          filmRollPlaceId: place.id,
+        ),
+      ),
+    );
+    if (captured != true || !mounted) return;
+
+    unawaited(
+      FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
+        widget.filmRollId,
+      ),
+    );
+    await widget.onVisitCompleted();
+  }
+
+  /// hero와 필름스트립 사이 안내 섹션. 미방문 장소가 있으면 "다음 장소"
+  /// 카드를, 코스 필수 장소를 모두 인증했고 필름이 남았으면 "자유 촬영"
+  /// 카드를 보여준다. 둘 다 아니면(장소 없음/필름 소진) null.
+  Widget? _buildGuidanceSection() {
+    final nextPlace = _nextPlace;
+    if (nextPlace != null) {
+      final gate = evaluateVisitGate(
+        position: _effectivePosition,
+        placeLatitude: nextPlace.latitude,
+        placeLongitude: nextPlace.longitude,
+        alreadyVisited: nextPlace.isVisited,
+      );
+      return GuidanceCard(
+        title: '다음 장소',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(nextPlace.name, style: ChaerokTypography.bodyLarge),
+            const SizedBox(height: ChaerokSpacing.xxs),
+            Text(
+              nextPlace.address,
+              style: ChaerokTypography.caption.copyWith(
+                color: ChaerokColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: ChaerokSpacing.xs),
+            VisitGateMessage(gate: gate),
+            const SizedBox(height: ChaerokSpacing.sm),
+            ChaerokButton(
+              text: '방문 인증하기',
+              isLoading: _isVerifyingLocation,
+              onPressed: () => _onVerifyTap(nextPlace),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final freeCaptureTarget = _mostRecentlyVisitedPlace;
+    final photoCount = widget.photos.length;
+    if (freeCaptureTarget != null && photoCount < FilmRoll.maxExposureCount) {
+      return GuidanceCard(
+        title: '자유 촬영',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '모든 장소 인증을 마쳤어요. 필름이 남아있는 동안 자유롭게 더 찍어보세요.',
+              style: ChaerokTypography.bodyMedium,
+            ),
+            const SizedBox(height: ChaerokSpacing.xs),
+            Text(
+              '$photoCount/${FilmRoll.maxExposureCount}장',
+              style: ChaerokTypography.caption.copyWith(
+                color: ChaerokColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: ChaerokSpacing.sm),
+            ChaerokButton(
+              text: '필름 카메라 열기',
+              onPressed: () => _onFreeCaptureTap(freeCaptureTarget),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return null;
+  }
+
   /// 큰 사진을 탭했을 때 그 칸이 가리키는 장소의 상세 정보를 바텀시트로
   /// 보여준다. 인증 여부와 무관하게 열리며, 촬영한 사진이 있으면 그 사진들을
   /// 함께 보여준다([PlaceDetailSheet] 참고).
@@ -223,47 +400,59 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     final safeIndex = orderedPlaces.isEmpty
         ? 0
         : _heroIndex.clamp(0, orderedPlaces.length - 1);
+    final guidance = _buildGuidanceSection();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHero(orderedPlaces, safeIndex),
-        const SizedBox(height: ChaerokSpacing.sm),
-        _FilmStrip(
-          places: orderedPlaces,
-          photoForPlace: _photoForPlace,
-          selectedIndex: safeIndex,
-          onTap: _onPlaceTileTap,
-          onTagTap: _jumpHeroTo,
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ChaerokSpacing.md,
-            vertical: ChaerokSpacing.xs,
+    // "다음 장소"/"자유 촬영" 카드가 더해지면(둘 다 없을 때보다) 전체 높이가
+    // 카드 영역을 넘을 수 있어, 넘치는 대신 스크롤되도록 감싼다.
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHero(orderedPlaces, safeIndex),
+          if (guidance != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChaerokSpacing.md,
+              ),
+              child: guidance,
+            ),
+          const SizedBox(height: ChaerokSpacing.sm),
+          _FilmStrip(
+            places: orderedPlaces,
+            photoForPlace: _photoForPlace,
+            selectedIndex: safeIndex,
+            onTap: _onPlaceTileTap,
+            onTagTap: _jumpHeroTo,
           ),
-          child: Row(
-            children: [
-              Text(
-                '${widget.photos.length} / ${FilmRoll.maxExposureCount}',
-                style: ChaerokTypography.bodyLarge,
-              ),
-              const SizedBox(width: ChaerokSpacing.xs),
-              const Icon(
-                Icons.info_outline,
-                size: 14,
-                color: ChaerokColors.textSecondary,
-              ),
-              const SizedBox(width: ChaerokSpacing.xxs),
-              Text(
-                '지역 내 최대 ${FilmRoll.maxExposureCount}장',
-                style: ChaerokTypography.caption.copyWith(
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ChaerokSpacing.md,
+              vertical: ChaerokSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${widget.photos.length} / ${FilmRoll.maxExposureCount}',
+                  style: ChaerokTypography.bodyLarge,
+                ),
+                const SizedBox(width: ChaerokSpacing.xs),
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
                   color: ChaerokColors.textSecondary,
                 ),
-              ),
-            ],
+                const SizedBox(width: ChaerokSpacing.xxs),
+                Text(
+                  '지역 내 최대 ${FilmRoll.maxExposureCount}장',
+                  style: ChaerokTypography.caption.copyWith(
+                    color: ChaerokColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

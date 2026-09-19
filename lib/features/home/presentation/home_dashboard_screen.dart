@@ -750,6 +750,7 @@ class _RegionHomeBody extends StatelessWidget {
           photos: filmRollPhotos,
           places: filmRollPlaces,
           onVisitCompleted: onVisitCompleted,
+          currentPosition: locationResult?.position,
         ),
       );
     }
