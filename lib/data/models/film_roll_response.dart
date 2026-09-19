@@ -15,6 +15,7 @@ class FilmRollResponse {
     required this.developAvailable,
     required this.createdAt,
     required this.updatedAt,
+    this.clientFilmRollId,
     this.exitedAt,
     this.developAvailableAt,
     this.requestedAt,
@@ -26,6 +27,9 @@ class FilmRollResponse {
   factory FilmRollResponse.fromJson(Map<String, dynamic> json) {
     return FilmRollResponse(
       filmRollId: json['filmRollId'] as int,
+      // V21 이전(클라이언트 UUID 도입 이전)에 만들어진 서버 필름롤은
+      // client_film_roll_id가 NULL일 수 있다.
+      clientFilmRollId: json['clientFilmRollId'] as String?,
       regionId: json['regionId'] as int,
       filterId: json['filterId'] as String,
       filterStrength: (json['filterStrength'] as num).toDouble(),
@@ -79,6 +83,10 @@ class FilmRollResponse {
   }
 
   final int filmRollId;
+
+  /// 서버 필름롤 생성 시 멱등키로 쓰인 클라이언트 UUID. V21 이전 레거시
+  /// 서버 필름롤은 null일 수 있다.
+  final String? clientFilmRollId;
   final int regionId;
   final String filterId;
   final double filterStrength;

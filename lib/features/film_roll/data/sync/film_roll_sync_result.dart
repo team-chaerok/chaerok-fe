@@ -9,6 +9,7 @@ class FilmRollSyncResult {
     this.visitsSkipped = 0,
     this.serverStatus,
     this.error,
+    this.blockedByOtherActiveFilmRoll = false,
   });
 
   /// 이번 호출에서 서버 필름롤을 새로 생성(또는 멱등 조회로 연결)했는지 여부.
@@ -32,6 +33,11 @@ class FilmRollSyncResult {
   /// 부분 실패를 유발한 오류(있으면). 네트워크/서버 오류는 여기에 담기고
   /// 예외로 던져지지 않는다.
   final Object? error;
+
+  /// 이 계정에 이탈 처리되지 않은 *다른* 활성 필름롤(clientFilmRollId가 다름)이
+  /// 서버에 이미 있어 생성/연결이 막혔는지 여부. [hasError]와 달리 재시도로
+  /// 해결되지 않는 영구적인 상태다(그 필름롤이 서버에서 이탈 처리되기 전까지).
+  final bool blockedByOtherActiveFilmRoll;
 
   bool get hasError => error != null;
 }

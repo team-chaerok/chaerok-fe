@@ -24,11 +24,13 @@ class _StubFilmRollPlaceRepository implements FilmRollPlaceRepository {
 FilmRollPlace _place({
   required String id,
   int? serverPlaceId,
+  String? externalPlaceId,
   String? imageUrl,
+  String name = '',
 }) => FilmRollPlace(
   id: id,
   filmRollId: 'fr-1',
-  name: '장소 $id',
+  name: name.isEmpty ? '장소 $id' : name,
   address: '충남 어딘가',
   category: 'HERITAGE',
   latitude: 36.5,
@@ -37,6 +39,7 @@ FilmRollPlace _place({
   isVisited: false,
   photoCount: 0,
   serverPlaceId: serverPlaceId,
+  externalPlaceId: externalPlaceId,
   imageUrl: imageUrl,
 );
 
@@ -76,9 +79,9 @@ void main() {
     expect(repository.updatedImageUrls, isEmpty);
   });
 
-  test('fetcher가 null을 반환하면 그 장소는 건너뛴다', () async {
+  test('fetcher가 null을 반환하면 그 장소는 채우지 않는다(검증 불가한 검색 폴백을 쓰지 않는다)', () async {
     final repository = _StubFilmRollPlaceRepository([
-      _place(id: 'p1', serverPlaceId: 1),
+      _place(id: 'p1', serverPlaceId: 1, name: '제민천'),
     ]);
     final useCase = BackfillPlaceImagesUseCase(
       repository,
@@ -106,5 +109,59 @@ void main() {
     await useCase.call('fr-1');
 
     expect(repository.updatedImageUrls, {'p2': 'https://img/2.jpg'});
+  });
+
+  test('regionId가 있으면 serverPlaceId 없이 externalPlaceId만 있는 장소도 보충한다', () async {
+    final repository = _StubFilmRollPlaceRepository([
+      _place(id: 'p1', externalPlaceId: 'tour-1'),
+      _place(id: 'p2', externalPlaceId: 'tour-2'),
+    ]);
+    final regionIdsQueried = <int>[];
+    final useCase = BackfillPlaceImagesUseCase(
+      repository,
+      externalPlaceImageFetcher: (regionId) async {
+        regionIdsQueried.add(regionId);
+        return {'tour-1': 'https://img/tour-1.jpg'};
+      },
+    );
+
+    await useCase.call('fr-1', regionId: 10);
+
+    expect(regionIdsQueried, [10]);
+    // p2는 외부 목록에 이미지가 없어 채워지지 않는다(검증 불가한 검색 폴백 없음).
+    expect(repository.updatedImageUrls, {'p1': 'https://img/tour-1.jpg'});
+  });
+
+  test('regionId가 없으면 외부 장소 조회 자체를 시도하지 않는다', () async {
+    final repository = _StubFilmRollPlaceRepository([
+      _place(id: 'p1', externalPlaceId: 'tour-1'),
+    ]);
+    var fetchCount = 0;
+    final useCase = BackfillPlaceImagesUseCase(
+      repository,
+      externalPlaceImageFetcher: (regionId) async {
+        fetchCount++;
+        return {'tour-1': 'https://img/tour-1.jpg'};
+      },
+    );
+
+    await useCase.call('fr-1');
+
+    expect(fetchCount, 0);
+    expect(repository.updatedImageUrls, isEmpty);
+  });
+
+  test('serverPlaceId/externalPlaceId 어느 쪽으로도 못 채운 장소는 채우지 않는다', () async {
+    final repository = _StubFilmRollPlaceRepository([
+      _place(id: 'p1', externalPlaceId: 'kakao-1', name: '너티트릿츠'),
+    ]);
+    final useCase = BackfillPlaceImagesUseCase(
+      repository,
+      externalPlaceImageFetcher: (regionId) async => const {}, // TourAPI엔 없음
+    );
+
+    await useCase.call('fr-1', regionId: 10);
+
+    expect(repository.updatedImageUrls, isEmpty);
   });
 }

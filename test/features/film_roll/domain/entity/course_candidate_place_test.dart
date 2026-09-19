@@ -144,6 +144,61 @@ void main() {
     expect(place.imageUrl, 'https://example.com/photo.jpg');
   });
 
+  test(
+    'fromExplorePlace: resolvedServerPlaceId가 있으면 ExplorePlace.serverId 대신 그 값을 쓴다',
+    () {
+      const explorePlace = ExplorePlace(
+        title: '카카오 장소',
+        address: '주소',
+        latitude: 37.1,
+        longitude: 127.1,
+        categoryGroup: PlaceCategoryGroup.cafeDessert,
+        categoryGroupWire: 'CAFE_DESSERT',
+        categoryDetail: PlaceCategoryDetail.cafe,
+        categoryDetailLabel: '카페',
+        source: 'KAKAO_LOCAL',
+        identityKey: 'key',
+        // 코스 생성 요청 전 카카오 장소는 서버 ID가 항상 없다.
+        serverId: null,
+        externalPlaceId: 'kakao-1',
+      );
+
+      final place = CourseCandidatePlace.fromExplorePlace(
+        explorePlace,
+        visitOrder: 0,
+        resolvedServerPlaceId: 42,
+      );
+
+      expect(place.serverPlaceId, 42);
+    },
+  );
+
+  test(
+    'fromExplorePlace: resolvedServerPlaceId가 없으면 ExplorePlace.serverId를 그대로 쓴다',
+    () {
+      const explorePlace = ExplorePlace(
+        title: '테스트 장소',
+        address: '주소',
+        latitude: 37.1,
+        longitude: 127.1,
+        categoryGroup: PlaceCategoryGroup.tourism,
+        categoryGroupWire: 'TOURISM',
+        categoryDetail: PlaceCategoryDetail.heritage,
+        categoryDetailLabel: '역사',
+        source: 'TOUR_API',
+        identityKey: 'key',
+        serverId: 7,
+      );
+
+      final place = CourseCandidatePlace.fromExplorePlace(
+        explorePlace,
+        visitOrder: 0,
+      );
+
+      expect(place.serverPlaceId, 7);
+    },
+  );
+
   test('경계값(latitude 90, longitude 180)은 유효한 좌표로 보존된다', () {
     final place = CourseCandidatePlace.fromCoursePlaceResponse(
       const CoursePlaceResponse(

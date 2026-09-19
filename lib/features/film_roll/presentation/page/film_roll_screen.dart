@@ -13,6 +13,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
+import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_result.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
@@ -50,6 +51,12 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
   bool _isSyncing = false;
   bool _isExiting = false;
 
+  /// 필름롤 전체 촬영 매수(방문 인증 + 자유 촬영 합산). 자유 촬영 버튼
+  /// 노출 여부([FilmRoll.maxExposureCount] 도달 여부) 판단에 쓴다. 아직
+  /// 조회 전이면 null — 0으로 기본값을 두면 실제로는 필름을 다 쓴
+  /// 상태에서도 로딩 중 잠깐 자유 촬영 버튼이 노출될 수 있다.
+  int? _photoCount;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +68,50 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
       },
     );
     unawaited(_controller.load());
+    unawaited(_refreshPhotoCount());
+  }
+
+  Future<void> _refreshPhotoCount() async {
+    try {
+      final count = await FilmRollModule.instance.getFilmRollPhotoCount(
+        widget.filmRollId,
+      );
+      if (!mounted) return;
+      setState(() => _photoCount = count);
+    } catch (e, st) {
+      log('촬영 매수 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
+  }
+
+  /// 자유 촬영 사진을 귀속시킬 대상. 방문 인증된 장소 중 가장 최근에
+  /// 인증된 곳을 고른다(없으면 null).
+  FilmRollPlace? get _mostRecentlyVisitedPlace {
+    final visited = _state.places.where((place) => place.isVisited).toList()
+      ..sort(
+        (a, b) =>
+            (a.visitedAt ?? DateTime(0)).compareTo(b.visitedAt ?? DateTime(0)),
+      );
+    return visited.isEmpty ? null : visited.last;
+  }
+
+  /// 방문 인증과 별개로 필름 카메라만 여는 동선(자유 촬영). 3곳 인증을 모두
+  /// 마친 뒤에도 필름이 남아있는 한([FilmRoll.maxExposureCount]) 가장 최근에
+  /// 인증한 장소에 귀속되는 사진을 계속 찍을 수 있다. 방문 인증은 다시
+  /// 처리하지 않는다(인증은 장소당 최초 1장에만 해당).
+  Future<void> _onFreeCaptureTap(FilmRollPlace place) async {
+    final filmRoll = _state.filmRoll;
+    if (filmRoll == null) return;
+
+    final captured = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => VisitCaptureScreen(
+          filmRollId: filmRoll.id,
+          filmRollPlaceId: place.id,
+        ),
+      ),
+    );
+    if (captured != true || !mounted) return;
+    await _refreshPhotoCount();
   }
 
   Future<void> _onSelectCourseTap() async {
@@ -133,6 +184,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     );
     if (captured != true || !mounted) return;
     await _controller.completeVisit(place.id);
+    await _refreshPhotoCount();
   }
 
   Future<void> _showExitConfirmDialog() async {
@@ -178,6 +230,11 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
         if (!mounted) return;
       }
       Navigator.of(context).pop();
+    } on ActiveFilmRollConflictException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이전에 끝내지 않은 필름롤이 있어 현상할 수 없어요. 문의해주세요.')),
+      );
     } on ExitNotSyncedException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -247,6 +304,7 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
 
   Widget _buildLoaded() {
     final filmRoll = _state.filmRoll!;
+    final freeCaptureButton = _buildFreeCaptureButton();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(ChaerokSpacing.md),
       child: Column(
@@ -267,6 +325,10 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
           else ...[
             ..._state.places.map(_buildPlaceTile),
             const SizedBox(height: ChaerokSpacing.md),
+            if (freeCaptureButton != null) ...[
+              freeCaptureButton,
+              const SizedBox(height: ChaerokSpacing.md),
+            ],
             ChaerokButton(
               text: '지역을 벗어나 현상하기',
               isEnabled: filmRoll.isCompletable(_state.places),
@@ -276,6 +338,24 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// 3곳 방문 인증을 모두 마쳤고 필름이 남아있을 때만("$_photoCount <
+  /// [FilmRoll.maxExposureCount]") 자유 촬영 버튼을 보여준다. 그 외엔 null.
+  Widget? _buildFreeCaptureButton() {
+    final hasUnvisitedPlace = _state.places.any((place) => !place.isVisited);
+    if (hasUnvisitedPlace) return null;
+    final target = _mostRecentlyVisitedPlace;
+    final photoCount = _photoCount;
+    if (target == null ||
+        photoCount == null ||
+        photoCount >= FilmRoll.maxExposureCount) {
+      return null;
+    }
+    return ChaerokButton(
+      text: '자유 촬영하기 ($photoCount/${FilmRoll.maxExposureCount})',
+      onPressed: () => _onFreeCaptureTap(target),
     );
   }
 

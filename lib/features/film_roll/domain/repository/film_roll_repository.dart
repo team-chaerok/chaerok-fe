@@ -86,4 +86,12 @@ abstract class FilmRollRepository {
     required String clientFilmRollId,
     String? serverStatus,
   });
+
+  /// 현상 결과 조회(`getFilmRollResult`)가 `COMPLETED`를 반환했을 때 로컬
+  /// 필름롤을 [FilmRollStatus.completed]로 전환하고 완료 시각을 저장한다.
+  Future<void> markCompleted({
+    required String clientFilmRollId,
+    required DateTime completedAt,
+    String? serverStatus,
+  });
 }

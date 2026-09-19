@@ -47,14 +47,23 @@ class CourseCandidatePlace {
   /// 커스텀 코스 피커(관광지 목록·검색·북마크 통합 모델 [ExplorePlace])에서
   /// 사용자가 고른 장소를 필름롤 스냅샷 입력으로 변환한다. [ExplorePlace]는
   /// 좌표가 항상 있지만(비-nullable), NaN/범위 밖 값은 여전히 방어한다.
+  ///
+  /// [resolvedServerPlaceId]가 있으면 [place.serverId] 대신 그 값을 쓴다.
+  /// 카카오 장소는 코스 생성 요청 *전*엔 [place.serverId]가 항상 null인데,
+  /// `POST /api/courses`가 그 자리에서 장소를 찾거나 만들어 실제 서버
+  /// placeId를 응답에 담아 돌려준다([SelectCustomCourseUseCase] 참고). 이걸
+  /// 무시하고 [place.serverId](null)를 그대로 쓰면, 서버엔 place row가 이미
+  /// 있는데 로컬 `serverPlaceId`만 영원히 null로 남아 방문 인증이 서버에
+  /// 동기화되지 않는다.
   factory CourseCandidatePlace.fromExplorePlace(
     ExplorePlace place, {
     required int visitOrder,
+    int? resolvedServerPlaceId,
   }) {
     _validateCoordinateRange(place.title, place.latitude, place.longitude);
 
     return CourseCandidatePlace(
-      serverPlaceId: place.serverId,
+      serverPlaceId: resolvedServerPlaceId ?? place.serverId,
       externalPlaceId: place.externalPlaceId,
       name: place.title,
       address: place.address,

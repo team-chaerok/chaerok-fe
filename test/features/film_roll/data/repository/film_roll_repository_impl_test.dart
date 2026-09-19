@@ -362,6 +362,26 @@ void main() {
     expect(updated.serverStatus, 'EXPIRED');
   });
 
+  test('markCompleted는 필름롤을 completed 상태로 전환하고 완료 시각을 저장한다', () async {
+    final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
+      regionCode: RegionCode.gongju,
+      regionName: '공주시',
+      regionId: 1,
+    );
+    final completedAt = DateTime(2026, 9, 15, 12);
+
+    await filmRollRepository.markCompleted(
+      clientFilmRollId: filmRoll.id,
+      completedAt: completedAt,
+      serverStatus: 'COMPLETED',
+    );
+
+    final updated = await filmRollRepository.findById(filmRoll.id);
+    expect(updated!.status, FilmRollStatus.completed);
+    expect(updated.completedAt, completedAt);
+    expect(updated.serverStatus, 'COMPLETED');
+  });
+
   test('developing 필름롤이 있어도 같은 지역에 새 진행중 필름롤을 만들 수 있다', () async {
     final filmRoll = await filmRollRepository.findOrCreateActiveByRegion(
       regionCode: RegionCode.buyeo,

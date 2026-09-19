@@ -8,6 +8,7 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_screen.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
@@ -62,7 +63,9 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   Future<void> _onFilmRollTap(FilmRoll filmRoll) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => FilmRollScreen(filmRollId: filmRoll.id),
+        builder: (_) => filmRoll.status == FilmRollStatus.completed
+            ? FilmRollResultScreen(filmRoll: filmRoll)
+            : FilmRollScreen(filmRollId: filmRoll.id),
       ),
     );
     if (!mounted) return;

@@ -63,12 +63,35 @@ class PlaceImagePlaceholder extends StatelessWidget {
 
   final PlacePlaceholderMood mood;
 
+  /// 배경 일러스트만으로는 관광지/식당/카페 구분이 잘 안 보여, 카테고리를
+  /// 바로 알 수 있는 아이콘을 함께 얹는다([moodForCategory]와 1:1 대응).
+  IconData get _icon => switch (mood) {
+    PlacePlaceholderMood.forest => Icons.park_outlined,
+    PlacePlaceholderMood.wall => Icons.restaurant_outlined,
+    PlacePlaceholderMood.stream => Icons.local_cafe_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label: '여행 사진이 들어갈 자리',
       image: true,
-      child: CustomPaint(painter: _SummerTownPainter(mood)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CustomPaint(painter: _SummerTownPainter(mood)),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(ChaerokSpacing.sm),
+              decoration: BoxDecoration(
+                color: ChaerokColors.surface.withValues(alpha: 0.6),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(_icon, size: 28, color: ChaerokColors.primaryDark),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

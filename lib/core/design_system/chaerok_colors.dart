@@ -25,4 +25,7 @@ class ChaerokColors {
   static const Color cameraBlack = Color(0xFF1E1F1D);
 
   static const Color primaryGreen = Color(0xFF45523D);
+
+  /// Figma "primary/sage dark" 토큰. 촬영 화면 장식 패턴·아이콘 등에 사용.
+  static const Color sageDark = Color(0xFF7D8A6B);
 }

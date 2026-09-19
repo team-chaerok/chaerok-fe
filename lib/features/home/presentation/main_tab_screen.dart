@@ -6,6 +6,7 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/explore/presentation/explore_screen.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
@@ -92,24 +93,45 @@ class _MainTabScreenState extends State<MainTabScreen> {
         }
       }
 
-      if (nextPlace == null) {
-        // 코스 미선택 또는 전체 방문 완료 - 코스 선택/현상 등 다음 행동은
-        // 채록길 탭(FilmRollProgressView)이 이미 보여주므로 그리로 이동한다.
+      // 미방문 장소가 남아있으면 그 장소의 방문 인증 촬영으로 진입한다.
+      // 3곳을 모두 인증했다면(nextPlace == null) 그것으로 끝이 아니라, 필름이
+      // 남아있는 한(총 24장) "자유 촬영"으로 계속 찍을 수 있어야 한다 —
+      // 이 경우 가장 최근에 인증한 장소에 사진을 귀속시킨다.
+      final targetPlace = nextPlace ?? _mostRecentlyVisitedPlace(places);
+      if (targetPlace == null) {
+        // 코스 미선택 등으로 촬영할 장소 자체가 없는 경우 - 코스 선택 등
+        // 다음 행동은 채록길 탭(FilmRollProgressView)이 이미 보여주므로 그리로 이동한다.
         _onExploreRequested();
         return;
+      }
+
+      final isFreeCapture = nextPlace == null;
+      if (isFreeCapture) {
+        final photoCount = await FilmRollModule.instance.getFilmRollPhotoCount(
+          recovered.id,
+        );
+        if (!mounted) return;
+        if (photoCount >= FilmRoll.maxExposureCount) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('필름을 다 썼어요. 지역을 벗어나 현상해보세요.')),
+          );
+          return;
+        }
       }
 
       final captured = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => VisitCaptureScreen(
             filmRollId: recovered.id,
-            filmRollPlaceId: nextPlace!.id,
+            filmRollPlaceId: targetPlace.id,
           ),
         ),
       );
-      if (captured == true) {
+      // 자유 촬영은 이미 인증된 장소를 재사용하는 것일 뿐이므로 방문 인증을
+      // 다시 처리하지 않는다(방문 인증은 장소당 최초 1장에만 해당).
+      if (captured == true && !isFreeCapture) {
         try {
-          await FilmRollModule.instance.completeVisit(nextPlace.id);
+          await FilmRollModule.instance.completeVisit(targetPlace.id);
         } catch (e, st) {
           log('방문 완료 처리 실패', name: _tag, error: e, stackTrace: st);
           if (!mounted) return;
@@ -117,6 +139,18 @@ class _MainTabScreenState extends State<MainTabScreen> {
             const SnackBar(content: Text('촬영은 완료됐지만 방문 처리에 실패했어요.')),
           );
         }
+      }
+      if (captured == true) {
+        // completeVisit()과 자유 촬영의 savePhoto 모두 로컬 DB만 갱신한다.
+        // FilmRollController를 거치지 않는 이 진입점에서는 아무도 서버
+        // 동기화를 트리거하지 않으므로, 여기서 직접 걸어주지 않으면 이
+        // 방문/사진은 서버에 영원히 반영되지 않는다(로컬/서버 상태 불일치의
+        // 원인). 방문 인증이든 자유 촬영이든 항상 시도한다.
+        unawaited(
+          FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
+            recovered.id,
+          ),
+        );
       }
     } catch (e, st) {
       log('카메라 진입 실패', name: _tag, error: e, stackTrace: st);
@@ -129,6 +163,17 @@ class _MainTabScreenState extends State<MainTabScreen> {
       unawaited(_exploreKey.currentState?.reevaluate() ?? Future.value());
       unawaited(_homeKey.currentState?.refresh() ?? Future.value());
     }
+  }
+
+  /// 자유 촬영 사진을 귀속시킬 대상. 방문 인증된 장소 중 가장 최근에
+  /// 인증된 곳을 고른다(없으면 null, [visitedAt]이 없는 방문 기록은 없음).
+  FilmRollPlace? _mostRecentlyVisitedPlace(List<FilmRollPlace> places) {
+    final visited = places.where((place) => place.isVisited).toList()
+      ..sort(
+        (a, b) =>
+            (a.visitedAt ?? DateTime(0)).compareTo(b.visitedAt ?? DateTime(0)),
+      );
+    return visited.isEmpty ? null : visited.last;
   }
 
   Future<void> _showNoActiveFilmRollSheet() {

@@ -88,4 +88,32 @@ void main() {
 
     expect(tourApi.courseId, isNot(kakao.courseId));
   });
+
+  test('copyWithPlaceId: placeId만 바뀌고 나머지 필드(좌표 등)는 그대로 보존된다', () {
+    const original = CoursePlaceResponse(
+      placeId: null,
+      externalPlaceId: 'kakao-1',
+      source: 'KAKAO_LOCAL',
+      title: '한양손칼국수',
+      categoryGroup: 'FOOD',
+      categoryDetail: 'RESTAURANT',
+      address: '충남 공주시',
+      latitude: 36.46,
+      longitude: 127.12,
+      placeUrl: 'http://place.map.kakao.com/1',
+    );
+
+    final resolved = original.copyWithPlaceId(42);
+
+    expect(resolved.placeId, 42);
+    expect(resolved.externalPlaceId, original.externalPlaceId);
+    expect(resolved.source, original.source);
+    expect(resolved.title, original.title);
+    expect(resolved.categoryGroup, original.categoryGroup);
+    expect(resolved.categoryDetail, original.categoryDetail);
+    expect(resolved.address, original.address);
+    expect(resolved.latitude, original.latitude);
+    expect(resolved.longitude, original.longitude);
+    expect(resolved.placeUrl, original.placeUrl);
+  });
 }
