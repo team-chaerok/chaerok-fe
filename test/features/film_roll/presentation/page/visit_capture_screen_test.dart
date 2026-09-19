@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/camera_shutter_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_switch_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -347,5 +349,60 @@ void main() {
 
     expect(find.text('OFF'), findsNothing);
     expect(find.text('ON'), findsNothing);
+  });
+
+  testWidgets('촬영 매수가 이미 최대치면 카메라를 초기화하지 않고 필름 소진 안내를 보여준다', (tester) async {
+    final fakePermissions = _FakePermissionPlatform();
+    final fakeCamera = _FakeCameraPlatform();
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = fakeCamera;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+          debugFetchPhotoCount: () async => FilmRoll.maxExposureCount,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('필름을 다 썼어요. 더 이상 촬영할 수 없어요.'), findsOneWidget);
+    expect(
+      fakeCamera.createCameraCallCount,
+      0,
+      reason: '이미 필름이 가득 찬 상태에서는 카메라를 초기화할 필요가 없다',
+    );
+  });
+
+  testWidgets('카메라가 이미 열려 있어도 촬영 시점에 매수가 가득 찼으면 촬영하지 않고 안내로 전환한다', (
+    tester,
+  ) async {
+    final fakePermissions = _FakePermissionPlatform();
+    final fakeCamera = _FakeCameraPlatform();
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = fakeCamera;
+
+    var latestCount = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+          debugFetchPhotoCount: () async => latestCount,
+        ),
+      ),
+    );
+    fakePermissions.grant();
+    await tester.pumpAndSettle();
+
+    // 화면이 열려 있는 동안 다른 경로(동기화 등)로 필름이 가득 찼다고 가정한다.
+    latestCount = FilmRoll.maxExposureCount;
+
+    await tester.tap(find.byType(CameraShutterButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('필름을 다 썼어요. 더 이상 촬영할 수 없어요.'), findsOneWidget);
   });
 }
