@@ -442,8 +442,14 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                   ),
                 ),
                 Align(
-                  alignment: Alignment.bottomRight,
+                  // 로컬 '위(top)-오른쪽(right)'는 화면 정방향 기준
+                  // '오른쪽-아래(bottom)'로 회전한다(90° 회전 매핑:
+                  // final_x=-local_y, final_y=local_x). 세로 위치(아래)는
+                  // 그대로 두고 좌우만 오른쪽으로 옮기려면 로컬 bottomRight
+                  // 대신 topRight를 써야 한다.
+                  alignment: Alignment.bottomCenter,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       CameraZoomSelector(
