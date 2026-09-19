@@ -22,6 +22,8 @@ import 'package:chaerok/features/film_roll/presentation/page/course_selection_re
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/guidance_card.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/visit_gate_message.dart';
 import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
@@ -749,19 +751,11 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
       alreadyVisited: place.isVisited,
     );
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(ChaerokSpacing.lg),
-      decoration: BoxDecoration(
-        color: ChaerokColors.surface,
-        borderRadius: BorderRadius.circular(ChaerokRadius.md),
-        border: Border.all(color: ChaerokColors.primary),
-      ),
+    return GuidanceCard(
+      title: '다음 장소',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('다음 장소', style: ChaerokTypography.caption),
-          const SizedBox(height: ChaerokSpacing.xxs),
           Text(place.name, style: ChaerokTypography.bodyLarge),
           const SizedBox(height: ChaerokSpacing.xxs),
           Text(
@@ -771,14 +765,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
             ),
           ),
           const SizedBox(height: ChaerokSpacing.xs),
-          Text(
-            gate.message,
-            style: ChaerokTypography.caption.copyWith(
-              color: gate.canVerify
-                  ? ChaerokColors.primaryDark
-                  : ChaerokColors.textSecondary,
-            ),
-          ),
+          VisitGateMessage(gate: gate),
           const SizedBox(height: ChaerokSpacing.sm),
           ChaerokButton(
             text: '방문 인증하기',
@@ -812,19 +799,11 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   /// 인증한 장소)에 사진이 귀속되지만, 방문 인증(1장 제한)과 달리 필름이
   /// 남아있는 한([FilmRoll.maxExposureCount]) 계속 촬영할 수 있다.
   Widget _buildFreeCaptureCard(FilmRollPlace place, int photoCount) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(ChaerokSpacing.lg),
-      decoration: BoxDecoration(
-        color: ChaerokColors.surface,
-        borderRadius: BorderRadius.circular(ChaerokRadius.md),
-        border: Border.all(color: ChaerokColors.primary),
-      ),
+    return GuidanceCard(
+      title: '자유 촬영',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('자유 촬영', style: ChaerokTypography.caption),
-          const SizedBox(height: ChaerokSpacing.xxs),
           const Text(
             '모든 장소 인증을 마쳤어요. 필름이 남아있는 동안 자유롭게 더 찍어보세요.',
             style: ChaerokTypography.bodyMedium,

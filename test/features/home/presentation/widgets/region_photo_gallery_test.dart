@@ -3,8 +3,32 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/region_photo_gallery.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
+
+/// 장소 좌표(36.0/127.0)를 기준으로 반경 안/밖 좌표를 만든다. 기본값은
+/// 장소와 동일 좌표(거리 0m, 반경 안).
+Position _position({
+  double latitude = 36.0,
+  double longitude = 127.0,
+  double accuracy = 5,
+}) => Position(
+  latitude: latitude,
+  longitude: longitude,
+  timestamp: DateTime(2026, 1, 1),
+  accuracy: accuracy,
+  altitude: 0,
+  altitudeAccuracy: 0,
+  heading: 0,
+  headingAccuracy: 0,
+  speed: 0,
+  speedAccuracy: 0,
+);
+
+/// 장소에서 약 300m 떨어진(반경 100m 밖) 좌표.
+Position _tooFarPosition() => _position(latitude: 36.0027);
 
 /// 존재하지 않는 파일 경로를 넘기면 `Image.file`이 비동기로 실패하고
 /// errorBuilder(회색 슬롯)로 폴백한다 — 실제 이미지 디코딩은 검증 대상이
@@ -108,6 +132,8 @@ void main() {
   Widget host({
     List<FilmRollPhoto>? overridePhotos,
     List<FilmRollPlace>? overridePlaces,
+    Position? currentPosition,
+    Future<Position?> Function()? debugFetchCurrentPosition,
   }) => MaterialApp(
     home: Scaffold(
       body: RegionPhotoGallery(
@@ -115,9 +141,18 @@ void main() {
         photos: overridePhotos ?? photos,
         places: overridePlaces ?? places,
         onVisitCompleted: () async {},
+        currentPosition: currentPosition,
+        debugFetchCurrentPosition: debugFetchCurrentPosition,
       ),
     ),
   );
+
+  /// 코스 필수 장소(관광지/식당/카페) 모두 인증 완료한 상태의 장소 목록.
+  final allVisitedPlaces = [
+    _place('p-tour', category: 'HERITAGE', visitOrder: 0),
+    _place('p-food', category: 'RESTAURANT', visitOrder: 1),
+    _place('p-cafe', category: 'CAFE', visitOrder: 2),
+  ];
 
   testWidgets('카테고리 태그는 필름스트립 각 칸 위에 개별로 뜨고, 카운터는 전체 사진 수/최대치를 보여준다', (
     tester,
@@ -152,14 +187,14 @@ void main() {
     expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
 
     // 필름스트립에서 식당(photo-3) 타일을 고른다.
-    await tester.tap(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is FileImage &&
-            (widget.image as FileImage).file.path == '/tmp/photo-3-thumb.jpg',
-      ),
+    final foodThumb = find.byWidgetPredicate(
+      (widget) =>
+          widget is Image &&
+          widget.image is FileImage &&
+          (widget.image as FileImage).file.path == '/tmp/photo-3-thumb.jpg',
     );
+    await tester.ensureVisible(foodThumb);
+    await tester.tap(foodThumb);
     await tester.pump();
 
     expect(_heroImagePath(tester), '/tmp/photo-3-original.jpg');
@@ -172,6 +207,7 @@ void main() {
     expect(_heroImagePath(tester), '/tmp/photo-2-original.jpg');
 
     // 필름스트립 위 "식당" 태그를 누른다(사진 타일이 아니라 태그).
+    await tester.ensureVisible(find.text('식당'));
     await tester.tap(find.text('식당'));
     await tester.pump();
 
@@ -184,6 +220,7 @@ void main() {
   ) async {
     await tester.pumpWidget(host());
 
+    await tester.ensureVisible(find.text('카페'));
     await tester.tap(find.text('카페'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -194,9 +231,14 @@ void main() {
     expect(_tagTextColor(tester, '카페'), Colors.white);
   });
 
-  testWidgets('아직 인증하지 않은 장소 타일을 누르면 그 장소를 인증하는 카메라 화면이 열린다', (tester) async {
-    await tester.pumpWidget(host());
+  testWidgets('아직 인증하지 않은 장소 타일을 누르면, 반경 안이면 그 장소를 인증하는 카메라 화면이 열린다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(debugFetchCurrentPosition: () async => _position()),
+    );
 
+    await tester.ensureVisible(_unvisitedTileFinder);
     await tester.tap(_unvisitedTileFinder);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -208,6 +250,140 @@ void main() {
     expect(pushed.filmRollPlaceId, 'p-cafe');
   });
 
+  testWidgets('미방문 장소가 반경 밖이면 타일을 눌러도 카메라가 열리지 않고 안내 문구가 스낵바로 뜬다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(debugFetchCurrentPosition: () async => _tooFarPosition()),
+    );
+
+    await tester.ensureVisible(_unvisitedTileFinder);
+    await tester.tap(_unvisitedTileFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(VisitCaptureScreen), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text('장소에 더 가까이 가면 방문 인증할 수 있어요'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('현재 위치를 확인하지 못하면 타일을 눌러도 카메라가 열리지 않고 위치 확인 중 문구가 스낵바로 뜬다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(debugFetchCurrentPosition: () async => null));
+
+    await tester.ensureVisible(_unvisitedTileFinder);
+    await tester.tap(_unvisitedTileFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(VisitCaptureScreen), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text('현재 위치를 확인하는 중이에요'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('미방문 장소가 있으면 hero와 필름스트립 사이에 다음 장소 카드가 이름·주소와 함께 뜬다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(currentPosition: _position()));
+
+    expect(find.text('다음 장소'), findsOneWidget);
+    expect(find.text('장소 p-cafe'), findsOneWidget);
+    expect(find.text('충남 어딘가'), findsOneWidget);
+  });
+
+  testWidgets('다음 장소 카드의 방문 인증하기 버튼을 눌러도 필름스트립 탭과 동일한 게이트를 거친다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(debugFetchCurrentPosition: () async => _tooFarPosition()),
+    );
+
+    await tester.tap(find.text('방문 인증하기'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(VisitCaptureScreen), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text('장소에 더 가까이 가면 방문 인증할 수 있어요'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('코스 필수 장소를 모두 인증하고 필름이 남으면 다음 장소 카드 대신 자유 촬영 카드가 뜬다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(overridePlaces: allVisitedPlaces));
+
+    expect(find.text('다음 장소'), findsNothing);
+    expect(find.text('자유 촬영'), findsOneWidget);
+    expect(find.text('필름 카메라 열기'), findsOneWidget);
+  });
+
+  testWidgets('자유 촬영 버튼을 누르면 위치 확인 없이 바로 카메라가 열린다', (tester) async {
+    await tester.pumpWidget(host(overridePlaces: allVisitedPlaces));
+
+    await tester.tap(find.text('필름 카메라 열기'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(VisitCaptureScreen), findsOneWidget);
+  });
+
+  testWidgets(
+    '자유 촬영 버튼 콜백이 첫 Navigator.push가 끝나기 전에 두 번 실행돼도 카메라 화면은 하나만 열린다',
+    (tester) async {
+      await tester.pumpWidget(host(overridePlaces: allVisitedPlaces));
+
+      // tester.tap()을 두 번 연달아 호출하면 첫 push가 오버레이를 동기적으로
+      // 바꿔 두 번째 탭이 아예 히트 테스트조차 되지 않는다 — 실제로 재현하려는
+      // 상황(같은 프레임에서 콜백이 두 번 실행되는 경우)과 다르다. 콜백 자체를
+      // 직접 두 번 호출해 "첫 push가 끝나기 전에 두 번째 탭이 들어온" 상황을
+      // 정확히 흉내낸다.
+      final button = tester.widget<ChaerokButton>(
+        find.widgetWithText(ChaerokButton, '필름 카메라 열기'),
+      );
+      button.onPressed!();
+      button.onPressed!();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byType(VisitCaptureScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('코스를 다 인증했어도 필름을 다 쓰면 안내 카드가 뜨지 않는다', (tester) async {
+    final fullPhotos = [
+      for (var i = 0; i < 24; i++)
+        _photo(
+          'photo-$i',
+          placeId: 'p-tour',
+          sequence: i,
+          takenAt: DateTime(2026, 1, 1, 9, i),
+        ),
+    ];
+
+    await tester.pumpWidget(
+      host(overridePlaces: allVisitedPlaces, overridePhotos: fullPhotos),
+    );
+
+    expect(find.text('다음 장소'), findsNothing);
+    expect(find.text('자유 촬영'), findsNothing);
+  });
+
   testWidgets('필름스트립에서 사진을 고르면 그 칸의 카테고리 태그만 초록(선택) 색으로 바뀐다', (tester) async {
     await tester.pumpWidget(host());
 
@@ -215,14 +391,14 @@ void main() {
     expect(_tagTextColor(tester, '관광지'), Colors.white);
     expect(_tagTextColor(tester, '식당'), ChaerokColors.textSecondary);
 
-    await tester.tap(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is FileImage &&
-            (widget.image as FileImage).file.path == '/tmp/photo-3-thumb.jpg',
-      ),
+    final foodThumb = find.byWidgetPredicate(
+      (widget) =>
+          widget is Image &&
+          widget.image is FileImage &&
+          (widget.image as FileImage).file.path == '/tmp/photo-3-thumb.jpg',
     );
+    await tester.ensureVisible(foodThumb);
+    await tester.tap(foodThumb);
     await tester.pump();
 
     expect(_tagTextColor(tester, '식당'), Colors.white);

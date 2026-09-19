@@ -39,10 +39,15 @@ class VisitCaptureScreen extends StatefulWidget {
     super.key,
     required this.filmRollId,
     required this.filmRollPlaceId,
+    @visibleForTesting this.debugFetchPhotoCount,
   });
 
   final String filmRollId;
   final String filmRollPlaceId;
+
+  /// 테스트에서 실제 DB 조회 대신 촬영 매수를 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<int> Function()? debugFetchPhotoCount;
 
   @override
   State<VisitCaptureScreen> createState() => _VisitCaptureScreenState();
@@ -89,9 +94,19 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 카메라 초기화(권한 다이얼로그 등 사용자 상호작용이 걸릴 수 있음)와 매수
+    // 조회(로컬 DB)를 서로 기다리지 않고 동시에 시작한다 — 매수 조회를 먼저
+    // 기다리게 하면 그 조회가 늦어지는 동안 카메라 자체가 뜨지 않는다.
     unawaited(_initializeCamera());
     unawaited(_loadPhotoCount());
     unawaited(_loadPlace());
+  }
+
+  Future<int> _fetchPhotoCount() {
+    final override = widget.debugFetchPhotoCount;
+    return override != null
+        ? override()
+        : FilmRollModule.instance.getFilmRollPhotoCount(widget.filmRollId);
   }
 
   /// 지금 인증 중인 장소 이름을 안내 문구로 보여주기 위해 조회한다. 실패해도
@@ -120,13 +135,30 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
   Future<void> _loadPhotoCount() async {
     try {
-      final count = await FilmRollModule.instance.getFilmRollPhotoCount(
-        widget.filmRollId,
-      );
+      final count = await _fetchPhotoCount();
       if (!mounted) return;
       setState(() => _photoCount = count);
+      // 매수 조회가 카메라 초기화보다 늦게 끝날 수 있어(둘은 동시에 시작),
+      // 이미 가득 찬 상태로 확인되면 그 사이 열렸을 수 있는 카메라를 정리하고
+      // 안내로 전환한다 — 사용자가 쓸 수 없는 카메라를 계속 보게 두지 않는다.
+      if (count >= FilmRoll.maxExposureCount) {
+        await _disableCameraForExposureLimit();
+      }
     } catch (e, st) {
       log('촬영 매수 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
+  }
+
+  Future<void> _disableCameraForExposureLimit() async {
+    final controller = _cameraController;
+    if (mounted) {
+      setState(() {
+        _cameraController = null;
+        _errorMessage = '필름을 다 썼어요. 더 이상 촬영할 수 없어요.';
+      });
+    }
+    if (controller != null) {
+      await controller.dispose();
     }
   }
 
@@ -273,6 +305,20 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
     setState(() => _isSaving = true);
     try {
+      // 화면이 열려 있는 동안(예: 동기화)으로 필름이 가득 찼을 수 있으므로,
+      // 셔터를 누르기 직전 매수를 다시 확인해 불필요한 촬영·파일 처리를
+      // 막는다. savePhoto()도 같은 한도를 검사하지만, 그때는 이미 셔터가
+      // 눌리고 파일까지 처리된 뒤라 늦다.
+      final latestCount = await _fetchPhotoCount();
+      if (!mounted) return;
+      if (latestCount >= FilmRoll.maxExposureCount) {
+        setState(() {
+          _errorMessage = '필름을 다 썼어요. 더 이상 촬영할 수 없어요.';
+          _isSaving = false;
+        });
+        return;
+      }
+
       // 촬영 직전 플래시 모드를 한 번 더 확정한다(이전 촬영 후 모드가 초기화되는
       // 기기 대비).
       await _applyFlashModeSafely(controller);
