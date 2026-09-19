@@ -4,6 +4,14 @@ import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+
+/// Figma 촬영 매수 배지 배경 색(rgba(215,220,196,0.56)).
+const _kCounterBackground = Color(0x8FD7DCC4);
+
+/// Figma 닫기 버튼 배경 색(rgba(215,220,196,0.56)) · 테두리 색(#dadada).
+const _kCloseBackground = Color(0x8FD7DCC4);
+const _kCloseBorder = Color(0xFFDADADA);
 
 /// 촬영 화면 상단 바. 플래시 토글, 필름 타입 라벨, 촬영 매수 카운터,
 /// 닫기 버튼을 한 줄에 배치한다.
@@ -45,13 +53,13 @@ class CameraTopBar extends StatelessWidget {
             vertical: ChaerokSpacing.xxs,
           ),
           decoration: BoxDecoration(
-            color: ChaerokColors.border,
+            color: _kCounterBackground,
             borderRadius: BorderRadius.circular(ChaerokRadius.full),
           ),
           child: Text(
             '$photoCount/$maxPhotoCount',
             style: ChaerokTypography.progress.copyWith(
-              color: ChaerokColors.textPrimary,
+              color: ChaerokColors.sageDark,
             ),
           ),
         ),
@@ -64,13 +72,14 @@ class CameraTopBar extends StatelessWidget {
             height: 32,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: ChaerokColors.border,
+              color: _kCloseBackground,
               shape: BoxShape.circle,
+              border: Border.fromBorderSide(BorderSide(color: _kCloseBorder)),
             ),
-            child: const Icon(
-              Icons.close,
-              color: ChaerokColors.textPrimary,
-              size: 18,
+            child: SvgPicture.asset(
+              'assets/images/chaerok-camera-icon-cancel.svg',
+              width: 16,
+              height: 16,
             ),
           ),
         ),
@@ -82,7 +91,7 @@ class CameraTopBar extends StatelessWidget {
     final label = Text(
       filmTypeLabel,
       style: ChaerokTypography.displayMedium.copyWith(
-        color: ChaerokColors.textPrimary,
+        color: ChaerokColors.sageDark,
       ),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -100,15 +109,18 @@ class CameraTopBar extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                color: ChaerokColors.textPrimary,
-                size: 20,
+              Opacity(
+                opacity: _isFlashOn ? 1 : 0.5,
+                child: SvgPicture.asset(
+                  'assets/images/chaerok-camera-icon-flash.svg',
+                  width: 20,
+                  height: 20,
+                ),
               ),
               Text(
                 _isFlashOn ? 'ON' : 'OFF',
                 style: ChaerokTypography.caption.copyWith(
-                  color: ChaerokColors.textSecondary,
+                  color: ChaerokColors.sageDark,
                 ),
               ),
             ],
