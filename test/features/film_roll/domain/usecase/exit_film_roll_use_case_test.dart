@@ -129,6 +129,36 @@ void main() {
     expect(repo.filmRoll.status, FilmRollStatus.expired);
   });
 
+  test(
+    '조건은 충족했지만 아직 대기 시간이 안 지나 status가 CAPTURING이고 '
+    'developAvailable=false여도, developAvailableAt이 있으면 developing으로 전환한다',
+    () async {
+      final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
+      final developAvailableAt = DateTime(2026, 9, 5, 16);
+      final useCase = ExitFilmRollUseCase(
+        filmRollRepository: repo,
+        syncService: _FakeSyncService(),
+        exitFilmRoll: (id) async => FilmRollExitResponse(
+          filmRollId: id,
+          status: 'CAPTURING',
+          exitedAt: DateTime(2026, 9, 5, 15),
+          developAvailableAt: developAvailableAt,
+          developAvailable: false,
+        ),
+      );
+
+      final result = await useCase.call(repo.filmRoll);
+
+      expect(result.isDeveloping, isTrue);
+      expect(result.developAvailableAt, developAvailableAt);
+      expect(repo.markDevelopingCalls, [
+        ('fr-1', developAvailableAt, 'CAPTURING'),
+      ]);
+      expect(repo.filmRoll.status, FilmRollStatus.developing);
+      expect(repo.markExpiredCalls, isEmpty);
+    },
+  );
+
   test('developAvailableAt이 응답에 없으면 exitedAt + 1시간으로 대체한다', () async {
     final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
     final exitedAt = DateTime(2026, 9, 5, 15);
