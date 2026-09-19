@@ -129,6 +129,36 @@ void main() {
     expect(repo.filmRoll.status, FilmRollStatus.expired);
   });
 
+  test(
+    '조건은 충족했지만 아직 대기 시간이 안 지나 status가 CAPTURING이고 '
+    'developAvailable=false여도, developAvailableAt이 있으면 developing으로 전환한다',
+    () async {
+      final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
+      final developAvailableAt = DateTime(2026, 9, 5, 16);
+      final useCase = ExitFilmRollUseCase(
+        filmRollRepository: repo,
+        syncService: _FakeSyncService(),
+        exitFilmRoll: (id) async => FilmRollExitResponse(
+          filmRollId: id,
+          status: 'CAPTURING',
+          exitedAt: DateTime(2026, 9, 5, 15),
+          developAvailableAt: developAvailableAt,
+          developAvailable: false,
+        ),
+      );
+
+      final result = await useCase.call(repo.filmRoll);
+
+      expect(result.isDeveloping, isTrue);
+      expect(result.developAvailableAt, developAvailableAt);
+      expect(repo.markDevelopingCalls, [
+        ('fr-1', developAvailableAt, 'CAPTURING'),
+      ]);
+      expect(repo.filmRoll.status, FilmRollStatus.developing);
+      expect(repo.markExpiredCalls, isEmpty);
+    },
+  );
+
   test('developAvailableAt이 응답에 없으면 exitedAt + 1시간으로 대체한다', () async {
     final repo = _FakeFilmRollRepository(_filmRoll(serverFilmRollId: 900));
     final exitedAt = DateTime(2026, 9, 5, 15);
@@ -175,6 +205,26 @@ void main() {
     expect(sync.calls, ['fr-1']);
     expect(calledWithId, [900]);
     expect(result.isDeveloping, isTrue);
+  });
+
+  test('다른 활성 필름롤에 막히면(blockedByOtherActiveFilmRoll) '
+      'ActiveFilmRollConflictException을 던진다', () async {
+    final repo = _FakeFilmRollRepository(_filmRoll());
+    final sync = _FakeSyncService(
+      result: const FilmRollSyncResult(blockedByOtherActiveFilmRoll: true),
+    );
+    final useCase = ExitFilmRollUseCase(
+      filmRollRepository: repo,
+      syncService: sync,
+      exitFilmRoll: (_) async => throw StateError('호출되면 안 됨'),
+    );
+
+    await expectLater(
+      useCase.call(repo.filmRoll),
+      throwsA(isA<ActiveFilmRollConflictException>()),
+    );
+    expect(repo.markDevelopingCalls, isEmpty);
+    expect(repo.markExpiredCalls, isEmpty);
   });
 
   test('동기화 후에도 serverFilmRollId가 없으면 ExitNotSyncedException을 던진다', () async {

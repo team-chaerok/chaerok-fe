@@ -41,22 +41,26 @@ class _FakePathProviderPlatform extends PathProviderPlatform
   Future<String?> getApplicationDocumentsPath() async => dir.path;
 }
 
-FilmRollResponse _fakeResponse({int id = 900, String status = 'CAPTURING'}) =>
-    FilmRollResponse(
-      filmRollId: id,
-      regionId: 11,
-      filterId: 'f1',
-      filterStrength: 1.0,
-      filterVersion: 1,
-      status: status,
-      totalPhotoCount: 0,
-      processedPhotoCount: 0,
-      maxPhotoCount: 24,
-      exitConfirmed: false,
-      developAvailable: false,
-      createdAt: DateTime(2026, 8, 30),
-      updatedAt: DateTime(2026, 8, 30),
-    );
+FilmRollResponse _fakeResponse({
+  int id = 900,
+  String status = 'CAPTURING',
+  String? clientFilmRollId,
+}) => FilmRollResponse(
+  filmRollId: id,
+  clientFilmRollId: clientFilmRollId,
+  regionId: 11,
+  filterId: 'f1',
+  filterStrength: 1.0,
+  filterVersion: 1,
+  status: status,
+  totalPhotoCount: 0,
+  processedPhotoCount: 0,
+  maxPhotoCount: 24,
+  exitConfirmed: false,
+  developAvailable: false,
+  createdAt: DateTime(2026, 8, 30),
+  updatedAt: DateTime(2026, 8, 30),
+);
 
 DioException _dioError(
   int statusCode, {
@@ -179,6 +183,7 @@ void main() {
   FilmRollSyncService service({
     Future<FilmRollResponse> Function(FilmRollCreateRequest)? createFilmRoll,
     Future<FilmRollResponse> Function(int)? getFilmRoll,
+    Future<FilmRollResponse?> Function()? getCurrentFilmRoll,
     Future<VisitCreateResponse> Function(int, VisitCreateRequest)? createVisit,
     Future<PhotoUploadUrlResponse> Function(int, PhotoUploadUrlRequest)?
     requestPhotoUploadUrl,
@@ -194,6 +199,7 @@ void main() {
       preferences: prefs,
       createFilmRoll: createFilmRoll ?? (_) async => _fakeResponse(),
       getFilmRoll: getFilmRoll ?? (id) async => _fakeResponse(id: id),
+      getCurrentFilmRoll: getCurrentFilmRoll ?? () async => null,
       createVisit: createVisit ?? (_, __) async => VisitCreateResponse.empty(),
       requestPhotoUploadUrl:
           requestPhotoUploadUrl ??
@@ -317,18 +323,88 @@ void main() {
       expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
     });
 
-    test('다른 CAPTURING 롤 존재로 4xx 거절되면 미연동·무오류 보류', () async {
+    test('ACTIVE_FILM_ROLL_EXISTS(409)인데 /current가 다른 clientFilmRollId를 주면 '
+        '진짜 다른 필름롤 — 미연동·무오류 보류', () async {
       final fr = await seedFilmRoll();
 
       final result = await service(
-        createFilmRoll: (_) async =>
-            throw _dioError(409, message: '이탈하지 않은 필름롤이 있습니다'),
+        createFilmRoll: (_) async => throw _dioError(
+          409,
+          message: '이탈하지 않은 필름롤이 있습니다',
+          code: 'ACTIVE_FILM_ROLL_EXISTS',
+        ),
+        getCurrentFilmRoll: () async =>
+            _fakeResponse(id: 777, clientFilmRollId: 'other-uuid'),
       ).syncFilmRoll(fr.id);
 
       expect(result.hasError, isFalse);
       expect(result.created, isFalse);
+      expect(result.blockedByOtherActiveFilmRoll, isTrue);
       expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
     });
+
+    test('ACTIVE_FILM_ROLL_EXISTS(409)인데 /current의 clientFilmRollId가 같으면 '
+        '레이스로 이미 생성된 것 — 연결하고 동기화를 이어간다', () async {
+      final fr = await seedFilmRoll();
+
+      final result = await service(
+        createFilmRoll: (_) async => throw _dioError(
+          409,
+          message: '이탈하지 않은 필름롤이 있습니다',
+          code: 'ACTIVE_FILM_ROLL_EXISTS',
+        ),
+        getCurrentFilmRoll: () async =>
+            _fakeResponse(id: 777, clientFilmRollId: fr.id),
+      ).syncFilmRoll(fr.id);
+
+      expect(result.hasError, isFalse);
+      expect(result.created, isTrue);
+      expect(result.blockedByOtherActiveFilmRoll, isFalse);
+      expect((await repository.findById(fr.id))!.serverFilmRollId, 777);
+    });
+
+    test(
+      'ACTIVE_FILM_ROLL_EXISTS(409)인데 /current가 204(null)면 판정 불가 — 미연동·무오류 보류',
+      () async {
+        final fr = await seedFilmRoll();
+
+        final result = await service(
+          createFilmRoll: (_) async => throw _dioError(
+            409,
+            message: '이탈하지 않은 필름롤이 있습니다',
+            code: 'ACTIVE_FILM_ROLL_EXISTS',
+          ),
+          getCurrentFilmRoll: () async => null,
+        ).syncFilmRoll(fr.id);
+
+        expect(result.hasError, isFalse);
+        expect(result.created, isFalse);
+        expect(result.blockedByOtherActiveFilmRoll, isTrue);
+        expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+      },
+    );
+
+    test(
+      'ACTIVE_FILM_ROLL_EXISTS가 아닌 다른 4xx는 기존처럼 미연동·무오류 보류(/current 조회 안 함)',
+      () async {
+        final fr = await seedFilmRoll();
+        var currentCalls = 0;
+
+        final result = await service(
+          createFilmRoll: (_) async => throw _dioError(400, message: '잘못된 요청'),
+          getCurrentFilmRoll: () async {
+            currentCalls++;
+            return null;
+          },
+        ).syncFilmRoll(fr.id);
+
+        expect(result.hasError, isFalse);
+        expect(result.created, isFalse);
+        expect(result.blockedByOtherActiveFilmRoll, isFalse);
+        expect(currentCalls, 0);
+        expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+      },
+    );
   });
 
   group('방문 전송', () {

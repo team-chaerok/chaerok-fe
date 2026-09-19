@@ -1,8 +1,10 @@
 import 'package:chaerok/core/network/dio_client.dart';
 import 'package:chaerok/data/models/film_roll_create_request.dart';
+import 'package:chaerok/data/models/film_roll_development_response.dart';
 import 'package:chaerok/data/models/film_roll_exit_response.dart';
 import 'package:chaerok/data/models/film_roll_photo_list_response.dart';
 import 'package:chaerok/data/models/film_roll_response.dart';
+import 'package:chaerok/data/models/film_roll_result_response.dart';
 import 'package:chaerok/data/models/photo_complete_response.dart';
 import 'package:chaerok/data/models/photo_upload_url_request.dart';
 import 'package:chaerok/data/models/photo_upload_url_response.dart';
@@ -100,6 +102,37 @@ class FilmRollsApi {
           PhotoCompleteResponse.fromJson(data as Map<String, dynamic>),
     );
     return response.data ?? PhotoCompleteResponse.empty();
+  }
+
+  /// [필름 롤 현상 시작] API 호출
+  /// 사진 업로드 정합성, 방문 유형 조건과 지역 이탈 확정을 확인한 뒤 현상을
+  /// 시작한다. 일반 사용자는 현상 가능 시각(1시간 대기) 도달 여부를 검사하고,
+  /// 심사용 계정(`reviewMode`)은 이 대기 검사만 면제한다. 이미 QUEUED 또는
+  /// PROCESSING 상태면 새 요청을 만들지 않고 현재 상태를 반환한다.
+  static Future<FilmRollDevelopmentResponse> developFilmRoll(
+    int filmRollId,
+  ) async {
+    final response = await DioClient.instance.post<FilmRollDevelopmentResponse>(
+      '/api/film-rolls/$filmRollId/develop',
+      fromJson: (data) =>
+          FilmRollDevelopmentResponse.fromJson(data as Map<String, dynamic>),
+    );
+    return response.data ?? FilmRollDevelopmentResponse.empty();
+  }
+
+  /// [필름 롤 현상 결과 조회] API 호출
+  /// 현상 진행 상태를 조회한다. COMPLETED 상태에서는 필터 사진/zip/릴스의
+  /// 짧은 만료시간을 가진 Presigned Download URL을 반환한다. 결과 보관
+  /// 기간이 지나면 EXPIRED 상태와 빈 결과를 반환한다.
+  static Future<FilmRollResultResponse> getFilmRollResult(
+    int filmRollId,
+  ) async {
+    final response = await DioClient.instance.get<FilmRollResultResponse>(
+      '/api/film-rolls/$filmRollId/results',
+      fromJson: (data) =>
+          FilmRollResultResponse.fromJson(data as Map<String, dynamic>),
+    );
+    return response.data ?? FilmRollResultResponse.empty();
   }
 
   /// [현재 진행 중인 필름 롤 조회] API 호출

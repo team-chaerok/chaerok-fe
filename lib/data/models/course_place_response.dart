@@ -49,4 +49,23 @@ class CoursePlaceResponse {
     if (externalPlaceId != null) return ['external', source, externalPlaceId!];
     return ['title', source, title, address];
   }
+
+  /// [placeId]만 바꾼 사본을 만든다. 추천 코스의 카카오 소싱 장소는 이
+  /// 응답 시점엔 `placeId`가 없는데(서버 DB에 아직 없음), 코스 확정 시
+  /// `createCourse`가 그 자리에서 장소를 찾거나 만들어 실제 placeId를
+  /// 돌려주면 이걸로 채워 넣는다.
+  CoursePlaceResponse copyWithPlaceId(int placeId) {
+    return CoursePlaceResponse(
+      placeId: placeId,
+      externalPlaceId: externalPlaceId,
+      source: source,
+      title: title,
+      categoryGroup: categoryGroup,
+      categoryDetail: categoryDetail,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      placeUrl: placeUrl,
+    );
+  }
 }

@@ -23,6 +23,7 @@ import 'package:chaerok/features/film_roll/presentation/page/course_selection_sc
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
+import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/region/region_code.dart';
@@ -282,42 +283,12 @@ class ExploreScreenState extends State<ExploreScreen>
     unawaited(_showPlaceDetailSheet(place));
   }
 
+  /// 필름롤 코스 장소와 동일한 [PlaceDetailSheet]를 띄운다 — 채록길 탐색
+  /// 모드는 아직 촬영한 사진이 없으니 photos는 비워 둔다.
   Future<void> _showPlaceDetailSheet(ExplorePlace place) {
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: ChaerokColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(ChaerokRadius.lg),
-        ),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(ChaerokSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(place.title, style: ChaerokTypography.titleMedium),
-              const SizedBox(height: ChaerokSpacing.xs),
-              Text(
-                '${place.categoryDisplayLabel}'
-                '${_distanceLabel(place) != null ? ' · ${_distanceLabel(place)}' : ''}',
-                style: ChaerokTypography.bodyMedium.copyWith(
-                  color: ChaerokColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: ChaerokSpacing.xs),
-              Text(
-                place.address,
-                style: ChaerokTypography.caption.copyWith(
-                  color: ChaerokColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return showPlaceDetailSheet(
+      context,
+      place: PlaceDetailSheetPlace.fromExplorePlace(place),
     );
   }
 

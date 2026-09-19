@@ -14,6 +14,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/backfill_place_images_
 import 'package:chaerok/features/film_roll/domain/usecase/complete_visit_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_photo_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/develop_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/enter_region_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_photo_count_use_case.dart';
@@ -22,6 +23,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entr
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_custom_course_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/watch_film_roll_result_use_case.dart';
 
 /// 필름롤 기능의 리포지토리/유스케이스 인스턴스를 조립하는 단순 조립 지점.
 /// 프로젝트에 별도 DI 프레임워크가 없으므로, 기존 `TokenStorage.instance`/
@@ -73,6 +75,8 @@ class FilmRollModule {
       syncService: filmRollSyncService,
     );
     backfillPlaceImages = BackfillPlaceImagesUseCase(filmRollPlaceRepository);
+    developFilmRoll = DevelopFilmRollUseCase();
+    watchFilmRollResult = WatchFilmRollResultUseCase();
   }
 
   static FilmRollModule? _instance;
@@ -98,4 +102,6 @@ class FilmRollModule {
   late final DeleteFilmRollUseCase deleteFilmRoll;
   late final ExitFilmRollUseCase exitFilmRoll;
   late final BackfillPlaceImagesUseCase backfillPlaceImages;
+  late final DevelopFilmRollUseCase developFilmRoll;
+  late final WatchFilmRollResultUseCase watchFilmRollResult;
 }

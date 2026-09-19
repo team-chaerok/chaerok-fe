@@ -14,6 +14,7 @@ import 'package:chaerok/features/film_roll/domain/visit_category_progress.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
+import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.dart';
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
 import 'package:flutter/material.dart';
 
@@ -69,20 +70,34 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
   /// 카테고리.
   static const _defaultCategory = PlaceCategoryGroup.tourism;
 
-  String? _selectedPhotoId;
+  /// 큰 사진이 지금 가리키는 [_placesByCategoryOrder] 안의 인덱스. 필름스트립
+  /// 탭·큰 사진 좌우 스와이프 둘 다 이 값을 갱신하는 단일 소스다.
+  late int _heroIndex;
+  late final PageController _heroController;
 
-  Map<String, PlaceCategoryGroup> get _categoryByPlaceId => {
-    for (final place in widget.places)
-      place.id: resolvePlaceCategoryGroup(place.category),
-  };
+  @override
+  void initState() {
+    super.initState();
+    _heroIndex = _initialHeroIndex();
+    _heroController = PageController(initialPage: _heroIndex);
+  }
 
-  List<FilmRollPhoto> _photosFor(PlaceCategoryGroup category) {
-    final categoryByPlaceId = _categoryByPlaceId;
-    final matched = widget.photos
-        .where((photo) => categoryByPlaceId[photo.filmRollPlaceId] == category)
-        .toList();
-    matched.sort((a, b) => a.sequence.compareTo(b.sequence));
-    return matched;
+  @override
+  void dispose() {
+    _heroController.dispose();
+    super.dispose();
+  }
+
+  /// 코스에 담긴 장소가 없으면 0(빈 상태), 있으면 기본 카테고리(관광지)에서
+  /// 아직 안 간 장소를 우선하고(방문 순서대로) 없으면 그 카테고리의 첫 장소를
+  /// 가리키는 인덱스.
+  int _initialHeroIndex() {
+    final orderedPlaces = _placesByCategoryOrder;
+    if (orderedPlaces.isEmpty) return 0;
+    final defaultPlace = _placeFor(_defaultCategory);
+    if (defaultPlace == null) return 0;
+    final index = orderedPlaces.indexWhere((p) => p.id == defaultPlace.id);
+    return index < 0 ? 0 : index;
   }
 
   /// 필름스트립에 보여줄 코스 장소 전체 — 관광지→식당→카페 순으로 묶고,
@@ -117,14 +132,6 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     return photos.reduce((a, b) => a.takenAt.isAfter(b.takenAt) ? a : b);
   }
 
-  FilmRollPhoto? _findById(String? id) {
-    if (id == null) return null;
-    for (final photo in widget.photos) {
-      if (photo.id == id) return photo;
-    }
-    return null;
-  }
-
   /// 아직 사진이 없을 때 큰 사진 자리에 보여줄, 이미 코스에 넣어둔 장소.
   /// 아직 안 가본 장소를 우선하고(방문 순서대로), 카테고리에 담긴 장소가
   /// 없으면 null(그때는 빈 placeholder로 폴백).
@@ -143,6 +150,17 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     );
   }
 
+  /// 큰 사진을 [place]가 있는 페이지로 이동시킨다(필름스트립 태그·이미 인증된
+  /// 사진 타일 탭이 공유하는 동작). 코스에 없는 장소면 아무것도 하지 않는다.
+  void _jumpHeroTo(FilmRollPlace place) {
+    final index = _placesByCategoryOrder.indexWhere((p) => p.id == place.id);
+    if (index < 0) return;
+    setState(() => _heroIndex = index);
+    if (_heroController.hasClients) {
+      _heroController.jumpToPage(index);
+    }
+  }
+
   /// 필름스트립 칸을 탭했을 때: 이미 인증(촬영)한 장소면 그 사진을 큰 사진
   /// 자리로 선택하고, 아직 안 간 장소면 카메라를 열어 바로 인증하게 한다.
   /// 위치(GPS)는 확인하지 않는다 — 카메라 화면 자체가 "이 장소를 인증
@@ -152,7 +170,7 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
     FilmRollPhoto? photo,
   ) async {
     if (photo != null) {
-      setState(() => _selectedPhotoId = photo.id);
+      _jumpHeroTo(place);
       return;
     }
 
@@ -168,32 +186,53 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
 
     try {
       await FilmRollModule.instance.completeVisit(place.id);
+      // completeVisit()은 로컬 DB만 갱신한다. FilmRollController를 거치지
+      // 않는 이 진입점에서는 아무도 서버 동기화를 트리거하지 않으므로,
+      // 여기서 직접 걸어주지 않으면 이 방문 인증은 서버에 영원히 반영되지
+      // 않는다(로컬/서버 상태 불일치의 원인).
+      unawaited(
+        FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
+          widget.filmRollId,
+        ),
+      );
     } catch (e, st) {
       log('방문 완료 처리 실패', name: _tag, error: e, stackTrace: st);
     }
     await widget.onVisitCompleted();
   }
 
+  /// 큰 사진을 탭했을 때 그 칸이 가리키는 장소의 상세 정보를 바텀시트로
+  /// 보여준다. 인증 여부와 무관하게 열리며, 촬영한 사진이 있으면 그 사진들을
+  /// 함께 보여준다([PlaceDetailSheet] 참고).
+  Future<void> _showPlaceDetailSheet(FilmRollPlace place) {
+    final placePhotos = widget.photos
+        .where((photo) => photo.filmRollPlaceId == place.id)
+        .toList();
+    return showPlaceDetailSheet(
+      context,
+      place: PlaceDetailSheetPlace.fromFilmRollPlace(place),
+      photos: placePhotos,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 명시적으로 고른 사진이 없으면 기본 카테고리(관광지)의 최근 사진으로
-    // 폴백한다. 찍은 사진이 하나도 없으면(아래) 코스에 담긴 장소 미리보기를
-    // 대신 보여준다(완전히 빈 화면 대신 "여기로 가볼까요" 느낌).
-    final selected =
-        _findById(_selectedPhotoId) ??
-        _mostRecentOf(_photosFor(_defaultCategory));
-    final previewPlace = selected == null ? _placeFor(_defaultCategory) : null;
+    final orderedPlaces = _placesByCategoryOrder;
+    final safeIndex = orderedPlaces.isEmpty
+        ? 0
+        : _heroIndex.clamp(0, orderedPlaces.length - 1);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _HeroPhoto(photo: selected, previewPlace: previewPlace),
+        _buildHero(orderedPlaces, safeIndex),
         const SizedBox(height: ChaerokSpacing.sm),
         _FilmStrip(
-          places: _placesByCategoryOrder,
+          places: orderedPlaces,
           photoForPlace: _photoForPlace,
-          selectedPhotoId: selected?.id,
+          selectedIndex: safeIndex,
           onTap: _onPlaceTileTap,
+          onTagTap: _jumpHeroTo,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(
@@ -225,27 +264,23 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
       ],
     );
   }
-}
-
-class _HeroPhoto extends StatelessWidget {
-  const _HeroPhoto({required this.photo, this.previewPlace});
-
-  final FilmRollPhoto? photo;
-
-  /// [photo]가 없을 때(아직 고른 사진이 없고 기본 카테고리에 찍은 사진도
-  /// 없음) 대신 보여줄, 이미 코스에 담긴 장소. 내가 찍은 사진이 아님을
-  /// 라벨로 구분한다.
-  final FilmRollPlace? previewPlace;
 
   /// 필름 느낌을 내는 위아래 검은 띠 두께.
-  static const double _filmEdgeHeight = 10;
+  static const double _heroFilmEdgeHeight = 10;
 
   /// 사진 영역 세로 크기(검은 띠 제외, 순수 사진).
-  static const double _photoHeight = 294;
+  static const double _heroPhotoHeight = 294;
 
-  @override
-  Widget build(BuildContext context) {
-    final place = photo == null ? previewPlace : null;
+  /// 큰 사진 — 코스 장소 순서(관광지→식당→카페, 각 묶음 안에서는 방문 순서)
+  /// 그대로 좌우로 스와이프된다. 인증(촬영)한 장소는 그 사진을, 아직 안 간
+  /// 장소는 "가 볼 장소" 미리보기를 보여준다.
+  Widget _buildHero(List<FilmRollPlace> places, int index) {
+    final pageCount = places.isEmpty ? 1 : places.length;
+    final currentPlace = places.isEmpty ? null : places[index];
+    final currentPhoto = currentPlace == null
+        ? null
+        : _photoForPlace(currentPlace);
+    final previewPlace = currentPhoto == null ? currentPlace : null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -255,25 +290,49 @@ class _HeroPhoto extends StatelessWidget {
         children: [
           const ColoredBox(
             color: Colors.black,
-            child: SizedBox(width: double.infinity, height: _filmEdgeHeight),
+            child: SizedBox(
+              width: double.infinity,
+              height: _heroFilmEdgeHeight,
+            ),
           ),
-          SizedBox(height: _photoHeight, child: _photo(context)),
+          SizedBox(
+            height: _heroPhotoHeight,
+            child: PageView.builder(
+              controller: _heroController,
+              itemCount: pageCount,
+              onPageChanged: (i) => setState(() => _heroIndex = i),
+              itemBuilder: (context, i) {
+                if (places.isEmpty) {
+                  return const ColoredBox(color: ChaerokColors.surface);
+                }
+                final place = places[i];
+                return GestureDetector(
+                  onTap: () => _showPlaceDetailSheet(place),
+                  child: _heroSlide(context, _photoForPlace(place), place),
+                );
+              },
+            ),
+          ),
           const ColoredBox(
             color: Colors.black,
-            child: SizedBox(width: double.infinity, height: _filmEdgeHeight),
+            child: SizedBox(
+              width: double.infinity,
+              height: _heroFilmEdgeHeight,
+            ),
           ),
-          if (place != null) ...[
+          if (previewPlace != null) ...[
             const SizedBox(height: ChaerokSpacing.xs),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: ChaerokSpacing.md,
               ),
               child: Text(
-                '가 볼 장소 · ${place.name}',
+                '가 볼 장소 · ${previewPlace.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ChaerokTypography.caption.copyWith(
-                  color: ChaerokColors.textSecondary,
+                style: ChaerokTypography.bodyMedium.copyWith(
+                  color: ChaerokColors.textPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -283,26 +342,31 @@ class _HeroPhoto extends StatelessWidget {
     );
   }
 
-  Widget _photo(BuildContext context) {
-    final current = photo;
-    if (current != null) {
+  Widget _heroSlide(
+    BuildContext context,
+    FilmRollPhoto? photo,
+    FilmRollPlace previewPlace,
+  ) {
+    if (photo != null) {
+      // 카메라 원본 해상도를 그대로 디코딩하면, 스와이프로 지나간 페이지도
+      // PageView가 keep-alive로 살려둔 채 여러 장이 한꺼번에 메모리에
+      // 올라가 디코딩 실패(→ errorBuilder 회색 슬롯)로 이어질 수 있다.
+      // 실제 표시 높이로 다운샘플링해 디코딩 메모리를 크게 줄인다.
+      final cacheHeight =
+          (_heroPhotoHeight * MediaQuery.of(context).devicePixelRatio).round();
       return Image.file(
-        File(current.originalPath),
+        File(photo.originalPath),
         fit: BoxFit.cover,
         width: double.infinity,
+        cacheHeight: cacheHeight,
         // 앱 재설치 등으로 원본 파일이 사라졌으면 회색 슬롯으로 폴백한다.
         errorBuilder: (context, error, stackTrace) =>
             const ColoredBox(color: ChaerokColors.surface),
       );
     }
-
-    final place = previewPlace;
-    if (place == null) {
-      return const ColoredBox(color: ChaerokColors.surface);
-    }
     return PlaceImage(
-      imageUrl: place.imageUrl,
-      mood: PlacePlaceholderMood.forest,
+      imageUrl: previewPlace.imageUrl,
+      mood: moodForCategory(resolvePlaceCategoryGroup(previewPlace.category)),
     );
   }
 }
@@ -354,14 +418,22 @@ class _FilmStrip extends StatefulWidget {
   const _FilmStrip({
     required this.places,
     required this.photoForPlace,
-    required this.selectedPhotoId,
+    required this.selectedIndex,
     required this.onTap,
+    required this.onTagTap,
   });
 
   final List<FilmRollPlace> places;
   final FilmRollPhoto? Function(FilmRollPlace place) photoForPlace;
-  final String? selectedPhotoId;
+
+  /// 지금 큰 사진이 가리키는 [places] 안의 인덱스 — 그 칸의 카테고리 태그만
+  /// 초록색으로 켠다.
+  final int selectedIndex;
   final void Function(FilmRollPlace place, FilmRollPhoto? photo) onTap;
+
+  /// 카테고리 태그를 탭했을 때 — 방문 여부와 무관하게 큰 사진만 그 장소로
+  /// 스와이프한다(사진 타일 탭과 달리 카메라로 이어지지 않는다).
+  final void Function(FilmRollPlace place) onTagTap;
 
   @override
   State<_FilmStrip> createState() => _FilmStripState();
@@ -451,14 +523,16 @@ class _FilmStripState extends State<_FilmStrip> {
       separatorBuilder: (_, _) => const SizedBox(width: _itemGap),
       itemBuilder: (context, index) {
         final place = widget.places[index];
-        final photo = widget.photoForPlace(place);
-        final isSelected = photo != null && photo.id == widget.selectedPhotoId;
+        final isSelected = index == widget.selectedIndex;
         final category = resolvePlaceCategoryGroup(place.category);
         return SizedBox(
           width: _itemWidth,
-          child: _CategoryTag(
-            label: _categoryLabels[category] ?? '',
-            selected: isSelected,
+          child: GestureDetector(
+            onTap: () => widget.onTagTap(place),
+            child: _CategoryTag(
+              label: _categoryLabels[category] ?? '',
+              selected: isSelected,
+            ),
           ),
         );
       },

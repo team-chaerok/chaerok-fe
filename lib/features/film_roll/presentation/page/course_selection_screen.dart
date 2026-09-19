@@ -86,6 +86,9 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   final List<ExplorePlace> _selectedPlaces = [];
   bool _isCreatingCustomCourse = false;
 
+  // 추천 코스 확정(서버 장소 확보) 중 여부.
+  bool _isConfirmingCourse = false;
+
   @override
   void initState() {
     super.initState();
@@ -139,8 +142,80 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     }
   }
 
-  void _onCourseSelected(CourseResponse course) {
-    Navigator.of(context).pop(CourseSelectionResult.recommended(course));
+  /// 추천 코스를 확정한다. 응답의 카카오 소싱 장소는 이 시점까지 `placeId`가
+  /// 없다(서버 DB에 아직 없음) — 커스텀 코스와 마찬가지로 `createCourse`를
+  /// 호출해 그 자리에서 장소를 찾거나 만들고, 응답의 실제 placeId를 채워
+  /// 넣은 뒤 확정한다. 이 값을 그대로 두면 서버엔 place row가 없어 그
+  /// 장소의 방문 인증이 영원히 동기화되지 않는다.
+  Future<void> _onCourseSelected(CourseResponse course) async {
+    if (_isConfirmingCourse) return;
+    setState(() => _isConfirmingCourse = true);
+    try {
+      // createCourse는 서버의 기존 ACTIVE 코스를 조용히 INACTIVE 처리하고
+      // 새로 만든다. 이미 방문/촬영 기록이 있어 로컬 확정(selectCourse)이
+      // 어차피 막힐 상황이면, 서버 상태만 먼저 바뀌어 로컬/서버가 어긋나지
+      // 않도록 호출 전에 미리 확인해 막는다(직접 만들기와 동일한 정책).
+      final isBlocked = await FilmRollModule.instance.filmRollRepository
+          .hasVisitOrPhotoRecords(widget.filmRollId);
+      if (isBlocked) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미 방문/촬영 기록이 있어 코스를 변경할 수 없습니다.')),
+        );
+        return;
+      }
+
+      final resolved = await CoursesApi.createCourse(
+        CourseCreateRequest(
+          regionId: widget.regionId,
+          title: course.title,
+          places: [
+            for (final place in course.places)
+              CoursePlaceSaveRequest(
+                placeId: place.placeId,
+                externalPlaceId: place.externalPlaceId,
+                source: place.source,
+                title: place.title,
+                categoryGroup: place.categoryGroup,
+                categoryDetail: place.categoryDetail,
+                address: place.address,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                placeUrl: place.placeUrl,
+              ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+
+      final resolvedPlaces = [...resolved.places]
+        ..sort((a, b) => a.sequence.compareTo(b.sequence));
+      final mergedPlaces = [
+        for (var i = 0; i < course.places.length; i++)
+          if (i < resolvedPlaces.length)
+            course.places[i].copyWithPlaceId(resolvedPlaces[i].placeId)
+          else
+            course.places[i],
+      ];
+
+      Navigator.of(context).pop(
+        CourseSelectionResult.recommended(
+          CourseResponse(
+            title: course.title,
+            score: course.score,
+            places: mergedPlaces,
+          ),
+        ),
+      );
+    } catch (e, st) {
+      log('추천 코스 확정 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(apiErrorMessage(e))));
+    } finally {
+      if (mounted) setState(() => _isConfirmingCourse = false);
+    }
   }
 
   void _onShowCourseMap(CourseResponse course) {
@@ -372,22 +447,31 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
       appBar: const ChaerokAppbar(title: '코스 선택'),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              ChaerokSpacing.md,
-              ChaerokSpacing.sm,
-              ChaerokSpacing.md,
-              0,
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  ChaerokSpacing.md,
+                  ChaerokSpacing.sm,
+                  ChaerokSpacing.md,
+                  0,
+                ),
+                child: _buildModeSwitch(),
+              ),
+              Expanded(
+                child: _mode == _CourseMode.recommended
+                    ? _buildRecommendedBody()
+                    : _buildCustomBody(),
+              ),
+            ],
+          ),
+          if (_isConfirmingCourse)
+            const ColoredBox(
+              color: Color(0x66000000),
+              child: Center(child: ChaerokLoadingIndicator()),
             ),
-            child: _buildModeSwitch(),
-          ),
-          Expanded(
-            child: _mode == _CourseMode.recommended
-                ? _buildRecommendedBody()
-                : _buildCustomBody(),
-          ),
         ],
       ),
     );
@@ -460,7 +544,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
   Widget _buildCourseCard(CourseResponse course) {
     return InkWell(
-      onTap: () => _onCourseSelected(course),
+      onTap: _isConfirmingCourse ? null : () => _onCourseSelected(course),
       borderRadius: BorderRadius.circular(ChaerokRadius.md),
       child: Container(
         width: double.infinity,

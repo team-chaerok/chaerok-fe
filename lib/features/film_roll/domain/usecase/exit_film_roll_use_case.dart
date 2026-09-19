@@ -31,7 +31,9 @@ class ExitFilmRollUseCase {
   final FilmRollSyncService _syncService;
   final Future<FilmRollExitResponse> Function(int) _exitFilmRoll;
 
-  /// 서버 필름롤 ID가 없으면 [ExitNotSyncedException]을 던진다.
+  /// 서버 필름롤 ID가 없으면 [ExitNotSyncedException]을, 이 계정에 이탈 처리되지
+  /// 않은 다른 활성 필름롤이 있어 확보 자체가 불가능하면 [ActiveFilmRollConflictException]을
+  /// 던진다.
   Future<ExitFilmRollResult> call(FilmRoll filmRoll) async {
     final serverFilmRollId = await _ensureServerFilmRollId(filmRoll);
     if (serverFilmRollId == null) {
@@ -39,13 +41,20 @@ class ExitFilmRollUseCase {
     }
 
     final response = await _exitFilmRoll(serverFilmRollId);
-    // developAvailable과 status 문자열 둘 중 하나라도 충족을 가리키면
-    // 현상 예약으로 처리한다(서버 스펙 확정 전 방어적 이중 판정).
-    final isReadyToRender =
+    // 현상 조건 충족 여부는 developAvailableAt의 존재로 판단한다 — 서버는
+    // 조건 미충족(EXPIRED) 응답에는 이 값을 아예 안 준다(모델 주석 참고).
+    // developAvailable(bool)은 "지금 당장 현상 가능한지"만 가리켜서, 조건은
+    // 충족했지만 아직 대기 시간이 안 지난 경우(status가 CAPTURING으로 남아
+    // 있고 developAvailable=false여도 developAvailableAt은 미래 시각으로
+    // 채워짐) false로 온다 — 이 값만 보고 판정하면 정상적으로 예약된
+    // 현상까지 EXPIRED로 잘못 처리하게 된다. status 문자열도 서버 스펙
+    // 확정 전 방어적으로 함께 본다.
+    final isDevelopmentScheduled =
+        response.developAvailableAt != null ||
         response.developAvailable ||
         response.status.toUpperCase() == _readyToRenderStatus;
 
-    if (!isReadyToRender) {
+    if (!isDevelopmentScheduled) {
       await _filmRollRepository.markExpired(
         clientFilmRollId: filmRoll.id,
         serverStatus: response.status,
@@ -79,6 +88,9 @@ class ExitFilmRollUseCase {
       filmRoll.id,
       skipRegionCheck: true,
     );
+    if (syncResult.blockedByOtherActiveFilmRoll) {
+      throw const ActiveFilmRollConflictException();
+    }
     if (syncResult.hasError) return null;
 
     final existing = filmRoll.serverFilmRollId;

@@ -19,6 +19,8 @@ class PlaceDetailResponse {
     this.lclsSystm1,
     this.lclsSystm2,
     this.lclsSystm3,
+    this.openingHours,
+    this.phone,
   });
 
   factory PlaceDetailResponse.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,10 @@ class PlaceDetailResponse {
       lclsSystm1: json['lclsSystm1'] as String?,
       lclsSystm2: json['lclsSystm2'] as String?,
       lclsSystm3: json['lclsSystm3'] as String?,
+      // TourAPI detailIntro2 usetime/infocenter passthrough — 백엔드가 아직
+      // 내려주지 않으면 null(안내 문구를 화면에서 숨긴다).
+      openingHours: json['openingHours'] as String?,
+      phone: json['phone'] as String?,
       categoryGroup: json['categoryGroup'] as String,
       categoryDetail: json['categoryDetail'] as String,
       isRepresentative: json['isRepresentative'] as bool,
@@ -75,6 +81,12 @@ class PlaceDetailResponse {
   final String? lclsSystm1;
   final String? lclsSystm2;
   final String? lclsSystm3;
+
+  /// TourAPI detailIntro2의 `usetime`(운영시간). 백엔드가 아직 내려주지 않는다.
+  final String? openingHours;
+
+  /// TourAPI detailIntro2의 `infocenter`(전화번호). 백엔드가 아직 내려주지 않는다.
+  final String? phone;
   final String categoryGroup;
   final String categoryDetail;
   final bool isRepresentative;

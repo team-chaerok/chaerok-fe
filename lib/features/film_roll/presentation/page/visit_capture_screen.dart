@@ -8,6 +8,7 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/camera_bottom_pattern.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_shutter_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_switch_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_top_bar.dart';
@@ -25,7 +26,7 @@ const _filmTypeLabel = '공주:공주의 잔(殘)';
 const _cameraName = 'Chaerok';
 const _cameraSubtitle = 'Film Camera';
 
-/// 촬영 화면 우측 줌 셀렉터에 노출할 배율 후보(위→아래 순서).
+/// 촬영 화면 우측 줌 셀렉터에 노출할 배율 후보(위→아래 순서, 회전 후 좌→우로 보인다).
 /// 실제로는 [_VisitCaptureScreenState._availableZoomLevels]에서 기기가
 /// 지원하는 범위로 필터링된다.
 const _zoomLevelCandidates = [2.0, 1.0, 0.5];
@@ -68,6 +69,10 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   /// (iOS 인터페이스 회전 강제는 iOS 16+에서 거부/프리뷰 불일치가 생겨 쓰지 않음)
   /// 방향이 통째로 90° 반대면 이 값을 3으로 바꾼다.
   static const _bodyQuarterTurns = 1;
+
+  /// 뷰파인더 안의 실제 카메라 프리뷰만은 [_bodyQuarterTurns]만큼 반대로 되돌려
+  /// 정방향(위아래가 맞는 방향)으로 보이게 한다. 나머지 UI는 회전된 채로 둔다.
+  static const _previewCounterQuarterTurns = (4 - _bodyQuarterTurns) % 4;
 
   int _photoCount = 0;
   FilmRollPlace? _place;
@@ -304,14 +309,20 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ChaerokColors.primaryLight,
-      // 앱 인터페이스는 세로. 이 화면만 본문 전체를 회전시켜 가로로 보이게 한다.
-      body: SafeArea(
-        child: RotatedBox(
-          key: const ValueKey('capture-body-rotator'),
-          quarterTurns: _bodyQuarterTurns,
-          child: _buildBody(),
-        ),
+      backgroundColor: ChaerokColors.background,
+      body: Stack(
+        children: [
+          // 실제 화면(회전 전) 좌표계 기준 장식 패턴이므로 RotatedBox 바깥에 둔다.
+          const Positioned.fill(child: CameraBottomPattern()),
+          // 앱 인터페이스는 세로. 이 화면만 본문 전체를 회전시켜 가로로 보이게 한다.
+          SafeArea(
+            child: RotatedBox(
+              key: const ValueKey('capture-body-rotator'),
+              quarterTurns: _bodyQuarterTurns,
+              child: _buildBody(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -376,66 +387,98 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
               ),
             ),
           ],
-          const SizedBox(height: ChaerokSpacing.lg),
+          // const SizedBox(height: ChaerokSpacing.lg),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            // Row 대신 Stack을 써서, 뷰파인더 그룹의 정렬 기준이 옆(줌/셔터/전환
+            // 버튼) 그룹의 폭에 영향받지 않고 이 영역 전체 크기를 기준으로 잡히게
+            // 한다. Row였을 때는 Align(0, ...)의 x=0이 "전체 화면 중앙"이 아니라
+            // "옆 그룹 폭을 뺀 나머지 영역의 중앙"이라 화면 전체 기준으로는 안
+            // 맞았다.
+            child: Stack(
               children: [
-                Expanded(
+                Align(
+                  // 본문이 90° 회전되므로(RotatedBox quarterTurns:1),
+                  // 이 로컬 좌표계의 '위(top)' 방향이 화면 정방향 기준
+                  // '오른쪽', '아래(bottom)' 방향이 정방향 기준 '왼쪽'이
+                  // 된다. y를 음수로 줄수록 뷰파인더(+라벨)가 정방향
+                  // 기준 오른쪽으로 이동한다. x=0이면 이 Stack(=Expanded
+                  // 전체) 너비 기준 정중앙에 위치한다.
+                  alignment: const Alignment(0, -2.4),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 3 / 2,
-                            child: FilmViewfinderFrame(
-                              child: CameraPreview(controller),
-                            ),
+                      // Figma 원본 뷰파인더 크기(393x852 화면 기준
+                      // 195x147)를 그대로 고정 크기로 사용한다.
+                      SizedBox(
+                        width: 212,
+                        height: 160,
+                        child: FilmViewfinderFrame(
+                          // UI(베젤)는 본문과 함께 회전되지만, 그 안의
+                          // 실제 카메라 프리뷰만은 반대로 되돌려
+                          // 정방향으로 보이게 한다.
+                          child: RotatedBox(
+                            quarterTurns: _previewCounterQuarterTurns,
+                            child: CameraPreview(controller),
                           ),
                         ),
                       ),
-                      const SizedBox(height: ChaerokSpacing.md),
+                      // 로컬 '아래' 방향 간격 = 정방향 기준 뷰파인더
+                      // 왼쪽 라벨과의 간격(24px).
+                      const SizedBox(height: 24),
                       Text(
                         _cameraName,
                         style: ChaerokTypography.titleMedium.copyWith(
-                          color: ChaerokColors.textPrimary,
+                          color: ChaerokColors.sageDark,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
                         _cameraSubtitle,
                         style: ChaerokTypography.caption.copyWith(
-                          color: ChaerokColors.textSecondary,
+                          color: ChaerokColors.sageDark,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: ChaerokSpacing.lg),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CameraZoomSelector(
-                      availableZoomLevels: _availableZoomLevels,
-                      selectedZoomLevel: _zoomLevel,
-                      onZoomSelected: _onZoomSelected,
-                    ),
-                    const SizedBox(height: ChaerokSpacing.xl),
-                    CameraShutterButton(
-                      onPressed: _onCaptureTap,
-                      isLoading: _isSaving,
-                    ),
-                    const SizedBox(height: ChaerokSpacing.lg),
-                    CameraSwitchButton(onPressed: _onCameraSwitch),
-                  ],
+                Align(
+                  // 로컬 '위(top)-오른쪽(right)'는 화면 정방향 기준
+                  // '오른쪽-아래(bottom)'로 회전한다(90° 회전 매핑:
+                  // final_x=-local_y, final_y=local_x). 세로 위치(아래)는
+                  // 그대로 두고 좌우만 오른쪽으로 옮기려면 로컬 bottomRight
+                  // 대신 topRight를 써야 한다.
+                  alignment: Alignment.bottomCenter,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CameraZoomSelector(
+                        availableZoomLevels: _availableZoomLevels,
+                        selectedZoomLevel: _zoomLevel,
+                        onZoomSelected: _onZoomSelected,
+                      ),
+                      const SizedBox(width: ChaerokSpacing.lg),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              CameraShutterButton(
+                                onPressed: _onCaptureTap,
+                                isLoading: _isSaving,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: ChaerokSpacing.lg),
+                          CameraSwitchButton(onPressed: _onCameraSwitch),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-
-          ///  TODO : 디자인 수정할 때까지 임시로 주석 처리
-          // const SizedBox(height: ChaerokSpacing.lg),
-          // CaptureFilmStrip(controller: controller),
         ],
       ),
     );

@@ -4,6 +4,12 @@ import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:flutter/material.dart';
 
+/// Figma 셀렉터 배경 색(#e5e7d8).
+const _kSelectorBackground = Color(0xFFE5E7D8);
+
+/// Figma 선택 배율 강조 원 색(#d7dcc4).
+const _kSelectedZoomBackground = Color(0xFFD7DCC4);
+
 /// 촬영 화면 우측의 줌 배율 선택 UI. [availableZoomLevels]에 담긴 배율만
 /// 선택 가능하며(기기가 지원하지 않는 배율은 상위에서 제외한다),
 /// [selectedZoomLevel]이 현재 활성 배율을 표시한다.
@@ -24,8 +30,7 @@ class CameraZoomSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: ChaerokSpacing.xs),
       decoration: BoxDecoration(
-        color: ChaerokColors.surface,
-        border: Border.all(color: ChaerokColors.border),
+        color: _kSelectorBackground,
         borderRadius: BorderRadius.circular(ChaerokRadius.full),
       ),
       child: Column(
@@ -66,13 +71,13 @@ class _ZoomOption extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(ChaerokSpacing.xs),
         decoration: BoxDecoration(
-          color: isSelected ? ChaerokColors.primary : Colors.transparent,
+          color: isSelected ? _kSelectedZoomBackground : Colors.transparent,
           shape: BoxShape.circle,
         ),
         child: Text(
           '${_formatZoom(zoom)}x',
           style: ChaerokTypography.caption.copyWith(
-            color: isSelected ? Colors.white : ChaerokColors.textSecondary,
+            color: ChaerokColors.sageDark,
           ),
         ),
       ),

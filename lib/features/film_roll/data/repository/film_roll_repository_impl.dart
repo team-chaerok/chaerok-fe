@@ -294,6 +294,25 @@ class FilmRollRepositoryImpl implements FilmRollRepository {
     );
   }
 
+  @override
+  Future<void> markCompleted({
+    required String clientFilmRollId,
+    required DateTime completedAt,
+    String? serverStatus,
+  }) {
+    return _filmRollDs.update(
+      clientFilmRollId,
+      FilmRollsCompanion(
+        status: const Value(FilmRollStatus.completed),
+        completedAt: Value(completedAt),
+        serverStatus: serverStatus == null
+            ? const Value.absent()
+            : Value(serverStatus),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   Future<FilmRoll> _toEntity(FilmRollRow row) async {
     final total = await _placeDs.countByFilmRoll(row.id);
     final visited = await _placeDs.countVisitedByFilmRoll(row.id);

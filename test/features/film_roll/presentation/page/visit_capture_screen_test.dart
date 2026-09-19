@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:camera/camera.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/camera_switch_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
@@ -240,6 +242,37 @@ void main() {
     expect(rotator.quarterTurns, 1);
   });
 
+  testWidgets('카메라 프리뷰는 본문 회전과 반대로 되돌려져 정방향으로 렌더된다', (tester) async {
+    final fakePermissions = _FakePermissionPlatform();
+    PermissionHandlerPlatform.instance = fakePermissions;
+    CameraPlatform.instance = _FakeCameraPlatform();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: VisitCaptureScreen(
+          filmRollId: 'roll-1',
+          filmRollPlaceId: 'place-1',
+        ),
+      ),
+    );
+    fakePermissions.grant();
+    await tester.pumpAndSettle();
+
+    final previewRotator = tester
+        .widgetList<RotatedBox>(
+          find.ancestor(
+            of: find.byType(CameraPreview),
+            matching: find.byType(RotatedBox),
+          ),
+        )
+        .first;
+    expect(
+      previewRotator.quarterTurns,
+      3,
+      reason: '본문 회전(1)을 상쇄해 카메라 프리뷰만 정방향으로 보여야 한다',
+    );
+  });
+
   testWidgets('플래시 토글을 누르면 상단 바 상태가 ON으로 바뀌고 플래시 모드가 적용된다', (tester) async {
     final fakePermissions = _FakePermissionPlatform();
     final fakeCamera = _FakeCameraPlatform();
@@ -259,11 +292,10 @@ void main() {
 
     expect(find.text('OFF'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.flash_off));
+    await tester.tap(find.text('OFF'));
     await tester.pumpAndSettle();
 
     expect(find.text('ON'), findsOneWidget);
-    expect(find.byIcon(Icons.flash_on), findsOneWidget);
     expect(fakeCamera.flashModeCalls, contains(FlashMode.always));
   });
 
@@ -284,11 +316,10 @@ void main() {
     fakePermissions.grant();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.flash_off));
+    await tester.tap(find.text('OFF'));
     await tester.pumpAndSettle();
 
     expect(find.text('OFF'), findsOneWidget, reason: '실패 시 OFF 상태를 유지해야 한다');
-    expect(find.byIcon(Icons.flash_on), findsNothing);
     expect(tester.takeException(), isNull, reason: '예외가 화면 밖으로 전파되면 안 된다');
   });
 
@@ -309,12 +340,12 @@ void main() {
     fakePermissions.grant();
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.flash_off), findsOneWidget);
+    expect(find.text('OFF'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.cameraswitch_outlined));
+    await tester.tap(find.byType(CameraSwitchButton));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.flash_off), findsNothing);
-    expect(find.byIcon(Icons.flash_on), findsNothing);
+    expect(find.text('OFF'), findsNothing);
+    expect(find.text('ON'), findsNothing);
   });
 }

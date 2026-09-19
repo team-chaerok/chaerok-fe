@@ -1,4 +1,3 @@
-import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +12,12 @@ class CameraShutterButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool isLoading;
 
+  /// Figma 셔터 버튼 바깥 링 색(#7d8a6b).
+  static const _ringColor = Color(0xFF7D8A6B);
+
+  /// Figma 셔터 버튼 안쪽 원 색(#c8d5b4).
+  static const _innerColor = Color(0xFFC8D5B4);
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -21,23 +26,29 @@ class CameraShutterButton extends StatelessWidget {
         width: 72,
         height: 72,
         alignment: Alignment.center,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: ChaerokColors.surface,
-          border: Border.all(color: ChaerokColors.primary, width: 4),
+          color: _ringColor,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x40000000),
+              offset: Offset(0, 3),
+              blurRadius: 6,
+            ),
+          ],
         ),
         child: isLoading
             ? const ChaerokLoadingIndicator(
-                color: ChaerokColors.primary,
+                color: Colors.white,
                 size: 28,
                 strokeWidth: 2.5,
               )
             : Container(
-                width: 56,
-                height: 56,
+                width: 65,
+                height: 65,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  color: ChaerokColors.primaryLight,
+                  color: _innerColor,
                 ),
               ),
       ),
