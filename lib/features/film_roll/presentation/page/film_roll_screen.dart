@@ -52,8 +52,10 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
   bool _isExiting = false;
 
   /// 필름롤 전체 촬영 매수(방문 인증 + 자유 촬영 합산). 자유 촬영 버튼
-  /// 노출 여부([FilmRoll.maxExposureCount] 도달 여부) 판단에 쓴다.
-  int _photoCount = 0;
+  /// 노출 여부([FilmRoll.maxExposureCount] 도달 여부) 판단에 쓴다. 아직
+  /// 조회 전이면 null — 0으로 기본값을 두면 실제로는 필름을 다 쓴
+  /// 상태에서도 로딩 중 잠깐 자유 촬영 버튼이 노출될 수 있다.
+  int? _photoCount;
 
   @override
   void initState() {
@@ -345,11 +347,14 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     final hasUnvisitedPlace = _state.places.any((place) => !place.isVisited);
     if (hasUnvisitedPlace) return null;
     final target = _mostRecentlyVisitedPlace;
-    if (target == null || _photoCount >= FilmRoll.maxExposureCount) {
+    final photoCount = _photoCount;
+    if (target == null ||
+        photoCount == null ||
+        photoCount >= FilmRoll.maxExposureCount) {
       return null;
     }
     return ChaerokButton(
-      text: '자유 촬영하기 ($_photoCount/${FilmRoll.maxExposureCount})',
+      text: '자유 촬영하기 ($photoCount/${FilmRoll.maxExposureCount})',
       onPressed: () => _onFreeCaptureTap(target),
     );
   }

@@ -186,18 +186,20 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
 
     try {
       await FilmRollModule.instance.completeVisit(place.id);
-      // completeVisit()은 로컬 DB만 갱신한다. FilmRollController를 거치지
-      // 않는 이 진입점에서는 아무도 서버 동기화를 트리거하지 않으므로,
-      // 여기서 직접 걸어주지 않으면 이 방문 인증은 서버에 영원히 반영되지
-      // 않는다(로컬/서버 상태 불일치의 원인).
-      unawaited(
-        FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
-          widget.filmRollId,
-        ),
-      );
     } catch (e, st) {
       log('방문 완료 처리 실패', name: _tag, error: e, stackTrace: st);
     }
+    // completeVisit() 성공 여부와 무관하게 항상 동기화를 시도한다 — 사진
+    // 자체는 촬영 시점에 이미 로컬에 저장돼 있으므로, completeVisit이
+    // 실패해도 사진 push는 그대로 진행돼야 한다. completeVisit()은 로컬
+    // DB만 갱신하고 FilmRollController를 거치지 않는 이 진입점에서는
+    // 아무도 서버 동기화를 트리거하지 않으므로, 여기서 직접 걸어주지 않으면
+    // 서버에 영원히 반영되지 않는다(로컬/서버 상태 불일치의 원인).
+    unawaited(
+      FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
+        widget.filmRollId,
+      ),
+    );
     await widget.onVisitCompleted();
   }
 

@@ -99,8 +99,10 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   bool _isExiting = false;
 
   /// 필름롤 전체 촬영 매수(방문 인증 + 자유 촬영 합산). 자유 촬영 카드
-  /// 노출 여부([FilmRoll.maxExposureCount] 도달 여부) 판단에 쓴다.
-  int _photoCount = 0;
+  /// 노출 여부([FilmRoll.maxExposureCount] 도달 여부) 판단에 쓴다. 아직
+  /// 조회 전이면 null — 0으로 기본값을 두면 실제로는 필름을 다 쓴
+  /// 상태에서도 로딩 중 잠깐 자유 촬영 카드가 노출될 수 있다.
+  int? _photoCount;
 
   @override
   void initState() {
@@ -700,15 +702,18 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
     final freeCaptureTarget = nextPlace == null
         ? _mostRecentlyVisitedPlace
         : null;
+    final photoCount = _photoCount;
     final canFreeCapture =
-        freeCaptureTarget != null && _photoCount < FilmRoll.maxExposureCount;
+        freeCaptureTarget != null &&
+        photoCount != null &&
+        photoCount < FilmRoll.maxExposureCount;
 
     return [
       if (nextPlace != null) ...[
         _buildNextSpotCard(nextPlace),
         const SizedBox(height: ChaerokSpacing.md),
       ] else if (canFreeCapture) ...[
-        _buildFreeCaptureCard(freeCaptureTarget),
+        _buildFreeCaptureCard(freeCaptureTarget, photoCount),
         const SizedBox(height: ChaerokSpacing.md),
       ],
       _buildProgressFilterRow(),
@@ -806,7 +811,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
   /// 3곳 방문 인증을 모두 마친 뒤 노출되는 "자유 촬영" 카드. [place](가장 최근
   /// 인증한 장소)에 사진이 귀속되지만, 방문 인증(1장 제한)과 달리 필름이
   /// 남아있는 한([FilmRoll.maxExposureCount]) 계속 촬영할 수 있다.
-  Widget _buildFreeCaptureCard(FilmRollPlace place) {
+  Widget _buildFreeCaptureCard(FilmRollPlace place, int photoCount) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(ChaerokSpacing.lg),
@@ -826,7 +831,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
           ),
           const SizedBox(height: ChaerokSpacing.xs),
           Text(
-            '$_photoCount/${FilmRoll.maxExposureCount}장',
+            '$photoCount/${FilmRoll.maxExposureCount}장',
             style: ChaerokTypography.caption.copyWith(
               color: ChaerokColors.textSecondary,
             ),

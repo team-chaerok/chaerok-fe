@@ -131,6 +131,23 @@ class FilmRollSyncService {
     String clientFilmRollId, {
     bool skipRegionCheck = false,
   }) async {
+    try {
+      return await _syncFilmRoll(
+        clientFilmRollId,
+        skipRegionCheck: skipRegionCheck,
+      );
+    } catch (e) {
+      // 호출부 다수가 이 Future를 unawaited()로 던지므로, 여기서 잡지 못한
+      // 예외는 처리되지 않은 Future 오류로 새어나간다. 어떤 예외든 반드시
+      // FilmRollSyncResult.error로 감싸 반환한다.
+      return FilmRollSyncResult(error: e);
+    }
+  }
+
+  Future<FilmRollSyncResult> _syncFilmRoll(
+    String clientFilmRollId, {
+    bool skipRegionCheck = false,
+  }) async {
     final filmRoll = await _filmRollRepository.findById(clientFilmRollId);
     // findById는 현재 로그인 계정으로 스코핑돼 있으므로, null이면 없는
     // 필름롤이거나 다른 계정 소유다. 어느 쪽이든 동기화하지 않는다.
@@ -158,11 +175,21 @@ class FilmRollSyncService {
           // 진짜 다른 필름롤인지, 아니면 같은 clientFilmRollId로 보낸 생성
           // 요청이 레이스(동시 재시도 등)로 이미 서버에 반영된 것뿐인지
           // GET /current로 확인해 구분한다.
-          final reconciled = await _reconcileActiveFilmRoll(filmRoll);
+          final int? reconciled;
+          try {
+            reconciled = await _reconcileActiveFilmRoll(filmRoll);
+          } catch (reconcileError) {
+            // GET /current 조회 자체가 실패 — 진짜 다른 필름롤인지 판정할
+            // 수 없다. 재시도하면 해결될 수 있는 일시적 오류이므로, 영구
+            // 차단(blockedByOtherActiveFilmRoll)이 아니라 일반 error로
+            // 남겨 다음 동기화에서 다시 판정하게 한다.
+            return FilmRollSyncResult(error: reconcileError);
+          }
           if (reconciled == null) {
-            // 확인 결과 정말 다른 필름롤(또는 판정 불가) — 재시도로는 해결되지
-            // 않는 영구적인 상태다. 오류(error)로 취급하진 않되(네트워크/서버
-            // 결함이 아니므로), 호출부가 "잠시 후 다시 시도"가 아니라 구분되는
+            // 조회는 성공했지만 정말 다른 필름롤(또는 clientFilmRollId
+            // 불일치로 판정 불가) — 재시도로는 해결되지 않는 영구적인
+            // 상태다. 오류(error)로 취급하진 않되(네트워크/서버 결함이
+            // 아니므로), 호출부가 "잠시 후 다시 시도"가 아니라 구분되는
             // 안내를 할 수 있게 표시해 둔다.
             return const FilmRollSyncResult(blockedByOtherActiveFilmRoll: true);
           }
@@ -407,14 +434,13 @@ class FilmRollSyncService {
   /// 연결하고 그 id를 반환한다. 일치하지 않거나(진짜 다른 필름롤) 판정할
   /// 수 없으면(204, 레거시라 clientFilmRollId가 없는 경우 등) null을 반환해
   /// 호출부가 안전하게 보류하게 한다.
+  ///
+  /// 조회(`GET /current`) 자체가 실패하면 예외를 그대로 던진다 — 호출부가
+  /// 이를 "확인 결과 정말 다른 필름롤"과 구분해 재시도 가능한 오류로
+  /// 처리해야 하기 때문이다(둘 다 null로 뭉치면 일시적 네트워크 장애가
+  /// 영구 차단으로 잘못 표시된다).
   Future<int?> _reconcileActiveFilmRoll(FilmRoll filmRoll) async {
-    final FilmRollResponse? current;
-    try {
-      current = await _getCurrentFilmRoll();
-    } catch (_) {
-      // 조회 실패는 무시 — 다음 동기화에서 다시 시도된다.
-      return null;
-    }
+    final current = await _getCurrentFilmRoll();
     if (current == null || current.clientFilmRollId != filmRoll.id) {
       return null;
     }

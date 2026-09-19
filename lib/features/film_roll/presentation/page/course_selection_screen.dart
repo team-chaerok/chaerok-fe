@@ -165,6 +165,18 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
         return;
       }
 
+      // createCourse는 서버의 기존 ACTIVE 코스를 조용히 INACTIVE 처리하고
+      // 새로 만든다. 방문/촬영 기록이 없어 위 확인은 통과했더라도, 이미
+      // 만들어 둔 코스가 있다면(아직 하나도 인증하지 않은 상태) 사용자
+      // 동의 없이 조용히 대체되지 않도록 직접 만들기와 동일하게 확인한다.
+      final hasActiveCourse = await _hasActiveCourse();
+      if (hasActiveCourse) {
+        if (!mounted) return;
+        final confirmed = await _showReplaceActiveCourseDialog();
+        if (confirmed != true) return;
+      }
+      if (!mounted) return;
+
       final resolved = await CoursesApi.createCourse(
         CourseCreateRequest(
           regionId: widget.regionId,
@@ -190,9 +202,17 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
       final resolvedPlaces = [...resolved.places]
         ..sort((a, b) => a.sequence.compareTo(b.sequence));
+      // sequence로 index-정렬해 매칭하는 건 응답 장소 수가 요청 장소 수와
+      // 정확히 같고 sequence 값이 서로 겹치지 않을 때만 안전하다. 어긋나면
+      // 잘못된 placeId를 엉뚱한 장소에 붙이는 대신 매칭하지 않는다(직접
+      // 만들기의 [SelectCustomCourseUseCase]와 동일한 정책).
+      final isFullyResolved =
+          resolvedPlaces.length == course.places.length &&
+          resolvedPlaces.map((p) => p.sequence).toSet().length ==
+              resolvedPlaces.length;
       final mergedPlaces = [
         for (var i = 0; i < course.places.length; i++)
-          if (i < resolvedPlaces.length)
+          if (isFullyResolved)
             course.places[i].copyWithPlaceId(resolvedPlaces[i].placeId)
           else
             course.places[i],

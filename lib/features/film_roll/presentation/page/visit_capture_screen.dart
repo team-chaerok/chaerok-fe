@@ -7,6 +7,7 @@ import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
+import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_bottom_pattern.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_shutter_button.dart';
@@ -289,6 +290,12 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
+    } on FilmRollExposureLimitExceededException {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '필름을 다 썼어요. 더 이상 촬영할 수 없어요.';
+        _isSaving = false;
+      });
     } catch (e, st) {
       log('사진 저장 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;

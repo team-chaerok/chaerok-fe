@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
@@ -16,8 +17,11 @@ class ReelPlayerPage extends StatefulWidget {
 }
 
 class _ReelPlayerPageState extends State<ReelPlayerPage> {
+  static const _tag = 'ReelPlayerPage';
+
   late final VideoPlayerController _controller;
   bool _isReady = false;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -27,11 +31,17 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
   }
 
   Future<void> _initializeAndPlay() async {
-    await _controller.initialize();
-    if (!mounted) return;
-    setState(() => _isReady = true);
-    await _controller.setLooping(true);
-    await _controller.play();
+    try {
+      await _controller.initialize();
+      if (!mounted) return;
+      setState(() => _isReady = true);
+      await _controller.setLooping(true);
+      await _controller.play();
+    } catch (e, st) {
+      log('릴스 재생 초기화 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      setState(() => _hasError = true);
+    }
   }
 
   @override
@@ -48,7 +58,12 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
         child: Stack(
           children: [
             Center(
-              child: _isReady
+              child: _hasError
+                  ? const Text(
+                      '영상을 재생할 수 없어요.',
+                      style: TextStyle(color: Colors.white),
+                    )
+                  : _isReady
                   ? AspectRatio(
                       aspectRatio: _controller.value.aspectRatio,
                       child: VideoPlayer(_controller),

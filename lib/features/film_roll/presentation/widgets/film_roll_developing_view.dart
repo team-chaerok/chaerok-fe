@@ -88,6 +88,11 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
       log('즉시 현상 요청 실패', name: _tag, error: e, stackTrace: st);
     }
 
+    // 위 await 중 위젯이 dispose됐을 수 있다 — 이미 dispose()가 실행돼
+    // 기존 구독을 정리한 뒤이므로, 여기서 만드는 새 구독은 아무도 취소하지
+    // 않아 leak된다.
+    if (!mounted) return;
+
     _resultSubscription = _watchFilmRollResult(serverFilmRollId).listen(
       _onResult,
       onError: (Object e, StackTrace st) {
@@ -115,23 +120,34 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
     if (!mounted) return;
 
     if (result.isCompleted) {
-      final completedAt = result.completedAt ?? DateTime.now();
-      await _filmRollRepository.markCompleted(
-        clientFilmRollId: widget.filmRoll.id,
-        completedAt: completedAt,
-      );
-      if (!mounted) return;
-      // 임베드된 탭(채록길)의 Navigator까지 교체하면 하단 탭이 사라지므로
-      // push로 결과 화면을 쌓는다(뒤로 가면 이 화면으로 돌아오지만, 이미
-      // completed로 갱신된 상태라 재진입 시 자연히 컬렉션 흐름으로 이어진다).
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FilmRollResultScreen(
-            filmRoll: widget.filmRoll.copyWith(completedAt: completedAt),
-            initialResult: result,
+      try {
+        final completedAt = result.completedAt ?? DateTime.now();
+        await _filmRollRepository.markCompleted(
+          clientFilmRollId: widget.filmRoll.id,
+          completedAt: completedAt,
+        );
+        if (!mounted) return;
+        // 임베드된 탭(채록길)의 Navigator까지 교체하면 하단 탭이 사라지므로
+        // push로 결과 화면을 쌓는다(뒤로 가면 이 화면으로 돌아오지만, 이미
+        // completed로 갱신된 상태라 재진입 시 자연히 컬렉션 흐름으로 이어진다).
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FilmRollResultScreen(
+              filmRoll: widget.filmRoll.copyWith(completedAt: completedAt),
+              initialResult: result,
+            ),
           ),
-        ),
-      );
+        );
+      } catch (e, st) {
+        // markCompleted 실패 시 아무 처리도 없으면 화면이 "현상 중" 상태로
+        // 영원히 멈춘다 — 재시도할 수 있게 오류 상태로 전환한다.
+        log('현상 완료 처리 실패', name: _tag, error: e, stackTrace: st);
+        if (!mounted) return;
+        setState(() {
+          _phase = _DevelopingPhase.pollError;
+          _failure = null;
+        });
+      }
       return;
     }
 

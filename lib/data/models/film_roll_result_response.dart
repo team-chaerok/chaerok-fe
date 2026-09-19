@@ -16,13 +16,23 @@ class FilmRollResultResponse {
   });
 
   factory FilmRollResultResponse.fromJson(Map<String, dynamic> json) {
+    final status = json['status'] as String;
+    final rawFilteredPhotos = json['filteredPhotos'] as List<dynamic>?;
+    // COMPLETED인데 filteredPhotos가 없는 건 서버 계약 위반이다. 빈
+    // 리스트로 조용히 넘기면 "완료됐지만 사진이 0장"으로 잘못 표시되므로,
+    // 여기서 실패시켜 호출부(폴링)가 오류 상태로 처리하게 한다.
+    if (status == 'COMPLETED' && rawFilteredPhotos == null) {
+      throw FormatException(
+        'COMPLETED 상태인데 filteredPhotos가 없습니다(filmRollId=${json['filmRollId']}).',
+      );
+    }
     return FilmRollResultResponse(
       filmRollId: json['filmRollId'] as int,
-      status: json['status'] as String,
+      status: status,
       totalPhotoCount: json['totalPhotoCount'] as int,
       processedPhotoCount: json['processedPhotoCount'] as int,
       filteredPhotos:
-          (json['filteredPhotos'] as List<dynamic>?)
+          rawFilteredPhotos
               ?.map(
                 (e) =>
                     FilteredPhotoResponse.fromJson(e as Map<String, dynamic>),

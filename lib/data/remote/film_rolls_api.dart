@@ -132,7 +132,15 @@ class FilmRollsApi {
       fromJson: (data) =>
           FilmRollResultResponse.fromJson(data as Map<String, dynamic>),
     );
-    return response.data ?? FilmRollResultResponse.empty();
+    final result = response.data;
+    if (result == null) {
+      // 다른 API들과 달리 이 값은 [WatchFilmRollResultUseCase]가 그대로
+      // 폴링 지속 여부 판단에 쓴다. `.empty()`(status: '')를 반환하면
+      // isInProgress가 계속 true라 오류 없이 무한 폴링에 빠지므로, 여기서는
+      // 예외를 던져 스트림이 오류로 끝나고 화면이 오류 상태를 보여주게 한다.
+      throw StateError('현상 결과 응답이 비어 있습니다(filmRollId=$filmRollId).');
+    }
+    return result;
   }
 
   /// [현재 진행 중인 필름 롤 조회] API 호출

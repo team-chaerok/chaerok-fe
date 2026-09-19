@@ -35,12 +35,22 @@ class SelectCustomCourseUseCase {
     final resolvedPlaces = [...course.places]
       ..sort((a, b) => a.sequence.compareTo(b.sequence));
 
+    // sequence로 index-정렬해 매칭하는 건 응답 장소 수가 요청 장소 수와
+    // 정확히 같고, sequence 값이 서로 겹치지 않아 정렬 순서가 명확할 때만
+    // 안전하다. 둘 중 하나라도 어긋나면 어떤 응답 장소가 어떤 요청 장소에
+    // 대응하는지 확신할 수 없으므로 — 잘못된 placeId를 엉뚱한 장소에 붙이는
+    // 대신, 아예 매칭하지 않고 기존처럼 서버 미확보(null)로 둔다.
+    final isFullyResolved =
+        resolvedPlaces.length == places.length &&
+        resolvedPlaces.map((p) => p.sequence).toSet().length ==
+            resolvedPlaces.length;
+
     final candidatePlaces = <CourseCandidatePlace>[
       for (var i = 0; i < places.length; i++)
         CourseCandidatePlace.fromExplorePlace(
           places[i],
           visitOrder: i,
-          resolvedServerPlaceId: i < resolvedPlaces.length
+          resolvedServerPlaceId: isFullyResolved
               ? resolvedPlaces[i].placeId
               : null,
         ),

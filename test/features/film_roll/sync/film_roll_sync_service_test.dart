@@ -384,6 +384,24 @@ void main() {
       },
     );
 
+    test('ACTIVE_FILM_ROLL_EXISTS(409)인데 /current 조회 자체가 실패하면 '
+        '영구 차단이 아니라 재시도 가능한 error로 남긴다', () async {
+      final fr = await seedFilmRoll();
+
+      final result = await service(
+        createFilmRoll: (_) async => throw _dioError(
+          409,
+          message: '이탈하지 않은 필름롤이 있습니다',
+          code: 'ACTIVE_FILM_ROLL_EXISTS',
+        ),
+        getCurrentFilmRoll: () async => throw _dioError(500),
+      ).syncFilmRoll(fr.id);
+
+      expect(result.hasError, isTrue);
+      expect(result.blockedByOtherActiveFilmRoll, isFalse);
+      expect((await repository.findById(fr.id))!.serverFilmRollId, isNull);
+    });
+
     test(
       'ACTIVE_FILM_ROLL_EXISTS가 아닌 다른 4xx는 기존처럼 미연동·무오류 보류(/current 조회 안 함)',
       () async {

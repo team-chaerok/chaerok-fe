@@ -2,7 +2,9 @@ import 'package:chaerok/core/database/local_database.dart';
 import 'package:chaerok/core/file/local_photo_storage.dart';
 import 'package:chaerok/features/film_roll/data/local/photo_local_data_source.dart';
 import 'package:chaerok/features/film_roll/data/model/photo_mapper.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
+import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
@@ -29,6 +31,14 @@ class PhotoRepositoryImpl implements PhotoRepository {
     double? latitude,
     double? longitude,
   }) async {
+    // UI(자유 촬영 버튼 등)에서도 이 상한을 사전에 체크하지만, 화면에 표시된
+    // 매수가 로딩 중이라 최신이 아니었을 수 있다 — 실제 저장 경계에서 한 번
+    // 더 강제해 24장을 넘겨 저장되는 일이 없게 한다.
+    final existingCount = await _photoDs.countByFilmRoll(filmRollId);
+    if (existingCount >= FilmRoll.maxExposureCount) {
+      throw const FilmRollExposureLimitExceededException();
+    }
+
     final photoId = _uuid.v4();
     final paths = await _photoStorage.save(
       filmRollId: filmRollId,
@@ -39,8 +49,8 @@ class PhotoRepositoryImpl implements PhotoRepository {
 
     final now = DateTime.now();
     // 서버 업로드에 쓸 촬영 순서(1~24). 필름롤 안에서 단조 증가하도록 기존
-    // 사진 수 + 1을 부여한다.
-    final sequence = await _photoDs.countByFilmRoll(filmRollId) + 1;
+    // 사진 수 + 1을 부여한다(위에서 이미 조회한 값을 재사용).
+    final sequence = existingCount + 1;
     try {
       // DB에는 문서 디렉터리 기준 상대 경로만 저장한다. 절대 경로는 iOS 앱
       // 컨테이너 UUID가 재설치·백업 복원 시 바뀌어 이후 파일을 못 찾는다.

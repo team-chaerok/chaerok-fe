@@ -95,6 +95,11 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     }
   }
 
+  /// 저장/공유 둘 다 같은 임시 파일 경로를 쓰므로([_downloadReelToTempFile])
+  /// 동시에 실행되면 한쪽이 쓰는 중인 파일을 다른 쪽이 읽어 손상된 파일을
+  /// 저장/공유할 수 있다. 두 동작을 상호 배타적으로 만든다.
+  bool get _isBusyWithReel => _isSaving || _isSharing;
+
   Future<String> _downloadReelToTempFile(DownloadResponse reel) async {
     final dio = Dio();
     final response = await dio.get<List<int>>(
@@ -107,12 +112,38 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     return file.path;
   }
 
-  Future<void> _onSaveTap() async {
+  /// 저장/공유 직전에 릴스 다운로드 URL의 유효기간을 확인하고, 만료(임박)면
+  /// `/results`를 다시 조회해 새 presigned URL로 교체한다. 서버 필름롤 id가
+  /// 없으면(이론상 발생하지 않음) 기존 값을 그대로 반환한다.
+  Future<DownloadResponse?> _freshReel() async {
     final reel = _result?.reel;
-    if (reel == null || _isSaving) return;
+    if (reel == null) return null;
+
+    const refreshBuffer = Duration(seconds: 30);
+    if (reel.downloadUrlExpiresAt.isAfter(DateTime.now().add(refreshBuffer))) {
+      return reel;
+    }
+
+    final serverFilmRollId = widget.filmRoll.serverFilmRollId;
+    if (serverFilmRollId == null) return reel;
+
+    try {
+      final refreshed = await FilmRollsApi.getFilmRollResult(serverFilmRollId);
+      if (mounted) setState(() => _result = refreshed);
+      return refreshed.reel ?? reel;
+    } catch (e, st) {
+      log('릴스 URL 갱신 실패', name: _tag, error: e, stackTrace: st);
+      return reel;
+    }
+  }
+
+  Future<void> _onSaveTap() async {
+    if (_result?.reel == null || _isBusyWithReel) return;
 
     setState(() => _isSaving = true);
     try {
+      final reel = await _freshReel();
+      if (reel == null) return;
       final path = await _downloadReelToTempFile(reel);
       await Gal.putVideo(path);
       if (!mounted) return;
@@ -131,11 +162,12 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   }
 
   Future<void> _onShareTap() async {
-    final reel = _result?.reel;
-    if (reel == null || _isSharing) return;
+    if (_result?.reel == null || _isBusyWithReel) return;
 
     setState(() => _isSharing = true);
     try {
+      final reel = await _freshReel();
+      if (reel == null) return;
       final path = await _downloadReelToTempFile(reel);
       await Share.shareXFiles([XFile(path)]);
     } catch (e, st) {
@@ -158,7 +190,12 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   }
 
   void _openAllPhotos() {
-    final photos = _result?.filteredPhotos ?? const [];
+    // 대표 사진 캐러셀([_buildBody])과 같은 순서(코스 sequence 오름차순)로
+    // 보여준다 — 정렬하지 않으면 서버가 준 순서 그대로라 대표 사진과
+    // "전체 사진" 화면의 순서가 어긋날 수 있다.
+    final photos = List<FilteredPhotoResponse>.of(
+      _result?.filteredPhotos ?? const [],
+    )..sort((a, b) => a.sequence.compareTo(b.sequence));
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -424,7 +461,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: hasReel && !_isSaving ? _onSaveTap : null,
+            onPressed: hasReel && !_isBusyWithReel ? _onSaveTap : null,
             child: _isSaving
                 ? const SizedBox(
                     width: 18,
@@ -437,7 +474,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
         const SizedBox(width: ChaerokSpacing.sm),
         Expanded(
           child: ElevatedButton(
-            onPressed: hasReel && !_isSharing ? _onShareTap : null,
+            onPressed: hasReel && !_isBusyWithReel ? _onShareTap : null,
             child: _isSharing
                 ? const SizedBox(
                     width: 18,

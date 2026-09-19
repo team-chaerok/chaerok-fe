@@ -372,19 +372,25 @@ class _PlaceDetailSheetState extends State<PlaceDetailSheet> {
                               style: ChaerokTypography.titleLarge,
                             ),
                           ),
-                          IconButton(
-                            onPressed: _isTogglingBookmark
-                                ? null
-                                : _toggleBookmark,
-                            icon: Icon(
-                              _isBookmarked
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isBookmarked
-                                  ? ChaerokColors.error
-                                  : ChaerokColors.textSecondary,
+                          // 필름롤 코스 장소([PlaceDetailSheetPlace.fromFilmRollPlace])는
+                          // source를 모른다(bookmarkSource: ''). 이 상태로
+                          // 북마크하면 BookmarkedPlace.canBuildCourse가 항상
+                          // false가 돼, 나중에 "이 장소로 코스 만들기"가 조용히
+                          // 막힌다 — source를 알 때만 북마크 버튼을 보여준다.
+                          if (place.bookmarkSource.isNotEmpty)
+                            IconButton(
+                              onPressed: _isTogglingBookmark
+                                  ? null
+                                  : _toggleBookmark,
+                              icon: Icon(
+                                _isBookmarked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isBookmarked
+                                    ? ChaerokColors.error
+                                    : ChaerokColors.textSecondary,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                       if (tags.isNotEmpty) ...[
