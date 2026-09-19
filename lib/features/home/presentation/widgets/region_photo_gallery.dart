@@ -99,6 +99,7 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
   /// 대신 이 값으로 상태 문구를 다시 평가한다.
   Position? _refreshedPosition;
   bool _isVerifyingLocation = false;
+  bool _isOpeningFreeCapture = false;
 
   Position? get _effectivePosition =>
       _refreshedPosition ?? widget.currentPosition;
@@ -290,24 +291,31 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
 
   /// "자유 촬영" 카드의 CTA — 이미 인증된 장소이므로 게이트 없이 바로 카메라를
   /// 열고, 반환 후 동기화는 하되 [FilmRollModule.completeVisit]은 호출하지
-  /// 않는다(중복 인증 방지).
+  /// 않는다(중복 인증 방지). 첫 push가 끝나기 전에 버튼이 다시 눌려 카메라
+  /// 화면이 중복으로 쌓이지 않도록 push가 끝날 때까지 잠근다.
   Future<void> _onFreeCaptureTap(FilmRollPlace place) async {
-    final captured = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => VisitCaptureScreen(
-          filmRollId: widget.filmRollId,
-          filmRollPlaceId: place.id,
+    if (_isOpeningFreeCapture) return;
+    setState(() => _isOpeningFreeCapture = true);
+    try {
+      final captured = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => VisitCaptureScreen(
+            filmRollId: widget.filmRollId,
+            filmRollPlaceId: place.id,
+          ),
         ),
-      ),
-    );
-    if (captured != true || !mounted) return;
+      );
+      if (captured != true || !mounted) return;
 
-    unawaited(
-      FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
-        widget.filmRollId,
-      ),
-    );
-    await widget.onVisitCompleted();
+      unawaited(
+        FilmRollModule.instance.filmRollSyncService.syncFilmRoll(
+          widget.filmRollId,
+        ),
+      );
+      await widget.onVisitCompleted();
+    } finally {
+      if (mounted) setState(() => _isOpeningFreeCapture = false);
+    }
   }
 
   /// hero와 필름스트립 사이 안내 섹션. 미방문 장소가 있으면 "다음 장소"
@@ -370,6 +378,7 @@ class _RegionPhotoGalleryState extends State<RegionPhotoGallery> {
             const SizedBox(height: ChaerokSpacing.sm),
             ChaerokButton(
               text: '필름 카메라 열기',
+              isLoading: _isOpeningFreeCapture,
               onPressed: () => _onFreeCaptureTap(freeCaptureTarget),
             ),
           ],

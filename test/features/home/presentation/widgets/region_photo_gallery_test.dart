@@ -3,6 +3,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/region_photo_gallery.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -341,6 +342,28 @@ void main() {
 
     expect(find.byType(VisitCaptureScreen), findsOneWidget);
   });
+
+  testWidgets(
+    '자유 촬영 버튼 콜백이 첫 Navigator.push가 끝나기 전에 두 번 실행돼도 카메라 화면은 하나만 열린다',
+    (tester) async {
+      await tester.pumpWidget(host(overridePlaces: allVisitedPlaces));
+
+      // tester.tap()을 두 번 연달아 호출하면 첫 push가 오버레이를 동기적으로
+      // 바꿔 두 번째 탭이 아예 히트 테스트조차 되지 않는다 — 실제로 재현하려는
+      // 상황(같은 프레임에서 콜백이 두 번 실행되는 경우)과 다르다. 콜백 자체를
+      // 직접 두 번 호출해 "첫 push가 끝나기 전에 두 번째 탭이 들어온" 상황을
+      // 정확히 흉내낸다.
+      final button = tester.widget<ChaerokButton>(
+        find.widgetWithText(ChaerokButton, '필름 카메라 열기'),
+      );
+      button.onPressed!();
+      button.onPressed!();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byType(VisitCaptureScreen), findsOneWidget);
+    },
+  );
 
   testWidgets('코스를 다 인증했어도 필름을 다 쓰면 안내 카드가 뜨지 않는다', (tester) async {
     final fullPhotos = [
