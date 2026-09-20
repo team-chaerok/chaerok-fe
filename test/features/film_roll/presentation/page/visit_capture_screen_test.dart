@@ -366,6 +366,9 @@ void main() {
         ),
       ),
     );
+    // 매수 조회가 먼저 끝난 뒤 권한이 승인되는 순서를 재현한다.
+    await tester.pump();
+    fakePermissions.grant();
     await tester.pumpAndSettle();
 
     expect(find.text('필름을 다 썼어요. 더 이상 촬영할 수 없어요.'), findsOneWidget);
