@@ -175,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: ChaerokSpacing.xxl * 4),
+              const SizedBox(height: ChaerokSpacing.xxl * 5),
               SocialLoginButton(
                 logo: 'assets/images/kakao-logo.svg',
                 label: '카카오로 계속하기',
