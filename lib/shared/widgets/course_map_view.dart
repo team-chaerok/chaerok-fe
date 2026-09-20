@@ -129,6 +129,14 @@ class _CourseMapViewState extends State<CourseMapView> {
   /// 않도록, 새 그리기를 시작할 때마다 올려 이전 작업을 무효화한다.
   int _renderToken = 0;
 
+  /// 빠르게 강조 대상이 바뀔 때 앞선 강조 적용이 뒤늦게 덮어쓰지 않도록, 새 강조
+  /// 적용을 시작할 때마다 올려 이전 적용을 무효화한다.
+  int _focusToken = 0;
+
+  /// 지금 강조 스타일이 실제로 적용된 마커 순번. 이전 적용이 중간에 무효화돼도
+  /// 다음 적용이 현재 상태와 비교해 어긋난 마커만 바로잡을 수 있게 한다.
+  final Set<int> _focusedStyled = {};
+
   /// 아이콘 이미지는 (순번, 강조 여부)마다 한 번만 만든다.
   final Map<(int, bool), KImage> _iconCache = {};
 
@@ -142,7 +150,7 @@ class _CourseMapViewState extends State<CourseMapView> {
     if (!identical(oldWidget.places, widget.places)) {
       unawaited(_render());
     } else if (oldWidget.focusOrder != widget.focusOrder) {
-      unawaited(_applyFocus(oldWidget.focusOrder));
+      unawaited(_applyFocus());
     }
   }
 
@@ -176,6 +184,7 @@ class _CourseMapViewState extends State<CourseMapView> {
     final controller = _controller;
     if (controller == null) return;
     final token = ++_renderToken;
+    _focusToken++;
     final markers = _markers;
 
     await _clear(controller);
@@ -212,26 +221,37 @@ class _CourseMapViewState extends State<CourseMapView> {
         return;
       }
       _pois[marker.order] = poi;
+      if (isFocused) _focusedStyled.add(marker.order);
     }
 
     await _moveCamera(controller, markers);
   }
 
   /// 강조 마커만 다시 스타일링하고 카메라를 옮긴다(전체 재렌더 없이).
-  Future<void> _applyFocus(int? previousFocusOrder) async {
+  /// 각 await 뒤에 최신 요청인지 확인하고, 스타일은 항상 현재
+  /// [CourseMapView.focusOrder]와 실제 적용 상태를 비교해 맞춘다.
+  Future<void> _applyFocus() async {
     final controller = _controller;
     if (controller == null) return;
+    final focusToken = ++_focusToken;
+    final renderToken = _renderToken;
+    bool isStale() =>
+        !mounted || focusToken != _focusToken || renderToken != _renderToken;
 
-    final restyle = <int>{
-      if (previousFocusOrder != null) previousFocusOrder,
-      if (widget.focusOrder != null) widget.focusOrder!,
-    };
-    for (final order in restyle) {
-      final poi = _pois[order];
-      if (poi == null) continue;
-      await poi.changeStyles(
-        await _poiStyle(order, order == widget.focusOrder),
-      );
+    for (final entry in _pois.entries.toList()) {
+      final order = entry.key;
+      final shouldBeFocused = order == widget.focusOrder;
+      if (shouldBeFocused == _focusedStyled.contains(order)) continue;
+
+      final style = await _poiStyle(order, shouldBeFocused);
+      if (isStale()) return;
+      await entry.value.changeStyles(style);
+      if (isStale()) return;
+      if (shouldBeFocused) {
+        _focusedStyled.add(order);
+      } else {
+        _focusedStyled.remove(order);
+      }
     }
     await _moveCamera(controller, _markers);
   }
@@ -260,6 +280,7 @@ class _CourseMapViewState extends State<CourseMapView> {
   Future<void> _clear(KakaoMapController controller) async {
     final pois = _pois.values.toList();
     _pois.clear();
+    _focusedStyled.clear();
     for (final poi in pois) {
       await poi.remove();
     }

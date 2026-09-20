@@ -51,6 +51,9 @@ class _SelectCourseButtonState extends State<SelectCourseButton> {
   void didUpdateWidget(SelectCourseButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.filmRollId != widget.filmRollId) {
+      // 이전 필름롤의 판정이 남아 새 필름롤 버튼을 막거나, 새 조회가 실패했을 때
+      // 계속 비활성으로 남지 않도록 먼저 기본(활성) 상태로 되돌린다.
+      _isBlocked = false;
       unawaited(_checkRecords());
     }
   }

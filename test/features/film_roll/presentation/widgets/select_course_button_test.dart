@@ -70,4 +70,38 @@ void main() {
 
     expect(pressed, 1);
   });
+
+  testWidgets('필름롤이 바뀌면 이전 차단 상태를 지우고, 새 조회가 실패해도 활성으로 돌아간다', (tester) async {
+    var pressed = 0;
+    Future<bool> Function() lookup = () async => true;
+
+    late StateSetter setOuterState;
+    var filmRollId = 'roll-1';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              setOuterState = setState;
+              return SelectCourseButton(
+                filmRollId: filmRollId,
+                onPressed: () => pressed++,
+                debugHasRecords: () => lookup(),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(SelectCourseButton.blockedMessage), findsOneWidget);
+
+    lookup = () async => throw StateError('db');
+    setOuterState(() => filmRollId = 'roll-2');
+    await tester.pumpAndSettle();
+
+    expect(find.text(SelectCourseButton.blockedMessage), findsNothing);
+    await tester.tap(find.text('추천 코스 선택하기'));
+    expect(pressed, 1);
+  });
 }
