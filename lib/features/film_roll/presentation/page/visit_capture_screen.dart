@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/core/file/captured_photo_orientation.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
@@ -332,7 +333,12 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       // 기기 대비).
       await _applyFlashModeSafely(controller);
       final file = await controller.takePicture();
-      final bytes = await file.readAsBytes();
+      // 카메라는 앱 방향(세로) 기준으로 저장하지만 이 화면은 UI를 돌려 그리므로,
+      // 뷰파인더에서 본 방향과 같아지도록 사진도 그만큼 돌려 저장한다.
+      final bytes = await orientCapturedPhotoInBackground(
+        await file.readAsBytes(),
+        uiQuarterTurns: _bodyQuarterTurns,
+      );
       final position = await LocationPermissionService.getCurrentPosition();
 
       await FilmRollModule.instance.savePhoto(
