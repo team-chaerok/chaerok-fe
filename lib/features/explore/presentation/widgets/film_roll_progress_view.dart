@@ -23,6 +23,7 @@ import 'package:chaerok/features/film_roll/presentation/page/course_selection_sc
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/guidance_card.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/select_course_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/visit_gate_message.dart';
 import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
@@ -557,8 +558,8 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
                 _buildProgressCard(filmRoll),
                 const SizedBox(height: ChaerokSpacing.md),
                 if (!hasCourse)
-                  ChaerokButton(
-                    text: '추천 코스 선택하기',
+                  SelectCourseButton(
+                    filmRollId: filmRoll.id,
                     isLoading: _isResolvingRegion,
                     onPressed: _onSelectCourseTap,
                   )

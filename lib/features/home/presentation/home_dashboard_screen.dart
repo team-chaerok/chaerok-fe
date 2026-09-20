@@ -17,6 +17,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entr
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/select_course_button.dart';
 import 'package:chaerok/features/home/data/weather_api_service.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_data.dart';
 import 'package:chaerok/features/home/presentation/models/home_card_tab.dart';
@@ -864,9 +865,8 @@ class _RegionHomeBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: ChaerokSpacing.sm),
-          ChaerokButton(
-            text: '추천 코스 선택하기',
-            isEnabled: !isSelectingCourse,
+          SelectCourseButton(
+            filmRollId: recoveredFilmRoll!.id,
             isLoading: isSelectingCourse,
             onPressed: onSelectCourseTap,
           ),

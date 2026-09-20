@@ -102,4 +102,55 @@ void main() {
       expect(find.text('지도에 표시할 위치 정보가 없어요'), findsOneWidget);
     });
   });
+
+  group('CourseMapMarker 순번', () {
+    test('좌표가 없어 제외된 장소가 있어도 남은 마커는 원래 코스 순번을 유지한다', () {
+      final markers = CourseMapMarker.fromCoursePlaces([
+        _place(title: 'A', latitude: 37.1, longitude: 127.1),
+        _place(title: 'B'),
+        _place(title: 'C', latitude: 37.3, longitude: 127.3),
+      ]);
+
+      expect(markers.map((m) => m.order), [1, 3]);
+    });
+  });
+
+  group('CourseMapCameraTarget.resolve', () {
+    final markers = CourseMapMarker.fromCoursePlaces([
+      _place(title: 'A', latitude: 37.1, longitude: 127.1),
+      _place(title: 'B', latitude: 37.2, longitude: 127.2),
+      _place(title: 'C', latitude: 37.3, longitude: 127.3),
+    ]);
+
+    test('마커가 없으면 null', () {
+      expect(CourseMapCameraTarget.resolve(const []), isNull);
+    });
+
+    test('강조 순번이 없고 두 곳 이상이면 전체가 보이도록 맞춘다', () {
+      final target = CourseMapCameraTarget.resolve(markers)!;
+
+      expect(target.isFit, isTrue);
+      expect(target.fitPoints, hasLength(3));
+    });
+
+    test('강조 순번이 있으면 그 마커 하나를 비춘다', () {
+      final target = CourseMapCameraTarget.resolve(markers, focusOrder: 2)!;
+
+      expect(target.isFit, isFalse);
+      expect(target.center!.title, 'B');
+    });
+
+    test('강조 순번에 해당하는 마커가 없으면 전체 보기로 대체한다', () {
+      final target = CourseMapCameraTarget.resolve(markers, focusOrder: 9)!;
+
+      expect(target.isFit, isTrue);
+    });
+
+    test('마커가 하나뿐이면 그곳을 비춘다', () {
+      final target = CourseMapCameraTarget.resolve([markers.first])!;
+
+      expect(target.isFit, isFalse);
+      expect(target.center!.title, 'A');
+    });
+  });
 }
