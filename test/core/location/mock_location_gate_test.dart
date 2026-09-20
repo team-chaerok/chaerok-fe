@@ -1,6 +1,7 @@
 import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/location/mock_location_gate.dart';
 import 'package:chaerok/core/location/mock_location_spots.dart';
+import 'package:chaerok/core/location/mock_position.dart';
 import 'package:chaerok/core/test_mode/test_mode_session.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,7 @@ void main() {
       expect(position.longitude, expected.longitude);
       expect(position.accuracy, kMockGpsAccuracyMeters);
       expect(position.isMocked, true);
+      expect(position, isA<MockPosition>());
     });
 
     test('저장된 지점 인덱스가 지역 지점 수를 벗어나면 마지막 지점으로 clamp 한다', () async {

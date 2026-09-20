@@ -1,5 +1,6 @@
 import 'package:chaerok/core/config/app_preferences.dart';
 import 'package:chaerok/core/location/mock_location_spots.dart';
+import 'package:chaerok/core/location/mock_position.dart';
 import 'package:chaerok/core/test_mode/test_mode_session.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/foundation.dart';
@@ -76,18 +77,11 @@ class MockLocationGate {
   }
 
   static Position _mockPosition(double latitude, double longitude) {
-    return Position(
+    return MockPosition(
       latitude: latitude,
       longitude: longitude,
       timestamp: DateTime.now(),
       accuracy: kMockGpsAccuracyMeters,
-      altitude: 0,
-      altitudeAccuracy: 0,
-      heading: 0,
-      headingAccuracy: 0,
-      speed: 0,
-      speedAccuracy: 0,
-      isMocked: true,
     );
   }
 }
