@@ -181,11 +181,15 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     }
   }
 
-  void _openReelPlayer(String url) {
-    unawaited(
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => ReelPlayerPage(videoUrl: url))),
+  /// 결과 화면을 오래 열어 둔 뒤 재생하면 presigned URL이 만료돼 있을 수
+  /// 있으므로, 재생 직전에 [_freshReel]로 유효기간을 확인·갱신한다.
+  Future<void> _openReelPlayer() async {
+    final reel = await _freshReel();
+    if (reel == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReelPlayerPage(videoUrl: reel.downloadUrl),
+      ),
     );
   }
 
@@ -423,32 +427,41 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       );
     }
 
-    return GestureDetector(
-      onTap: () => _openReelPlayer(reel.downloadUrl),
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(ChaerokRadius.lg),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              thumbnail == null
-                  ? const ColoredBox(color: ChaerokColors.cameraBlack)
-                  : Image.network(
-                      thumbnail.downloadUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const ColoredBox(color: ChaerokColors.cameraBlack),
+    // 릴스는 9:16 세로 영상이라 카드도 세로형으로 그리되, 스크롤 화면에서
+    // 화면을 다 차지하지 않도록 폭을 제한해 가운데 정렬한다.
+    return Center(
+      child: FractionallySizedBox(
+        widthFactor: 0.6,
+        child: GestureDetector(
+          onTap: () => unawaited(_openReelPlayer()),
+          child: AspectRatio(
+            aspectRatio: 9 / 16,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(ChaerokRadius.lg),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  thumbnail == null
+                      ? const ColoredBox(color: ChaerokColors.cameraBlack)
+                      : Image.network(
+                          thumbnail.downloadUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const ColoredBox(
+                                color: ChaerokColors.cameraBlack,
+                              ),
+                        ),
+                  ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
+                  const Center(
+                    child: Icon(
+                      Icons.play_circle_fill,
+                      size: 56,
+                      color: Colors.white,
                     ),
-              ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
-              const Center(
-                child: Icon(
-                  Icons.play_circle_fill,
-                  size: 56,
-                  color: Colors.white,
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
