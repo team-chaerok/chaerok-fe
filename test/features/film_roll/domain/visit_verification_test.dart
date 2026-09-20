@@ -1,3 +1,4 @@
+import 'package:chaerok/core/location/mock_position.dart';
 import 'package:chaerok/features/film_roll/domain/visit_verification.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -95,5 +96,53 @@ void main() {
     );
 
     expect(result.status, VisitGateStatus.ok);
+  });
+
+  group('mock 위치(QA/테스트 계정)', () {
+    MockPosition mockPosition({double accuracy = 12}) => MockPosition(
+      latitude: 0,
+      longitude: 0,
+      timestamp: DateTime(2026, 1, 1),
+      accuracy: accuracy,
+    );
+
+    test('장소에서 멀리 떨어져 있어도 거리 게이트를 통과한다', () {
+      final result = evaluate(mockPosition());
+
+      expect(result.status, VisitGateStatus.ok);
+      expect(result.canVerify, isTrue);
+    });
+
+    test('GPS 정확도 게이트도 통과한다', () {
+      final result = evaluate(
+        mockPosition(accuracy: kVisitMinGpsAccuracyMeters + 100),
+      );
+
+      expect(result.status, VisitGateStatus.ok);
+    });
+
+    test('이미 방문 인증한 장소는 mock이어도 alreadyVisited', () {
+      final result = evaluate(mockPosition(), alreadyVisited: true);
+
+      expect(result.status, VisitGateStatus.alreadyVisited);
+    });
+
+    test('실제 GPS가 isMocked=true여도(가짜 GPS 앱) 우회되지 않는다', () {
+      final fake = Position(
+        latitude: 0,
+        longitude: 0,
+        timestamp: DateTime(2026, 1, 1),
+        accuracy: 10,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+        isMocked: true,
+      );
+
+      expect(evaluate(fake).status, VisitGateStatus.tooFar);
+    });
   });
 }

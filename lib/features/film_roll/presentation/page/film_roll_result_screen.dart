@@ -13,6 +13,7 @@ import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_ph
 import 'package:chaerok/features/film_roll/presentation/widgets/reel_player_page.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
+import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +47,10 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   bool _isSharing = false;
   String? _errorMessage;
   FilmRollResultResponse? _result;
+
+  /// iOS 공유 창은 기준 위치(sharePositionOrigin)가 반드시 필요해서, 공유하기
+  /// 버튼의 화면 좌표를 여기서 얻는다.
+  final GlobalKey _shareButtonKey = GlobalKey();
 
   final PageController _representativePageController = PageController();
   int _representativePageIndex = 0;
@@ -164,12 +169,18 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   Future<void> _onShareTap() async {
     if (_result?.reel == null || _isBusyWithReel) return;
 
+    // 다운로드 등 await 이전에 버튼 위치를 잡아 둔다(이후엔 레이아웃이 바뀔 수 있음).
+    final shareBox = _shareButtonKey.currentContext?.findRenderObject();
+    final shareOrigin = shareBox is RenderBox && shareBox.hasSize
+        ? shareBox.localToGlobal(Offset.zero) & shareBox.size
+        : null;
+
     setState(() => _isSharing = true);
     try {
       final reel = await _freshReel();
       if (reel == null) return;
       final path = await _downloadReelToTempFile(reel);
-      await Share.shareXFiles([XFile(path)]);
+      await Share.shareXFiles([XFile(path)], sharePositionOrigin: shareOrigin);
     } catch (e, st) {
       log('릴스 공유 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
@@ -181,11 +192,15 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     }
   }
 
-  void _openReelPlayer(String url) {
-    unawaited(
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => ReelPlayerPage(videoUrl: url))),
+  /// 결과 화면을 오래 열어 둔 뒤 재생하면 presigned URL이 만료돼 있을 수
+  /// 있으므로, 재생 직전에 [_freshReel]로 유효기간을 확인·갱신한다.
+  Future<void> _openReelPlayer() async {
+    final reel = await _freshReel();
+    if (reel == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReelPlayerPage(videoUrl: reel.downloadUrl),
+      ),
     );
   }
 
@@ -423,32 +438,41 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       );
     }
 
-    return GestureDetector(
-      onTap: () => _openReelPlayer(reel.downloadUrl),
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(ChaerokRadius.lg),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              thumbnail == null
-                  ? const ColoredBox(color: ChaerokColors.cameraBlack)
-                  : Image.network(
-                      thumbnail.downloadUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const ColoredBox(color: ChaerokColors.cameraBlack),
+    // 릴스는 9:16 세로 영상이라 카드도 세로형으로 그리되, 스크롤 화면에서
+    // 화면을 다 차지하지 않도록 폭을 제한해 가운데 정렬한다.
+    return Center(
+      child: FractionallySizedBox(
+        widthFactor: 0.6,
+        child: GestureDetector(
+          onTap: () => unawaited(_openReelPlayer()),
+          child: AspectRatio(
+            aspectRatio: 9 / 16,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(ChaerokRadius.lg),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  thumbnail == null
+                      ? const ColoredBox(color: ChaerokColors.cameraBlack)
+                      : Image.network(
+                          thumbnail.downloadUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const ColoredBox(
+                                color: ChaerokColors.cameraBlack,
+                              ),
+                        ),
+                  ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
+                  const Center(
+                    child: Icon(
+                      Icons.play_circle_fill,
+                      size: 56,
+                      color: Colors.white,
                     ),
-              ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
-              const Center(
-                child: Icon(
-                  Icons.play_circle_fill,
-                  size: 56,
-                  color: Colors.white,
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -457,34 +481,55 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
 
   Widget _buildActionButtons(FilmRollResultResponse result) {
     final hasReel = result.reel != null;
+    // 테마 primary가 연한 세이지색이라 기본 스타일에서는 글자가 배경에 묻힌다.
+    // 강조색(primaryDark)을 글자/배경에 명시해 대비를 확보한다.
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
-            onPressed: hasReel && !_isBusyWithReel ? _onSaveTap : null,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: ChaerokLoadingIndicator(strokeWidth: 2),
-                  )
-                : const Text('저장하기'),
+          child: SizedBox(
+            height: 56,
+            child: OutlinedButton(
+              onPressed: hasReel && !_isBusyWithReel ? _onSaveTap : null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ChaerokColors.primaryDark,
+                disabledForegroundColor: ChaerokColors.textDisabled,
+                side: BorderSide(
+                  color: hasReel && !_isBusyWithReel
+                      ? ChaerokColors.primaryDark
+                      : ChaerokColors.border,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ChaerokRadius.md),
+                ),
+                textStyle: ChaerokTypography.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: ChaerokLoadingIndicator(
+                        color: ChaerokColors.primaryDark,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('저장하기'),
+            ),
           ),
         ),
         const SizedBox(width: ChaerokSpacing.sm),
         Expanded(
-          child: ElevatedButton(
-            onPressed: hasReel && !_isBusyWithReel ? _onShareTap : null,
-            child: _isSharing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: ChaerokLoadingIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('공유하기'),
+          child: KeyedSubtree(
+            key: _shareButtonKey,
+            child: ChaerokButton(
+              text: '공유하기',
+              backgroundColor: ChaerokColors.primaryDark,
+              isEnabled: hasReel && !_isBusyWithReel,
+              isLoading: _isSharing,
+              onPressed: _onShareTap,
+            ),
           ),
         ),
       ],

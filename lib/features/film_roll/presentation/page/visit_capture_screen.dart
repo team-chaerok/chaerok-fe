@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/core/design_system/chaerok_typography.dart';
+import 'package:chaerok/core/file/captured_photo_orientation.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
@@ -76,6 +77,12 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   /// 방향이 통째로 90° 반대면 이 값을 3으로 바꾼다.
   static const _bodyQuarterTurns = 1;
 
+  /// 저장 사진을 돌릴 횟수. 전면 카메라 파일은 후면과 회전 기준이 180° 달라서
+  /// (실기기 셀카가 상하 반전으로 저장됨) 2번을 더한다.
+  int get _photoQuarterTurns => _lensDirection == CameraLensDirection.front
+      ? (_bodyQuarterTurns + 2) % 4
+      : _bodyQuarterTurns;
+
   /// 뷰파인더 안의 실제 카메라 프리뷰만은 [_bodyQuarterTurns]만큼 반대로 되돌려
   /// 정방향(위아래가 맞는 방향)으로 보이게 한다. 나머지 UI는 회전된 채로 둔다.
   static const _previewCounterQuarterTurns = (4 - _bodyQuarterTurns) % 4;
@@ -129,9 +136,11 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   /// 플래시 모드를 적용하되, 미지원 렌즈/기기에서 던지는 예외는 삼켜 카메라
   /// 초기화나 촬영 흐름이 중단되지 않게 한다.
   Future<void> _applyFlashModeSafely(CameraController controller) async {
-    if (!_isFlashSupported) return;
+    // 전면 카메라에도 off를 명시해야 한다. 컨트롤러 기본값(auto)을 그대로 두면
+    // iOS 전면은 어두울 때 화면 플래시(Retina Flash)가 자동으로 켜진다.
+    final mode = _isFlashSupported ? _flashMode : FlashMode.off;
     try {
-      await controller.setFlashMode(_flashMode);
+      await controller.setFlashMode(mode);
     } catch (e, st) {
       log('플래시 모드 적용 실패', name: _tag, error: e, stackTrace: st);
     }
@@ -332,7 +341,12 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       // 기기 대비).
       await _applyFlashModeSafely(controller);
       final file = await controller.takePicture();
-      final bytes = await file.readAsBytes();
+      // 카메라는 앱 방향(세로) 기준으로 저장하지만 이 화면은 UI를 돌려 그리므로,
+      // 뷰파인더에서 본 방향과 같아지도록 사진도 그만큼 돌려 저장한다.
+      final bytes = await orientCapturedPhotoInBackground(
+        await file.readAsBytes(),
+        uiQuarterTurns: _photoQuarterTurns,
+      );
       final position = await LocationPermissionService.getCurrentPosition();
 
       await FilmRollModule.instance.savePhoto(

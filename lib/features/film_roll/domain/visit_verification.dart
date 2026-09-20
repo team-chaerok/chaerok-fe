@@ -1,3 +1,4 @@
+import 'package:chaerok/core/location/mock_position.dart';
 import 'package:geolocator/geolocator.dart';
 
 /// 방문 인증 가능 반경(m). 사용자 위치가 대상 장소로부터 이 거리 이내여야 인증할 수 있다.
@@ -34,6 +35,9 @@ class VisitGateResult {
 /// 2. 현재 위치를 확보했는지
 /// 3. GPS 정확도가 [kVisitMinGpsAccuracyMeters] 이내인지
 /// 4. 장소와의 거리가 [kVisitVerifiableRadiusMeters] 이내인지
+///
+/// QA/테스트 계정의 mock 위치([MockPosition])는 2~4번을 건너뛴다. 이동 없이 코스
+/// 전체를 인증해 보기 위한 것이며, 실제 GPS 위치는 이 분기를 타지 않는다.
 VisitGateResult evaluateVisitGate({
   required Position? position,
   required double placeLatitude,
@@ -45,6 +49,9 @@ VisitGateResult evaluateVisitGate({
   }
   if (position == null) {
     return const VisitGateResult(VisitGateStatus.noPosition);
+  }
+  if (position is MockPosition) {
+    return const VisitGateResult(VisitGateStatus.ok);
   }
   if (position.accuracy > kVisitMinGpsAccuracyMeters) {
     return const VisitGateResult(VisitGateStatus.inaccurate);

@@ -1,4 +1,5 @@
 import 'package:chaerok/data/models/region_response.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_collection_screen.dart';
 import 'package:chaerok/features/home/presentation/home_dashboard_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/film_collection_button.dart';
 import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_card.dart';
@@ -136,9 +137,7 @@ void main() {
     expect(find.byType(MyPageButton), findsNothing);
   });
 
-  testWidgets('겹친 "지난여행" 탭을 누르면 카드 안에서 인라인으로 placeholder 본문이 열린다', (
-    tester,
-  ) async {
+  testWidgets('겹친 "지난여행" 탭을 누르면 카드 안에서 인라인으로 필름 컬렉션이 열린다', (tester) async {
     final key = GlobalKey<HomeDashboardScreenState>();
     await pumpVerifiedHome(tester, key);
 
@@ -146,7 +145,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400)); // 스왑 전환(320ms) 완료 대기
 
-    expect(find.text('지난여행 화면은 곧 만나볼 수 있어요'), findsOneWidget);
+    expect(find.byType(FilmRollCollectionScreen), findsOneWidget);
+    // 카드가 이미 헤더(탭 라벨)를 가지므로 자체 앱바는 그리지 않는다.
+    expect(find.text('필름 컬렉션'), findsNothing);
     expect(find.text('공주시 필름롤'), findsOneWidget); // 현재여행지역은 이제 겹친 탭으로
   });
 
