@@ -57,6 +57,7 @@ class CourseSelectionScreen extends StatefulWidget {
     this.initialTab = CourseSelectionInitialTab.recommended,
     this.initialSelectedPlace,
     this.debugFetchCourses,
+    this.debugFetchRegionPlaces,
     this.debugMapBuilder,
   });
 
@@ -72,6 +73,9 @@ class CourseSelectionScreen extends StatefulWidget {
 
   /// 테스트용: 지정하면 추천 코스 조회를 API 대신 이 함수로 대체한다.
   final Future<List<CourseResponse>> Function()? debugFetchCourses;
+
+  /// 테스트용: 지정하면 직접 만들기의 지역 관광지 조회를 API 대신 이 함수로 대체한다.
+  final Future<List<ExplorePlace>> Function()? debugFetchRegionPlaces;
 
   /// 테스트용: 지정하면 지도 영역을 카카오맵 대신 이 빌더로 그린다.
   final CourseMapBuilder? debugMapBuilder;
@@ -109,6 +113,13 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   List<BookmarkedPlace> _bookmarkedPlaces = const [];
   String? _bookmarkedPlacesError;
   final List<ExplorePlace> _selectedPlaces = [];
+
+  /// [_selectedPlaces]를 지도용으로 변환한 목록. 선택이 바뀔 때만 새로 만들어,
+  /// 무관한 setState(검색어 입력 등)에서 지도가 다시 그려지지 않게 한다.
+  List<CoursePlaceResponse> _selectedMapPlaces = const [];
+
+  /// 직접 만들기 지도에서 강조 중인 선택 장소의 순번(1부터). 없으면 전체 보기.
+  int? _customFocusOrder;
   bool _isCreatingCustomCourse = false;
 
   // 추천 코스 확정(서버 장소 확보) 중 여부.
@@ -124,6 +135,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     final initialPlace = widget.initialSelectedPlace;
     if (initialPlace != null) {
       _selectedPlaces.add(initialPlace);
+      _syncSelectedMapPlaces();
       _customSource = _CustomPlaceSource.bookmark;
     }
 
@@ -298,10 +310,15 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
       _regionPlacesError = null;
     });
     try {
-      final places = await PlacesApi.getPlaces(widget.regionId);
+      final debugFetch = widget.debugFetchRegionPlaces;
+      final places = debugFetch != null
+          ? await debugFetch()
+          : (await PlacesApi.getPlaces(
+              widget.regionId,
+            )).map(ExplorePlace.fromListResponse).toList();
       if (!mounted) return;
       setState(() {
-        _regionPlaces = places.map(ExplorePlace.fromListResponse).toList();
+        _regionPlaces = places;
         _isLoadingRegionPlaces = false;
       });
     } catch (e, st) {
@@ -374,7 +391,11 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
       (p) => p.identityKey == place.identityKey,
     );
     if (index != -1) {
-      setState(() => _selectedPlaces.removeAt(index));
+      setState(() {
+        _selectedPlaces.removeAt(index);
+        _syncSelectedMapPlaces();
+        _customFocusOrder = null;
+      });
       return;
     }
     if (_selectedPlaces.length >= _maxCustomCoursePlaces) {
@@ -385,7 +406,33 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
       );
       return;
     }
-    setState(() => _selectedPlaces.add(place));
+    setState(() {
+      _selectedPlaces.add(place);
+      _syncSelectedMapPlaces();
+      // 방금 담은 장소를 지도에서 바로 확인할 수 있게 그곳을 비춘다.
+      _customFocusOrder = _selectedPlaces.length;
+    });
+  }
+
+  void _syncSelectedMapPlaces() {
+    _selectedMapPlaces = [
+      for (final place in _selectedPlaces)
+        CoursePlaceResponse(
+          source: place.source,
+          title: place.title,
+          categoryGroup: place.categoryGroupWire,
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+        ),
+    ];
+  }
+
+  /// 같은 장소를 다시 탭하면 강조를 풀고 선택한 장소 전체 보기로 돌아간다.
+  void _onFocusCustomPlace(int order) {
+    setState(() {
+      _customFocusOrder = _customFocusOrder == order ? null : order;
+    });
   }
 
   void _onMoveSelected(int index, int offset) {
@@ -394,6 +441,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     setState(() {
       final place = _selectedPlaces.removeAt(index);
       _selectedPlaces.insert(target, place);
+      _syncSelectedMapPlaces();
+      _customFocusOrder = null;
     });
   }
 
@@ -660,10 +709,48 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
             ),
             child: _buildSearchField(),
           ),
-        Expanded(child: _buildSourceList()),
+        // 키보드가 올라오면(검색 입력 중) 목록 공간을 지키기 위해 지도를 접는다.
+        if (MediaQuery.of(context).viewInsets.bottom == 0)
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ChaerokSpacing.md,
+                ChaerokSpacing.sm,
+                ChaerokSpacing.md,
+                0,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(ChaerokRadius.lg),
+                child: _buildCustomMap(),
+              ),
+            ),
+          ),
+        Expanded(flex: 3, child: _buildSourceList()),
         _buildSelectedPreview(),
         _buildConfirmFooter(),
       ],
+    );
+  }
+
+  Widget _buildCustomMap() {
+    final builder = widget.debugMapBuilder;
+    if (builder != null && _selectedMapPlaces.isNotEmpty) {
+      return builder(
+        context,
+        _selectedMapPlaces,
+        _customFocusOrder,
+        _onFocusCustomPlace,
+      );
+    }
+    return ColoredBox(
+      color: ChaerokColors.sageLight,
+      child: CourseMapView(
+        places: _selectedMapPlaces,
+        focusOrder: _customFocusOrder,
+        onMarkerTap: _onFocusCustomPlace,
+        emptyMessage: '아래에서 장소를 고르면\n지도에 순서대로 표시돼요',
+      ),
     );
   }
 
@@ -887,6 +974,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
             _SelectedPlaceRow(
               order: index + 1,
               place: place,
+              isFocused: _customFocusOrder == index + 1,
+              onTap: () => _onFocusCustomPlace(index + 1),
               canMoveUp: index > 0,
               canMoveDown: index < _selectedPlaces.length - 1,
               onMoveUp: () => _onMoveSelected(index, -1),
@@ -1044,6 +1133,8 @@ class _SelectedPlaceRow extends StatelessWidget {
   const _SelectedPlaceRow({
     required this.order,
     required this.place,
+    required this.isFocused,
+    required this.onTap,
     required this.canMoveUp,
     required this.canMoveDown,
     required this.onMoveUp,
@@ -1053,6 +1144,8 @@ class _SelectedPlaceRow extends StatelessWidget {
 
   final int order;
   final ExplorePlace place;
+  final bool isFocused;
+  final VoidCallback onTap;
   final bool canMoveUp;
   final bool canMoveDown;
   final VoidCallback onMoveUp;
@@ -1065,13 +1158,26 @@ class _SelectedPlaceRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text('$order.', style: ChaerokTypography.caption),
-          const SizedBox(width: ChaerokSpacing.xs),
           Expanded(
-            child: Text(
-              place.title,
-              style: ChaerokTypography.bodyMedium,
-              overflow: TextOverflow.ellipsis,
+            child: InkWell(
+              onTap: onTap,
+              child: Row(
+                children: [
+                  Text('$order.', style: ChaerokTypography.caption),
+                  const SizedBox(width: ChaerokSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      place.title,
+                      style: ChaerokTypography.bodyMedium.copyWith(
+                        fontWeight: isFocused
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           IconButton(

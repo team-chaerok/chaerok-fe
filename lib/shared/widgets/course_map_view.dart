@@ -101,7 +101,11 @@ class CourseMapView extends StatefulWidget {
     required this.places,
     this.focusOrder,
     this.onMarkerTap,
+    this.emptyMessage = '지도에 표시할 위치 정보가 없어요',
   });
+
+  /// 표시할 마커가 하나도 없을 때 지도 대신 보여줄 안내 문구.
+  final String emptyMessage;
 
   final List<CoursePlaceResponse> places;
   final int? focusOrder;
@@ -147,8 +151,12 @@ class _CourseMapViewState extends State<CourseMapView> {
     final markers = _markers;
 
     if (markers.isEmpty) {
-      return const Center(
-        child: Text('지도에 표시할 위치 정보가 없어요', style: ChaerokTypography.bodyMedium),
+      return Center(
+        child: Text(
+          widget.emptyMessage,
+          textAlign: TextAlign.center,
+          style: ChaerokTypography.bodyMedium,
+        ),
       );
     }
 

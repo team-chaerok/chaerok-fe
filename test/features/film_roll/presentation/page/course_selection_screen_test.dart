@@ -1,5 +1,7 @@
 import 'package:chaerok/data/models/course_place_response.dart';
 import 'package:chaerok/data/models/course_response.dart';
+import 'package:chaerok/data/models/place_category.dart';
+import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -114,5 +116,70 @@ void main() {
 
     expect(find.text('추천 코스가 없어요'), findsOneWidget);
     expect(find.text('이 코스로 시작하기'), findsNothing);
+  });
+
+  group('직접 만들기 탭', () {
+    ExplorePlace explorePlace(String title) => ExplorePlace(
+      title: title,
+      address: '충남 공주시',
+      latitude: 36.45,
+      longitude: 127.12,
+      categoryGroup: PlaceCategoryGroup.fromWire('CAFE'),
+      categoryGroupWire: 'CAFE',
+      categoryDetail: PlaceCategoryDetail.fromWire('카페'),
+      categoryDetailLabel: '카페',
+      source: 'KAKAO_LOCAL',
+      identityKey: title,
+    );
+
+    Future<void> pumpCustom(
+      WidgetTester tester, {
+      ExplorePlace? initial,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CourseSelectionScreen(
+            regionId: 1,
+            filmRollId: 'roll-1',
+            initialTab: CourseSelectionInitialTab.custom,
+            initialSelectedPlace: initial,
+            debugFetchCourses: () async => _courses,
+            debugFetchRegionPlaces: () async => const [],
+            debugMapBuilder: _fakeMap,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('선택한 장소가 없으면 지도 자리에 안내 문구를 보여준다', (tester) async {
+      await pumpCustom(tester);
+
+      expect(find.textContaining('지도에 순서대로 표시돼요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('fake-map')), findsNothing);
+    });
+
+    testWidgets('미리 담긴 장소가 있으면 지도에 표시하고 행을 탭해 강조를 토글한다', (tester) async {
+      await pumpCustom(tester, initial: explorePlace('공산성'));
+
+      expect(find.text('map:공산성:focus=null'), findsOneWidget);
+
+      await tester.tap(find.text('공산성').last);
+      await tester.pumpAndSettle();
+      expect(find.text('map:공산성:focus=1'), findsOneWidget);
+
+      await tester.tap(find.text('공산성').last);
+      await tester.pumpAndSettle();
+      expect(find.text('map:공산성:focus=null'), findsOneWidget);
+    });
+
+    testWidgets('선택한 장소를 제거하면 지도가 안내 문구로 돌아간다', (tester) async {
+      await pumpCustom(tester, initial: explorePlace('공산성'));
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('지도에 순서대로 표시돼요'), findsOneWidget);
+    });
   });
 }
