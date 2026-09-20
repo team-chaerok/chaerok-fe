@@ -762,7 +762,20 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
             const SizedBox(width: ChaerokSpacing.xs),
           Expanded(
             child: ChoiceChip(
-              label: Text(_sourceLabel(source)),
+              // 세 칩이 한 줄을 나눠 쓰므로 체크 아이콘과 기본 패딩을 빼고, 좁은
+              // 화면에서도 라벨이 잘리지 않게 한다("관광지 목록"이 가장 길다).
+              label: SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(_sourceLabel(source), maxLines: 1),
+                ),
+              ),
+              showCheckmark: false,
+              labelPadding: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChaerokSpacing.xs,
+              ),
               selected: _customSource == source,
               onSelected: (_) => setState(() => _customSource = source),
               selectedColor: ChaerokColors.primary,
