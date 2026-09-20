@@ -83,6 +83,10 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   int _photoCount = 0;
   FilmRollPlace? _place;
 
+  /// 필름 한도 도달 여부. 카메라 초기화 상태와 별개로 유지해, 초기화가 한도 확인보다
+  /// 늦게 끝나거나 resume으로 재시작돼도 필름 소진 안내가 덮어써지지 않게 한다.
+  bool _isExposureLimitReached = false;
+
   List<double> get _availableZoomLevels => _zoomLevelCandidates
       .where((zoom) => zoom >= _minZoom && zoom <= _maxZoom)
       .toList();
@@ -150,6 +154,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   }
 
   Future<void> _disableCameraForExposureLimit() async {
+    _isExposureLimitReached = true;
     final controller = _cameraController;
     if (mounted) {
       setState(() {
@@ -167,7 +172,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     // inactive/resumed로 흔들어 didChangeAppLifecycleState에서 이 메서드를
     // 다시 호출할 수 있다. 이미 진행 중이면 무시해 카메라 컨트롤러가
     // 중복 생성되어 서로 충돌하는 것을 막는다.
-    if (_isInitializingCamera) return;
+    if (_isInitializingCamera || _isExposureLimitReached) return;
     _isInitializingCamera = true;
     _isPermissionPermanentlyDenied = false;
     try {
@@ -185,6 +190,9 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
         });
         return;
       }
+
+      // 권한 응답을 기다리는 사이 한도 도달이 확인됐다면 카메라를 만들지 않는다.
+      if (_isExposureLimitReached) return;
 
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -205,7 +213,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       await controller.initialize();
       final minZoom = await controller.getMinZoomLevel();
       final maxZoom = await controller.getMaxZoomLevel();
-      if (!mounted) {
+      if (!mounted || _isExposureLimitReached) {
         await controller.dispose();
         return;
       }
@@ -312,6 +320,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       final latestCount = await _fetchPhotoCount();
       if (!mounted) return;
       if (latestCount >= FilmRoll.maxExposureCount) {
+        _isExposureLimitReached = true;
         setState(() {
           _errorMessage = '필름을 다 썼어요. 더 이상 촬영할 수 없어요.';
           _isSaving = false;
@@ -337,6 +346,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on FilmRollExposureLimitExceededException {
+      _isExposureLimitReached = true;
       if (!mounted) return;
       setState(() {
         _errorMessage = '필름을 다 썼어요. 더 이상 촬영할 수 없어요.';
