@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:chaerok/core/file/local_photo_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -138,5 +139,75 @@ void main() {
       ),
       completes,
     );
+  });
+
+  group('EXIF 방향 보정', () {
+    /// [width]x[height] 픽셀에 EXIF [orientation]을 단 JPEG. iOS 카메라는 폰을
+    /// 돌려 찍어도 센서 방향 픽셀 + EXIF 태그로 저장한다.
+    Uint8List jpegWithOrientation(
+      int orientation, {
+      int width = 60,
+      int height = 40,
+    }) {
+      final image = img.Image(width: width, height: height);
+      image.exif.imageIfd.orientation = orientation;
+      return Uint8List.fromList(img.encodeJpg(image));
+    }
+
+    Future<Uint8List> savedBytes(String storedPath) async =>
+        File(await storage.resolve(storedPath)).readAsBytes();
+
+    Future<img.Image> decodeSaved(String storedPath) async {
+      final file = File(await storage.resolve(storedPath));
+      return img.decodeJpg(await file.readAsBytes())!;
+    }
+
+    test('방향 태그가 있으면 원본 픽셀을 똑바로 돌려 저장하고 태그는 남기지 않는다', () async {
+      // orientation 6 = 시계 방향 90° 회전해야 정방향(가로 60x40 → 세로 40x60).
+      final paths = await storage.save(
+        filmRollId: 'fr1',
+        filmRollPlaceId: 'p1',
+        photoId: 'ph1',
+        imageBytes: jpegWithOrientation(6),
+      );
+
+      final original = await decodeSaved(paths.originalPath);
+      expect(original.width, 40);
+      expect(original.height, 60);
+      // decodeJpg는 태그를 자동 적용해 버리므로, 저장된 파일에 태그가 남았는지는
+      // 원본 바이트의 EXIF를 직접 읽어 확인한다(Flutter는 이 태그에 의존한다).
+      final rawExif = img.decodeJpgExif(await savedBytes(paths.originalPath));
+      expect(rawExif?.imageIfd.orientation, anyOf(isNull, 1));
+    });
+
+    test('썸네일도 방향이 반영된 상태로 만든다', () async {
+      final paths = await storage.save(
+        filmRollId: 'fr1',
+        filmRollPlaceId: 'p1',
+        photoId: 'ph1',
+        imageBytes: jpegWithOrientation(6),
+      );
+
+      final thumbnail = await decodeSaved(paths.thumbnailPath);
+      expect(thumbnail.height, greaterThan(thumbnail.width));
+    });
+
+    test('방향이 이미 정상(1)이면 원본 바이트를 그대로 저장한다', () async {
+      final source = jpegWithOrientation(1);
+      final paths = await storage.save(
+        filmRollId: 'fr1',
+        filmRollPlaceId: 'p1',
+        photoId: 'ph1',
+        imageBytes: source,
+      );
+
+      final saved = await File(
+        await storage.resolve(paths.originalPath),
+      ).readAsBytes();
+      expect(saved, source);
+
+      final thumbnail = await decodeSaved(paths.thumbnailPath);
+      expect(thumbnail.width, greaterThan(thumbnail.height));
+    });
   });
 }

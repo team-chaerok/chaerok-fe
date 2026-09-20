@@ -1,12 +1,29 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 const _thumbnailMaxWidth = 480;
 const _thumbnailJpegQuality = 80;
+const _originalJpegQuality = 95;
+
+/// 카메라(특히 iOS)는 폰을 돌려 찍어도 센서 방향 픽셀에 EXIF 방향 태그만 달아
+/// 저장한다. 태그를 적용하지 않는 곳(축소 디코딩, 서버 업로드 후 처리 등)에서는
+/// 사진이 옆으로 누워 보이므로, 태그가 정상(1)이 아니면 픽셀 자체를 돌려 저장한다.
+/// 태그가 없거나 정상이면 원본 바이트를 그대로 돌려줘 재인코딩 손실을 피한다.
+Uint8List _bakeExifOrientation(Uint8List imageBytes) {
+  final orientation = img.decodeJpgExif(imageBytes)?.imageIfd.orientation;
+  if (orientation == null || orientation == 1) return imageBytes;
+
+  // decodeImage는 디코딩 시 방향 태그를 픽셀에 반영한다.
+  final decoded = img.decodeImage(imageBytes);
+  if (decoded == null) return imageBytes;
+  return Uint8List.fromList(
+    img.encodeJpg(decoded, quality: _originalJpegQuality),
+  );
+}
 
 /// 필름롤 사진 원본/썸네일 파일을 앱 내부 영구 저장소에 저장/삭제하는 서비스.
 ///
@@ -43,11 +60,14 @@ class LocalPhotoStorage {
     await originalDir.create(recursive: true);
     await thumbnailDir.create(recursive: true);
 
+    // 큰 JPEG 재인코딩이 UI 스레드를 막지 않도록 별도 isolate에서 처리한다.
+    final upright = await compute(_bakeExifOrientation, imageBytes);
+
     final originalFile = File(p.join(originalDir.path, '$photoId.jpg'));
-    await originalFile.writeAsBytes(imageBytes, flush: true);
+    await originalFile.writeAsBytes(upright, flush: true);
 
     final thumbnailFile = File(p.join(thumbnailDir.path, '$photoId.jpg'));
-    await thumbnailFile.writeAsBytes(_buildThumbnail(imageBytes), flush: true);
+    await thumbnailFile.writeAsBytes(_buildThumbnail(upright), flush: true);
 
     return (
       originalPath: _relativeToDocuments(originalFile.path, documentsDir),
