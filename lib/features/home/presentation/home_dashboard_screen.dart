@@ -15,6 +15,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_exceptions.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_collection_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_developing_view.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/select_course_button.dart';
@@ -616,7 +617,7 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
               opened: opened,
               closedPreview: const ColoredBox(color: ChaerokColors.skyBlue),
               openedBody: const _RoundedOpenedBody(
-                child: _PlaceholderCardBody(text: '지난여행 화면은 곧 만나볼 수 있어요'),
+                child: FilmRollCollectionScreen(showAppBar: false),
               ),
             ),
             HomeCardTab.myPage => FolderCard(
@@ -891,28 +892,6 @@ class _RoundedOpenedBody extends StatelessWidget {
         top: Radius.circular(ChaerokRadius.lg),
       ),
       child: child,
-    );
-  }
-}
-
-/// "지난여행"/"마이페이지" 탭의 임시 본문. 화면 구성은 후속 작업에서 채운다.
-class _PlaceholderCardBody extends StatelessWidget {
-  const _PlaceholderCardBody({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: ChaerokColors.background,
-      child: Center(
-        child: Text(
-          text,
-          style: ChaerokTypography.bodyMedium.copyWith(
-            color: ChaerokColors.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 }

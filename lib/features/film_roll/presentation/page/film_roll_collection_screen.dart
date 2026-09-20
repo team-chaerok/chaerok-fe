@@ -16,7 +16,10 @@ import 'package:flutter/material.dart';
 
 /// 진행중/완료 필름롤을 모아 보여주는 컬렉션 화면.
 class FilmRollCollectionScreen extends StatefulWidget {
-  const FilmRollCollectionScreen({super.key});
+  const FilmRollCollectionScreen({super.key, this.showAppBar = true});
+
+  /// 홈 폴더 카드처럼 이미 상위 화면이 헤더를 가진 곳에 끼워 넣을 때 false.
+  final bool showAppBar;
 
   @override
   State<FilmRollCollectionScreen> createState() =>
@@ -76,7 +79,7 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ChaerokColors.background,
-      appBar: const ChaerokAppbar(title: '필름 컬렉션'),
+      appBar: widget.showAppBar ? const ChaerokAppbar(title: '필름 컬렉션') : null,
       body: _buildBody(),
     );
   }
