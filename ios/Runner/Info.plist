@@ -49,6 +49,10 @@
 	<string>현재 위치를 기반으로 주변 여행 장소를 안내하고 방문 여부를 확인하기 위해 위치 정보가 필요합니다.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>필름롤 방문 인증 사진 촬영을 위해 카메라 권한이 필요합니다.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>현상된 릴스 영상을 내 사진 앨범에 저장하기 위해 사진 접근 권한이 필요합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>현상된 릴스 영상을 내 사진 앨범에 저장하기 위해 사진 접근 권한이 필요합니다.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>kakaokompassauth</string>
