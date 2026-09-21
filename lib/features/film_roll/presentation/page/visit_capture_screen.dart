@@ -17,14 +17,14 @@ import 'package:chaerok/features/film_roll/presentation/widgets/camera_top_bar.d
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_zoom_selector.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_viewfinder_frame.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
+import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-/// 목업에 고정된 필름 타입/카메라 브랜드 표기. 실제 데이터 모델과 연동되는
-/// 값이 아니라 촬영 화면의 정적인 UI 카피다.
-const _filmTypeLabel = '공주:공주의 잔(殘)';
+/// 카메라 브랜드 표기. 실제 데이터 모델과 연동되는 값이 아니라 촬영 화면의
+/// 정적인 UI 카피다.
 const _cameraName = 'Chaerok';
 const _cameraSubtitle = 'Film Camera';
 
@@ -41,6 +41,7 @@ class VisitCaptureScreen extends StatefulWidget {
     required this.filmRollId,
     required this.filmRollPlaceId,
     @visibleForTesting this.debugFetchPhotoCount,
+    @visibleForTesting this.debugFetchRegionCode,
   });
 
   final String filmRollId;
@@ -49,6 +50,10 @@ class VisitCaptureScreen extends StatefulWidget {
   /// 테스트에서 실제 DB 조회 대신 촬영 매수를 주입하기 위한 훅.
   @visibleForTesting
   final Future<int> Function()? debugFetchPhotoCount;
+
+  /// 테스트에서 실제 DB 조회 대신 필름롤 지역을 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<RegionCode?> Function()? debugFetchRegionCode;
 
   @override
   State<VisitCaptureScreen> createState() => _VisitCaptureScreenState();
@@ -90,6 +95,9 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   int _photoCount = 0;
   FilmRollPlace? _place;
 
+  /// 촬영 중인 필름롤의 지역. 상단 필름 타입 라벨에 쓰며, 조회 전/실패 시 null.
+  RegionCode? _regionCode;
+
   /// 필름 한도 도달 여부. 카메라 초기화 상태와 별개로 유지해, 초기화가 한도 확인보다
   /// 늦게 끝나거나 resume으로 재시작돼도 필름 소진 안내가 덮어써지지 않게 한다.
   bool _isExposureLimitReached = false;
@@ -111,6 +119,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     unawaited(_initializeCamera());
     unawaited(_loadPhotoCount());
     unawaited(_loadPlace());
+    unawaited(_loadRegionCode());
   }
 
   Future<int> _fetchPhotoCount() {
@@ -118,6 +127,23 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     return override != null
         ? override()
         : FilmRollModule.instance.getFilmRollPhotoCount(widget.filmRollId);
+  }
+
+  /// 상단 필름 타입 라벨을 지역별로 보여주기 위해 필름롤의 지역을 조회한다.
+  /// 실패해도 촬영 자체는 계속할 수 있어야 하므로 예외는 삼킨다(라벨만 생략).
+  Future<void> _loadRegionCode() async {
+    try {
+      final override = widget.debugFetchRegionCode;
+      final regionCode = override != null
+          ? await override()
+          : (await FilmRollModule.instance.filmRollRepository.findById(
+              widget.filmRollId,
+            ))?.regionCode;
+      if (!mounted) return;
+      setState(() => _regionCode = regionCode);
+    } catch (e, st) {
+      log('필름롤 지역 조회 실패', name: _tag, error: e, stackTrace: st);
+    }
   }
 
   /// 지금 인증 중인 장소 이름을 안내 문구로 보여주기 위해 조회한다. 실패해도
@@ -446,7 +472,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
           CameraTopBar(
             flashMode: _flashMode,
             isFlashSupported: _isFlashSupported,
-            filmTypeLabel: _filmTypeLabel,
+            filmTypeLabel: _regionCode?.filmTypeLabel ?? '',
             photoCount: _photoCount,
             maxPhotoCount: FilmRoll.maxExposureCount,
             onFlashToggle: _onFlashToggle,

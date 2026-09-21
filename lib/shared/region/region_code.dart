@@ -38,4 +38,12 @@ extension RegionCodeX on RegionCode {
 
   /// 충남 외 지역 홈 화면의 필름롤 아코디언 헤더 라벨.
   String get filmStripLabel => '$displayName 필름롤';
+
+  /// 촬영 화면 상단에 표시하는 지역별 필름 이름(예: "공주:공주의 잔(殘)").
+  String get filmTypeLabel => switch (this) {
+    RegionCode.gongju => '공주:공주의 잔(殘)',
+    RegionCode.buyeo => '부여:백제의 연(戀)',
+    RegionCode.seosan => '서산:서산의 낙(落)',
+    RegionCode.yesan => '예산:윤(潤)',
+  };
 }
