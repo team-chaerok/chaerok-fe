@@ -6,6 +6,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_shutter_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/camera_switch_button.dart';
+import 'package:chaerok/shared/region/region_code.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
@@ -408,4 +409,29 @@ void main() {
 
     expect(find.text('필름을 다 썼어요. 더 이상 촬영할 수 없어요.'), findsOneWidget);
   });
+
+  for (final region in RegionCode.values) {
+    testWidgets('상단 필름 타입 라벨에 ${region.displayName} 필름롤의 지역 라벨을 보여준다', (
+      tester,
+    ) async {
+      final fakePermissions = _FakePermissionPlatform();
+      PermissionHandlerPlatform.instance = fakePermissions;
+      CameraPlatform.instance = _FakeCameraPlatform();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: VisitCaptureScreen(
+            filmRollId: 'roll-1',
+            filmRollPlaceId: 'place-1',
+            debugFetchPhotoCount: () async => 0,
+            debugFetchRegionCode: () async => region,
+          ),
+        ),
+      );
+      fakePermissions.grant();
+      await tester.pumpAndSettle();
+
+      expect(find.text(region.filmTypeLabel), findsOneWidget);
+    });
+  }
 }
