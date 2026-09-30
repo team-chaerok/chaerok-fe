@@ -3,6 +3,7 @@ import 'package:chaerok/data/models/course_response.dart';
 import 'package:chaerok/data/models/place_category.dart';
 import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/film_roll/presentation/page/course_selection_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/recommended_course_carousel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -67,6 +68,19 @@ void main() {
     expect(find.text('지도로 보기'), findsNothing);
   });
 
+  testWidgets('지도 크게 보기를 누르면 코스 카드가 접히고 다시 누르면 펼쳐진다', (tester) async {
+    await _pumpScreen(tester);
+
+    await tester.tap(find.byTooltip('지도 크게 보기'));
+    await tester.pump();
+    expect(find.text('제민천 산책 코스'), findsNothing);
+    expect(find.text('이 코스로 시작하기'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('지도 작게 보기'));
+    await tester.pump();
+    expect(find.text('제민천 산책 코스'), findsOneWidget);
+  });
+
   testWidgets('카드를 옆으로 넘기면 지도가 그 코스로 바뀌고 확정되지는 않는다', (tester) async {
     await _pumpScreen(tester);
 
@@ -80,11 +94,21 @@ void main() {
   testWidgets('장소 행을 탭하면 지도가 그 장소를 강조하고, 다시 탭하면 전체 보기로 돌아간다', (tester) async {
     await _pumpScreen(tester);
 
-    await tester.tap(find.text('제민천'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(RecommendedCourseCarousel),
+        matching: find.text('제민천'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('map:공산성:focus=2'), findsOneWidget);
 
-    await tester.tap(find.text('제민천'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(RecommendedCourseCarousel),
+        matching: find.text('제민천'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('map:공산성:focus=null'), findsOneWidget);
   });
@@ -99,6 +123,17 @@ void main() {
     await tester.drag(find.text('제민천 산책 코스'), const Offset(-400, 0));
     await tester.pumpAndSettle();
     expect(find.text('map:무령왕릉:focus=null'), findsOneWidget);
+  });
+
+  testWidgets('지도에서 장소를 탭하면 지도 위에 장소 정보 카드가 나타난다', (tester) async {
+    await _pumpScreen(tester);
+    await tester.tap(find.byTooltip('지도 크게 보기'));
+    await tester.pump();
+    expect(find.text('공산성'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('fake-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('공산성'), findsOneWidget);
   });
 
   testWidgets('추천 코스가 없으면 안내 문구를 보여준다', (tester) async {

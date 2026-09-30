@@ -125,6 +125,9 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   // 추천 코스 확정(서버 장소 확보) 중 여부.
   bool _isConfirmingCourse = false;
 
+  /// 지도를 더 크게 볼 수 있도록 지도 아래 목록/카드 영역을 접은 상태.
+  bool _isMapExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -649,17 +652,22 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(ChaerokRadius.lg),
-              child: _buildCourseMap(selectedCourse),
+              child: _withMapOverlay(
+                _buildCourseMap(selectedCourse),
+                selectedCourse.places,
+                _focusedPlaceOrder,
+              ),
             ),
           ),
         ),
-        RecommendedCourseCarousel(
-          courses: _courses,
-          selectedIndex: _selectedCourseIndex,
-          focusedPlaceOrder: _focusedPlaceOrder,
-          onPageChanged: _onCoursePageChanged,
-          onPlaceTap: _onFocusPlace,
-        ),
+        if (!_isMapExpanded)
+          RecommendedCourseCarousel(
+            courses: _courses,
+            selectedIndex: _selectedCourseIndex,
+            focusedPlaceOrder: _focusedPlaceOrder,
+            onPageChanged: _onCoursePageChanged,
+            onPlaceTap: _onFocusPlace,
+          ),
         Container(
           padding: const EdgeInsets.all(ChaerokSpacing.md),
           child: SafeArea(
@@ -722,13 +730,65 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(ChaerokRadius.lg),
-                child: _buildCustomMap(),
+                child: _withMapOverlay(
+                  _buildCustomMap(),
+                  _selectedMapPlaces,
+                  _customFocusOrder,
+                ),
               ),
             ),
           ),
-        Expanded(flex: 3, child: _buildSourceList()),
-        _buildSelectedPreview(),
+        if (!_isMapExpanded) ...[
+          Expanded(flex: 3, child: _buildSourceList()),
+          _buildSelectedPreview(),
+        ],
         _buildConfirmFooter(),
+      ],
+    );
+  }
+
+  /// 지도 우상단에 "크게 보기/작게 보기" 버튼을 얹는다. 지도가 화면에 붙박이로
+  /// 작게만 보이지 않도록 아래 영역을 접어 지도를 넓힌다.
+  /// 마커를 눌러 강조된 장소가 있으면 지도 하단에 장소 정보 카드를 함께 보여준다.
+  Widget _withMapOverlay(
+    Widget map,
+    List<CoursePlaceResponse> places,
+    int? focusOrder,
+  ) {
+    final focused =
+        focusOrder != null && focusOrder >= 1 && focusOrder <= places.length
+        ? places[focusOrder - 1]
+        : null;
+    return Stack(
+      children: [
+        Positioned.fill(child: map),
+        if (focused != null)
+          Positioned(
+            left: ChaerokSpacing.xs,
+            right: ChaerokSpacing.xs,
+            bottom: ChaerokSpacing.xs,
+            child: _MapPlaceInfoCard(place: focused, order: focusOrder!),
+          ),
+        Positioned(
+          top: ChaerokSpacing.xs,
+          right: ChaerokSpacing.xs,
+          child: Material(
+            color: ChaerokColors.surface,
+            shape: const CircleBorder(),
+            elevation: 1,
+            child: IconButton(
+              tooltip: _isMapExpanded ? '지도 작게 보기' : '지도 크게 보기',
+              icon: Icon(
+                _isMapExpanded
+                    ? Icons.close_fullscreen_rounded
+                    : Icons.open_in_full_rounded,
+                size: 20,
+                color: ChaerokColors.primary,
+              ),
+              onPressed: () => setState(() => _isMapExpanded = !_isMapExpanded),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1212,6 +1272,59 @@ class _SelectedPlaceRow extends StatelessWidget {
             icon: const Icon(Icons.close),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 지도에서 선택한 장소의 순번, 이름, 관광 유형, 주소를 보여주는 카드.
+class _MapPlaceInfoCard extends StatelessWidget {
+  const _MapPlaceInfoCard({required this.place, required this.order});
+
+  final CoursePlaceResponse place;
+  final int order;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ChaerokColors.surface,
+      elevation: 2,
+      borderRadius: BorderRadius.circular(ChaerokRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.all(ChaerokSpacing.sm),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 12,
+              backgroundColor: ChaerokColors.primary,
+              child: Text(
+                '$order',
+                style: ChaerokTypography.caption.copyWith(color: Colors.white),
+              ),
+            ),
+            const SizedBox(width: ChaerokSpacing.sm),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    place.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ChaerokTypography.titleMedium,
+                  ),
+                  Text(
+                    '${place.categoryGroup} · ${place.address}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ChaerokTypography.caption,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
