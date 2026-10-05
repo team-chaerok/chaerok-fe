@@ -16,10 +16,23 @@ import 'package:flutter/material.dart';
 
 /// 진행중/완료 필름롤을 모아 보여주는 컬렉션 화면.
 class FilmRollCollectionScreen extends StatefulWidget {
-  const FilmRollCollectionScreen({super.key, this.showAppBar = true});
+  const FilmRollCollectionScreen({
+    super.key,
+    this.showAppBar = true,
+    @visibleForTesting this.debugFetchFilmRolls,
+    @visibleForTesting this.debugDeleteFilmRoll,
+  });
 
   /// 홈 폴더 카드처럼 이미 상위 화면이 헤더를 가진 곳에 끼워 넣을 때 false.
   final bool showAppBar;
+
+  /// 테스트에서 실제 로컬 DB 조회 대신 필름롤 목록을 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<List<FilmRoll>> Function()? debugFetchFilmRolls;
+
+  /// 테스트에서 실제 삭제 유스케이스 호출 대신 결과를 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<void> Function(String filmRollId)? debugDeleteFilmRoll;
 
   @override
   State<FilmRollCollectionScreen> createState() =>
@@ -32,6 +45,9 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<FilmRoll> _filmRolls = const [];
+
+  /// 삭제 확인/삭제 API 호출이 진행 중인 필름롤 id. 중복 탭 방지용.
+  final Set<String> _deletingIds = {};
 
   @override
   void initState() {
@@ -46,8 +62,10 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
     });
 
     try {
-      final filmRolls = await FilmRollModule.instance.filmRollRepository
-          .findAll();
+      final override = widget.debugFetchFilmRolls;
+      final filmRolls = override != null
+          ? await override()
+          : await FilmRollModule.instance.filmRollRepository.findAll();
       if (!mounted) return;
       setState(() {
         _filmRolls = filmRolls;
@@ -73,6 +91,69 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
     );
     if (!mounted) return;
     await _fetch();
+  }
+
+  Future<void> _onDeleteTap(FilmRoll filmRoll) async {
+    if (_deletingIds.contains(filmRoll.id)) return;
+
+    final confirmed = await _showDeleteConfirmDialog(context, filmRoll);
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    setState(() => _deletingIds.add(filmRoll.id));
+
+    try {
+      final override = widget.debugDeleteFilmRoll;
+      if (override != null) {
+        await override(filmRoll.id);
+      } else {
+        await FilmRollModule.instance.deleteFilmRoll(filmRoll.id);
+      }
+      if (!mounted) return;
+      setState(() {
+        _filmRolls = _filmRolls
+            .where((roll) => roll.id != filmRoll.id)
+            .toList();
+        _deletingIds.remove(filmRoll.id);
+      });
+    } catch (e, st) {
+      log('필름롤 삭제 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      setState(() => _deletingIds.remove(filmRoll.id));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('필름롤을 삭제하지 못했어요.')));
+    }
+  }
+
+  Future<bool?> _showDeleteConfirmDialog(
+    BuildContext context,
+    FilmRoll filmRoll,
+  ) {
+    final isCompleted = filmRoll.status == FilmRollStatus.completed;
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('필름롤 삭제', style: ChaerokTypography.titleMedium),
+        content: Text(
+          isCompleted
+              ? '${filmRoll.title}을(를) 삭제하면 저장된 필름 사진과 릴스도 함께 사라지며 복구할 수 없어요.'
+              : '${filmRoll.title}을(를) 삭제하면 지금까지의 방문·촬영 기록도 함께 사라지며 복구할 수 없어요.',
+          style: ChaerokTypography.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: ChaerokColors.error),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -122,6 +203,8 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   }
 
   Widget _buildFilmRollCard(FilmRoll filmRoll) {
+    final isDeleting = _deletingIds.contains(filmRoll.id);
+
     return InkWell(
       onTap: () => _onFilmRollTap(filmRoll),
       borderRadius: BorderRadius.circular(ChaerokRadius.md),
@@ -151,9 +234,43 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
               ),
             ),
             Icon(_statusIcon(filmRoll), color: _statusIconColor(filmRoll)),
+            const SizedBox(width: ChaerokSpacing.xs),
+            _buildDeleteButton(filmRoll, isDeleting: isDeleting),
           ],
         ),
       ),
+    );
+  }
+
+  /// 필름롤을 삭제하는 X 아이콘 버튼. 삭제가 진행 중이면 작은 로딩 인디케이터로
+  /// 대체해 중복 탭을 막는다.
+  Widget _buildDeleteButton(FilmRoll filmRoll, {required bool isDeleting}) {
+    if (isDeleting) {
+      return const SizedBox(
+        width: 44,
+        height: 44,
+        child: Padding(
+          padding: EdgeInsets.all(ChaerokSpacing.md),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: ChaerokColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    return IconButton(
+      onPressed: () => _onDeleteTap(filmRoll),
+      // 만료 상태 아이콘(Icons.cancel_outlined)과 혼동되지 않도록 휴지통
+      // 모양으로 구분한다.
+      icon: const Icon(
+        Icons.delete_outline,
+        color: ChaerokColors.textSecondary,
+      ),
+      iconSize: 20,
+      tooltip: '필름롤 삭제',
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      padding: EdgeInsets.zero,
     );
   }
 
