@@ -261,7 +261,12 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
 
     return IconButton(
       onPressed: () => _onDeleteTap(filmRoll),
-      icon: const Icon(Icons.close, color: ChaerokColors.textSecondary),
+      // 만료 상태 아이콘(Icons.cancel_outlined)과 혼동되지 않도록 휴지통
+      // 모양으로 구분한다.
+      icon: const Icon(
+        Icons.delete_outline,
+        color: ChaerokColors.textSecondary,
+      ),
       iconSize: 20,
       tooltip: '필름롤 삭제',
       constraints: const BoxConstraints(minWidth: 44, minHeight: 44),

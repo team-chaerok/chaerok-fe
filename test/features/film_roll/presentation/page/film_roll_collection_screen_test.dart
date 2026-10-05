@@ -44,7 +44,7 @@ void main() {
 
     expect(find.text('공주 필름롤'), findsOneWidget);
 
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.delete_outline));
     await tester.pumpAndSettle();
 
     // 확인 다이얼로그가 뜨고, 아직 삭제되지 않았다.
@@ -73,7 +73,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.delete_outline));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('취소'));
@@ -102,7 +102,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.delete_outline));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('필름 사진과 릴스도 함께 사라지며'), findsOneWidget);
@@ -121,7 +121,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.delete_outline));
     await tester.pumpAndSettle();
     await tester.tap(find.text('삭제'));
     await tester.pumpAndSettle();
