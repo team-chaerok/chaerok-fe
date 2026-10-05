@@ -143,4 +143,73 @@ void main() {
     expect(find.text('릴스 생성에 실패했어요'), findsOneWidget);
     expect(find.text('릴스 생성 중 오류가 발생했어요.'), findsOneWidget);
   });
+
+  Widget developingView(
+    _FakeFilmRollRepository repo,
+    FilmRollResultResponse result,
+  ) {
+    return MaterialApp(
+      home: Scaffold(
+        body: FilmRollDevelopingView(
+          filmRoll: _filmRoll(),
+          filmRollRepository: repo,
+          developFilmRoll: DevelopFilmRollUseCase(
+            developFilmRoll: (id) async => FilmRollDevelopmentResponse(
+              filmRollId: id,
+              status: 'QUEUED',
+              totalPhotoCount: 12,
+              requestedAt: DateTime(2026, 9, 15, 11),
+            ),
+          ),
+          watchFilmRollResult: WatchFilmRollResultUseCase(
+            pollInterval: Duration.zero,
+            getFilmRollResult: (id) async => result,
+          ),
+        ),
+      ),
+    );
+  }
+
+  testWidgets(
+    '현상은 끝났지만 보관 기간이 지난 EXPIRED(completedAt 있음)를 받으면 완료 처리 후 결과 화면으로 이동한다',
+    (tester) async {
+      final repo = _FakeFilmRollRepository();
+
+      await tester.pumpWidget(
+        developingView(
+          repo,
+          FilmRollResultResponse(
+            filmRollId: 900,
+            status: 'EXPIRED',
+            totalPhotoCount: 12,
+            processedPhotoCount: 12,
+            filteredPhotos: const [],
+            completedAt: DateTime(2026, 9, 15, 12),
+            expiresAt: DateTime(2026, 9, 17, 12),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(repo.markCompletedCalls, [
+        ('fr-1', DateTime(2026, 9, 15, 12), null),
+      ]);
+      expect(find.byType(FilmRollResultScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('현상된 적 없이 종료된 EXPIRED(completedAt 없음)는 완료 처리하지 않고 안내만 보여준다', (
+    tester,
+  ) async {
+    final repo = _FakeFilmRollRepository();
+
+    await tester.pumpWidget(developingView(repo, _result('EXPIRED')));
+    await tester.pumpAndSettle();
+
+    expect(repo.markCompletedCalls, isEmpty);
+    expect(find.byType(FilmRollResultScreen), findsNothing);
+    expect(find.text('결과 보관 기간이 지났어요'), findsOneWidget);
+  });
 }
