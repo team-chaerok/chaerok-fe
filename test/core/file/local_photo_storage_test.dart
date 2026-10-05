@@ -210,4 +210,56 @@ void main() {
       expect(thumbnail.width, greaterThan(thumbnail.height));
     });
   });
+
+  test(
+    'saveFiltered()로 보관한 필터 사진을 findFilteredPaths()가 photoId별로 돌려준다',
+    () async {
+      await storage.saveFiltered(
+        filmRollId: 'fr1',
+        serverPhotoId: 11,
+        bytes: bytes,
+      );
+      await storage.saveFiltered(
+        filmRollId: 'fr1',
+        serverPhotoId: 12,
+        bytes: bytes,
+      );
+
+      final paths = await storage.findFilteredPaths('fr1');
+
+      expect(paths.keys, unorderedEquals([11, 12]));
+      expect(
+        paths[11],
+        p.join(documentsDir.path, 'film_rolls', 'fr1', 'filtered', '11.jpg'),
+      );
+      expect(File(paths[11]!).readAsBytesSync(), bytes);
+    },
+  );
+
+  test('findFilteredPaths()는 보관본이 없으면 빈 맵을, 쓰다 만 임시 파일은 제외하고 돌려준다', () async {
+    expect(await storage.findFilteredPaths('fr1'), isEmpty);
+
+    await storage.saveFiltered(
+      filmRollId: 'fr1',
+      serverPhotoId: 11,
+      bytes: bytes,
+    );
+    File(
+      p.join(documentsDir.path, 'film_rolls', 'fr1', 'filtered', '12.jpg.tmp'),
+    ).writeAsBytesSync(bytes);
+
+    expect((await storage.findFilteredPaths('fr1')).keys, [11]);
+  });
+
+  test('deleteFilmRollDirectory()는 보관한 필터 사진도 함께 삭제한다', () async {
+    await storage.saveFiltered(
+      filmRollId: 'fr1',
+      serverPhotoId: 11,
+      bytes: bytes,
+    );
+
+    await storage.deleteFilmRollDirectory('fr1');
+
+    expect(await storage.findFilteredPaths('fr1'), isEmpty);
+  });
 }

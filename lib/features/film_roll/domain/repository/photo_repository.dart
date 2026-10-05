@@ -34,4 +34,15 @@ abstract class PhotoRepository {
 
   /// 서버 업로드가 끝나 발급받은 [serverPhotoId]를 저장하고 `isSynced`를 true로 만든다.
   Future<void> markUploaded(String photoId, {required int serverPhotoId});
+
+  /// 서버에서 내려받은 필터 사진을 기기에 보관한다. 현상 결과는 서버에 일정
+  /// 기간만 남으므로, 그 뒤에도 볼 수 있게 하기 위함이다.
+  Future<void> saveFilteredPhoto({
+    required String filmRollId,
+    required int serverPhotoId,
+    required List<int> bytes,
+  });
+
+  /// 기기에 보관된 필터 사진의 파일 경로를 서버 photoId별로 반환한다.
+  Future<Map<int, String>> findFilteredPhotoPaths(String filmRollId);
 }
