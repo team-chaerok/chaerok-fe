@@ -11,6 +11,7 @@ import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_rep
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/backfill_place_images_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/cache_filtered_photos_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/complete_visit_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/delete_photo_use_case.dart';
@@ -18,6 +19,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/develop_film_roll_use_
 import 'package:chaerok/features/film_roll/domain/usecase/enter_region_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/exit_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_photo_count_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_photos_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
@@ -77,6 +79,8 @@ class FilmRollModule {
     backfillPlaceImages = BackfillPlaceImagesUseCase(filmRollPlaceRepository);
     developFilmRoll = DevelopFilmRollUseCase();
     watchFilmRollResult = WatchFilmRollResultUseCase();
+    cacheFilteredPhotos = CacheFilteredPhotosUseCase(photoRepository);
+    getFilmRollResultPhotos = GetFilmRollResultPhotosUseCase(photoRepository);
   }
 
   static FilmRollModule? _instance;
@@ -104,4 +108,6 @@ class FilmRollModule {
   late final BackfillPlaceImagesUseCase backfillPlaceImages;
   late final DevelopFilmRollUseCase developFilmRoll;
   late final WatchFilmRollResultUseCase watchFilmRollResult;
+  late final CacheFilteredPhotosUseCase cacheFilteredPhotos;
+  late final GetFilmRollResultPhotosUseCase getFilmRollResultPhotos;
 }
