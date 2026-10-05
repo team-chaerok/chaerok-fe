@@ -1,7 +1,8 @@
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
 import 'package:chaerok/core/design_system/chaerok_spacing.dart';
-import 'package:chaerok/data/models/film_roll_result_response.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_image.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:flutter/material.dart';
 
@@ -9,7 +10,7 @@ import 'package:flutter/material.dart';
 class FilmRollResultPhotosScreen extends StatelessWidget {
   const FilmRollResultPhotosScreen({super.key, required this.photos});
 
-  final List<FilteredPhotoResponse> photos;
+  final List<FilmRollResultPhoto> photos;
 
   @override
   Widget build(BuildContext context) {
@@ -25,15 +26,9 @@ class FilmRollResultPhotosScreen extends StatelessWidget {
         ),
         itemCount: photos.length,
         itemBuilder: (context, index) {
-          final photo = photos[index];
           return ClipRRect(
             borderRadius: BorderRadius.circular(ChaerokRadius.sm),
-            child: Image.network(
-              photo.downloadUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  const ColoredBox(color: ChaerokColors.sageLight),
-            ),
+            child: FilmRollResultPhotoImage(photo: photos[index]),
           );
         },
       ),
