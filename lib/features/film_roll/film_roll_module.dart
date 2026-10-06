@@ -23,6 +23,7 @@ import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_p
 import 'package:chaerok/features/film_roll/domain/usecase/recover_last_active_film_roll_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/resolve_film_roll_entry_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_photo_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/save_result_photo_to_gallery_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_course_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/select_custom_course_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/watch_film_roll_result_use_case.dart';
@@ -81,6 +82,7 @@ class FilmRollModule {
     watchFilmRollResult = WatchFilmRollResultUseCase();
     cacheFilteredPhotos = CacheFilteredPhotosUseCase(photoRepository);
     getFilmRollResultPhotos = GetFilmRollResultPhotosUseCase(photoRepository);
+    saveResultPhotoToGallery = SaveResultPhotoToGalleryUseCase();
   }
 
   static FilmRollModule? _instance;
@@ -110,4 +112,5 @@ class FilmRollModule {
   late final WatchFilmRollResultUseCase watchFilmRollResult;
   late final CacheFilteredPhotosUseCase cacheFilteredPhotos;
   late final GetFilmRollResultPhotosUseCase getFilmRollResultPhotos;
+  late final SaveResultPhotoToGalleryUseCase saveResultPhotoToGallery;
 }
