@@ -119,7 +119,11 @@ class _FilmRollDevelopingViewState extends State<FilmRollDevelopingView> {
   Future<void> _onResult(FilmRollResultResponse result) async {
     if (!mounted) return;
 
-    if (result.isCompleted) {
+    // 현상은 끝났는데 결과 보관 기간이 지난 뒤에야 앱을 연 경우도 완료로
+    // 처리한다. 그대로 두면 필름롤이 계속 "현상 중"에 머물러, 기기에 남아 있는
+    // 촬영 사진조차 결과 화면에서 볼 수 없다. 결과 화면이 릴스 보관 종료를
+    // 안내한다.
+    if (result.isCompleted || result.isRetentionExpired) {
       try {
         final completedAt = result.completedAt ?? DateTime.now();
         await _filmRollRepository.markCompleted(

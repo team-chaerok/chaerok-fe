@@ -158,4 +158,22 @@ class PhotoRepositoryImpl implements PhotoRepository {
   Future<void> markUploaded(String photoId, {required int serverPhotoId}) {
     return _photoDs.setServerPhotoId(photoId, serverPhotoId);
   }
+
+  @override
+  Future<void> saveFilteredPhoto({
+    required String filmRollId,
+    required int serverPhotoId,
+    required List<int> bytes,
+  }) {
+    return _photoStorage.saveFiltered(
+      filmRollId: filmRollId,
+      serverPhotoId: serverPhotoId,
+      bytes: bytes,
+    );
+  }
+
+  @override
+  Future<Map<int, String>> findFilteredPhotoPaths(String filmRollId) {
+    return _photoStorage.findFilteredPaths(filmRollId);
+  }
 }

@@ -86,6 +86,11 @@ class FilmRollResultResponse {
   bool get isFailed => status == 'FAILED';
   bool get isExpired => status == 'EXPIRED';
 
+  /// 현상은 끝났지만 결과 보관 기간이 지난 상태인지. 서버는 지역 이탈 시
+  /// 현상 조건 미달로 종료된 필름롤에도 `EXPIRED`를 주는데, 그 경우는 현상된
+  /// 적이 없어 [completedAt]이 null이다.
+  bool get isRetentionExpired => isExpired && completedAt != null;
+
   /// 현상이 아직 끝나지 않아 폴링을 계속해야 하는 상태인지.
   bool get isInProgress => !isCompleted && !isFailed && !isExpired;
 }

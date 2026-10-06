@@ -21,6 +21,7 @@ import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.da
 import 'package:chaerok/features/home/presentation/widgets/place_image.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
+import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -644,7 +645,6 @@ class _FilmStripState extends State<_FilmStrip> {
   static const double _itemHeight = 88;
   static const double _itemGap = ChaerokSpacing.sm;
   static const double _itemRadius = 2;
-  static const double _edgeHeight = 4;
   static const double _tagGap = ChaerokSpacing.xxs;
 
   final _tagScrollController = ScrollController();
@@ -692,22 +692,9 @@ class _FilmStripState extends State<_FilmStrip> {
       children: [
         SizedBox(height: _CategoryTag._height, child: _buildTags()),
         const SizedBox(height: _tagGap),
-        ColoredBox(
+        ChaerokFilmStripFrame(
           key: const ValueKey('filmStripFrame'),
-          color: ChaerokColors.cameraBlack,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: _edgeHeight),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const _FilmSprocketRow(),
-                const SizedBox(height: ChaerokSpacing.xxs),
-                SizedBox(height: _itemHeight, child: _buildPhotos()),
-                const SizedBox(height: ChaerokSpacing.xxs),
-                const _FilmSprocketRow(),
-              ],
-            ),
-          ),
+          child: SizedBox(height: _itemHeight, child: _buildPhotos()),
         ),
       ],
     );
@@ -768,39 +755,6 @@ class _FilmStripState extends State<_FilmStrip> {
                   // 카메라가 열린다.
                   : const ColoredBox(color: ChaerokColors.border),
             ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 필름 가장자리의 스프라켓 구멍 한 줄. 가용 너비에 맞춰 개수를 계산해
-/// 고르게 채운다.
-class _FilmSprocketRow extends StatelessWidget {
-  const _FilmSprocketRow();
-
-  static const double _holeWidth = 8;
-  static const double _holeHeight = 4;
-  static const double _pitch = 20;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final holeCount = (constraints.maxWidth / _pitch).floor();
-        return SizedBox(
-          height: _holeHeight,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (var i = 0; i < holeCount; i++)
-                const SizedBox(
-                  width: _holeWidth,
-                  height: _holeHeight,
-                  child: ColoredBox(color: ChaerokColors.background),
-                ),
-            ],
           ),
         );
       },

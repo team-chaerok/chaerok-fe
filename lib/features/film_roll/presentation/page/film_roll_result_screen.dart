@@ -9,11 +9,19 @@ import 'package:chaerok/core/design_system/chaerok_typography.dart';
 import 'package:chaerok/data/models/film_roll_result_response.dart';
 import 'package:chaerok/data/remote/film_rolls_api.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/cache_filtered_photos_use_case.dart';
+import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_photos_use_case.dart';
+import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_film_frame.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_image.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/reel_player_page.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
+import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -25,15 +33,28 @@ import 'package:share_plus/share_plus.dart';
 /// 보여주는 화면. [initialResult]가 있으면(현상 대기 화면에서 방금 완료를
 /// 감지해 넘어온 경우) 추가 조회 없이 바로 그리고, 없으면(필름 컬렉션에서
 /// 다시 열람하는 경우) presigned URL이 만료됐을 수 있으므로 새로 조회한다.
+///
+/// 서버는 현상 결과를 현상 완료 후 일정 기간만 보관한다. 보관 기간 안에 이
+/// 화면을 열면 필터 사진을 기기에 받아 두고, 기간이 지나면(`EXPIRED`) 릴스는
+/// 보관 종료로 안내하되 사진은 기기에 있는 것으로 계속 보여준다.
 class FilmRollResultScreen extends StatefulWidget {
   const FilmRollResultScreen({
     super.key,
     required this.filmRoll,
     this.initialResult,
-  });
+    Future<FilmRollResultResponse> Function(int filmRollId)? getFilmRollResult,
+    GetFilmRollResultPhotosUseCase? getResultPhotos,
+    CacheFilteredPhotosUseCase? cacheFilteredPhotos,
+  }) : _getFilmRollResult = getFilmRollResult,
+       _getResultPhotos = getResultPhotos,
+       _cacheFilteredPhotos = cacheFilteredPhotos;
 
   final FilmRoll filmRoll;
   final FilmRollResultResponse? initialResult;
+  final Future<FilmRollResultResponse> Function(int filmRollId)?
+  _getFilmRollResult;
+  final GetFilmRollResultPhotosUseCase? _getResultPhotos;
+  final CacheFilteredPhotosUseCase? _cacheFilteredPhotos;
 
   @override
   State<FilmRollResultScreen> createState() => _FilmRollResultScreenState();
@@ -41,12 +62,29 @@ class FilmRollResultScreen extends StatefulWidget {
 
 class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   static const _tag = 'FilmRollResultScreen';
+  static const _reelExpiredMessage = '릴스 보관 기간이 끝났어요. 촬영한 사진은 계속 볼 수 있어요.';
+  static const _reelNotDevelopedMessage = '현상된 릴스가 없어요. 촬영한 사진은 계속 볼 수 있어요.';
+
+  late final Future<FilmRollResultResponse> Function(int filmRollId)
+  _getFilmRollResult =
+      widget._getFilmRollResult ?? FilmRollsApi.getFilmRollResult;
+  late final GetFilmRollResultPhotosUseCase _getResultPhotos =
+      widget._getResultPhotos ??
+      FilmRollModule.instance.getFilmRollResultPhotos;
+  late final CacheFilteredPhotosUseCase _cacheFilteredPhotos =
+      widget._cacheFilteredPhotos ??
+      FilmRollModule.instance.cacheFilteredPhotos;
 
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isSharing = false;
+  bool _isCachingPhotos = false;
   String? _errorMessage;
   FilmRollResultResponse? _result;
+
+  /// 화면에 보여줄 사진(촬영 순서). [_result]가 바뀔 때마다 [_loadPhotos]가
+  /// 기기에 보관된 사진까지 반영해 다시 채운다.
+  List<FilmRollResultPhoto> _photos = const [];
 
   /// iOS 공유 창은 기준 위치(sharePositionOrigin)가 반드시 필요해서, 공유하기
   /// 버튼의 화면 좌표를 여기서 얻는다.
@@ -58,8 +96,13 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialResult != null) {
-      _result = widget.initialResult;
+    final initialResult = widget.initialResult;
+    if (initialResult != null) {
+      _result = initialResult;
+      _photos = GetFilmRollResultPhotosUseCase.fromServer(initialResult);
+      // 보관 기간이 지난 결과는 서버 사진이 없어 기기 사진을 읽어야 그릴 수 있다.
+      _isLoading = initialResult.isExpired;
+      unawaited(_loadPhotos(initialResult));
     } else {
       unawaited(_fetchResult());
     }
@@ -83,13 +126,9 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       _errorMessage = null;
     });
 
+    final FilmRollResultResponse result;
     try {
-      final result = await FilmRollsApi.getFilmRollResult(serverFilmRollId);
-      if (!mounted) return;
-      setState(() {
-        _result = result;
-        _isLoading = false;
-      });
+      result = await _getFilmRollResult(serverFilmRollId);
     } catch (e, st) {
       log('현상 결과 조회 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
@@ -97,6 +136,67 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
         _errorMessage = '필름롤 결과를 불러오지 못했어요.';
         _isLoading = false;
       });
+      return;
+    }
+    if (!mounted) return;
+    _applyResult(result);
+  }
+
+  /// 새로 받은 결과를 화면에 반영한다. 보관 기간 안이면 서버 사진으로 바로
+  /// 그리고, 기간이 지났으면 기기 사진을 읽을 때까지 로딩을 유지한다.
+  void _applyResult(FilmRollResultResponse result) {
+    setState(() {
+      _result = result;
+      // URL만 갱신된 재조회라면 [_loadPhotos]가 끝날 때까지 보던 사진을 그대로
+      // 둬, 기기 파일로 그리던 사진이 잠깐 서버 사진으로 바뀌며 깜빡이지 않게 한다.
+      if (_photos.isEmpty || result.isExpired) {
+        _photos = GetFilmRollResultPhotosUseCase.fromServer(result);
+      }
+      _isLoading = result.isExpired;
+    });
+    unawaited(_loadPhotos(result));
+  }
+
+  /// 기기에 보관된 사진을 반영해 [_photos]를 채우고, 보관 기간 안이면 아직
+  /// 받지 않은 필터 사진을 기기에 내려받아 둔다. 실패해도 서버 사진만으로
+  /// 화면은 계속 쓸 수 있으므로 오류 화면으로 바꾸지 않는다.
+  Future<void> _loadPhotos(FilmRollResultResponse result) async {
+    // 보관 기간 안인데 사진이 없으면 읽을 것도 받을 것도 없다.
+    if (result.isCompleted && result.filteredPhotos.isEmpty) return;
+
+    try {
+      final photos = await _getResultPhotos(
+        filmRollId: widget.filmRoll.id,
+        result: result,
+      );
+      // 읽는 사이 결과가 다시 조회됐으면 오래된 목록으로 덮어쓰지 않는다.
+      if (mounted && identical(_result, result)) {
+        setState(() => _photos = photos);
+      }
+    } catch (e, st) {
+      log('현상 결과 사진 조회 실패', name: _tag, error: e, stackTrace: st);
+      if (mounted && identical(_result, result)) {
+        setState(
+          () => _photos = GetFilmRollResultPhotosUseCase.fromServer(result),
+        );
+      }
+    } finally {
+      if (mounted && identical(_result, result) && _isLoading) {
+        setState(() => _isLoading = false);
+      }
+    }
+
+    if (!result.isCompleted || _isCachingPhotos) return;
+    _isCachingPhotos = true;
+    try {
+      await _cacheFilteredPhotos(
+        filmRollId: widget.filmRoll.id,
+        photos: result.filteredPhotos,
+      );
+    } catch (e, st) {
+      log('필터 사진 보관 실패', name: _tag, error: e, stackTrace: st);
+    } finally {
+      _isCachingPhotos = false;
     }
   }
 
@@ -119,7 +219,8 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
 
   /// 저장/공유 직전에 릴스 다운로드 URL의 유효기간을 확인하고, 만료(임박)면
   /// `/results`를 다시 조회해 새 presigned URL로 교체한다. 서버 필름롤 id가
-  /// 없으면(이론상 발생하지 않음) 기존 값을 그대로 반환한다.
+  /// 없으면(이론상 발생하지 않음) 기존 값을 그대로 반환한다. 다시 조회했더니
+  /// 결과 보관 기간이 지나 있으면 화면을 보관 종료 상태로 바꾸고 null을 반환한다.
   Future<DownloadResponse?> _freshReel() async {
     final reel = _result?.reel;
     if (reel == null) return null;
@@ -133,8 +234,15 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     if (serverFilmRollId == null) return reel;
 
     try {
-      final refreshed = await FilmRollsApi.getFilmRollResult(serverFilmRollId);
-      if (mounted) setState(() => _result = refreshed);
+      final refreshed = await _getFilmRollResult(serverFilmRollId);
+      if (!mounted) return null;
+      _applyResult(refreshed);
+      if (refreshed.isExpired) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(_reelExpiredMessage)));
+        return null;
+      }
       return refreshed.reel ?? reel;
     } catch (e, st) {
       log('릴스 URL 갱신 실패', name: _tag, error: e, stackTrace: st);
@@ -204,13 +312,24 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
+  void _openPhotoViewer(int index) {
+    final photos = _photos;
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => FilmRollResultPhotoViewerPage(
+            photos: photos,
+            initialIndex: index,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openAllPhotos() {
-    // 대표 사진 캐러셀([_buildBody])과 같은 순서(코스 sequence 오름차순)로
-    // 보여준다 — 정렬하지 않으면 서버가 준 순서 그대로라 대표 사진과
-    // "전체 사진" 화면의 순서가 어긋날 수 있다.
-    final photos = List<FilteredPhotoResponse>.of(
-      _result?.filteredPhotos ?? const [],
-    )..sort((a, b) => a.sequence.compareTo(b.sequence));
+    // 대표 사진 캐러셀([_buildBody])과 같은 목록([_photos], 촬영 순서)을
+    // 넘겨 대표 사진과 "전체 사진" 화면의 순서가 어긋나지 않게 한다.
+    final photos = _photos;
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -253,9 +372,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       return const SizedBox.shrink();
     }
 
-    final photos = [...result.filteredPhotos]
-      ..sort((a, b) => a.sequence.compareTo(b.sequence));
-    final previewPhotos = photos.take(3).toList();
+    final photos = _photos;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(ChaerokSpacing.md),
@@ -270,11 +387,11 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
           const SizedBox(height: ChaerokSpacing.xl),
           _buildSectionTitle('오늘의 사진', onSeeAll: _openAllPhotos),
           const SizedBox(height: ChaerokSpacing.sm),
-          _buildPhotoPreviewRow(previewPhotos),
+          _buildPhotoFilmStrip(photos),
           const SizedBox(height: ChaerokSpacing.xl),
           _buildSectionTitle('오늘의 릴스'),
           const SizedBox(height: ChaerokSpacing.sm),
-          _buildReelCard(result.reel, photos.isEmpty ? null : photos.first),
+          _buildReelSection(result, photos.isEmpty ? null : photos.first),
           const SizedBox(height: ChaerokSpacing.xl),
           _buildActionButtons(result),
         ],
@@ -302,10 +419,10 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
-  /// 코스 순서([FilteredPhotoResponse.sequence] 오름차순)대로 좌우 스와이프되는
+  /// 코스 순서([FilmRollResultPhoto.sequence] 오름차순)대로 좌우 스와이프되는
   /// 대표 사진. 관광지 → 식당 → 카페 순으로 방문·촬영되므로 정렬된 목록을
   /// 그대로 넘기면 스와이프 순서가 코스 순서와 일치한다.
-  Widget _buildRepresentativeImage(List<FilteredPhotoResponse> photos) {
+  Widget _buildRepresentativeImage(List<FilmRollResultPhoto> photos) {
     final pageCount = photos.isEmpty ? 1 : photos.length;
     final safeIndex = _representativePageIndex >= pageCount
         ? pageCount - 1
@@ -327,12 +444,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
                 if (photos.isEmpty) {
                   return const ColoredBox(color: ChaerokColors.sageLight);
                 }
-                return Image.network(
-                  photos[i].downloadUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const ColoredBox(color: ChaerokColors.sageLight),
-                );
+                return FilmRollResultPhotoImage(photo: photos[i]);
               },
             ),
             if (photos.length > 1)
@@ -391,7 +503,9 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
-  Widget _buildPhotoPreviewRow(List<FilteredPhotoResponse> photos) {
+  /// 촬영한 사진 전체를 가로로 넘겨 보는 필름 스트립. 칸을 누르면 그 사진부터
+  /// 전체 화면으로 본다.
+  Widget _buildPhotoFilmStrip(List<FilmRollResultPhoto> photos) {
     if (photos.isEmpty) {
       return Text(
         '표시할 사진이 없어요.',
@@ -401,33 +515,81 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       );
     }
 
-    return Row(
-      children: [
-        for (final photo in photos)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: ChaerokSpacing.xs),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(ChaerokRadius.sm),
-                  child: Image.network(
-                    photo.downloadUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const ColoredBox(color: ChaerokColors.sageLight),
-                  ),
-                ),
-              ),
+    const frameWidth = 84.0;
+    const frameHeight = frameWidth / FilmRollResultFilmFrame.aspectRatio;
+    return ChaerokFilmStripFrame(
+      child: SizedBox(
+        height: frameHeight,
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
+          scrollDirection: Axis.horizontal,
+          itemCount: photos.length,
+          separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
+          itemBuilder: (context, index) => SizedBox(
+            width: frameWidth,
+            child: FilmRollResultFilmFrame(
+              photo: photos[index],
+              onTap: () => _openPhotoViewer(index),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 보관 기간이 지났으면 릴스 대신 보관 종료 안내를, 기간 안이면 릴스 카드와
+  /// 언제까지 볼 수 있는지를 보여준다.
+  Widget _buildReelSection(
+    FilmRollResultResponse result,
+    FilmRollResultPhoto? thumbnail,
+  ) {
+    if (result.isExpired) {
+      return _buildReelExpiredNotice(
+        result.isRetentionExpired
+            ? _reelExpiredMessage
+            : _reelNotDevelopedMessage,
+      );
+    }
+
+    final expiresAt = result.expiresAt;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildReelCard(result.reel, thumbnail),
+        if (result.reel != null && expiresAt != null) ...[
+          const SizedBox(height: ChaerokSpacing.sm),
+          Text(
+            '${_formatDateTime(expiresAt.toLocal())}까지 볼 수 있어요',
+            textAlign: TextAlign.center,
+            style: ChaerokTypography.caption.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildReelExpiredNotice(String message) {
+    return Container(
+      padding: const EdgeInsets.all(ChaerokSpacing.md),
+      decoration: BoxDecoration(
+        color: ChaerokColors.sageLight,
+        borderRadius: BorderRadius.circular(ChaerokRadius.md),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: ChaerokTypography.bodyMedium.copyWith(
+          color: ChaerokColors.primaryDark,
+        ),
+      ),
     );
   }
 
   Widget _buildReelCard(
     DownloadResponse? reel,
-    FilteredPhotoResponse? thumbnail,
+    FilmRollResultPhoto? thumbnail,
   ) {
     if (reel == null) {
       return Text(
@@ -454,13 +616,10 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
                 children: [
                   thumbnail == null
                       ? const ColoredBox(color: ChaerokColors.cameraBlack)
-                      : Image.network(
-                          thumbnail.downloadUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const ColoredBox(
-                                color: ChaerokColors.cameraBlack,
-                              ),
+                      : FilmRollResultPhotoImage(
+                          photo: thumbnail,
+                          placeholderColor: ChaerokColors.cameraBlack,
+                          showUnfilteredLabel: false,
                         ),
                   ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
                   const Center(
@@ -539,5 +698,11 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   String _formatDate(DateTime date) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     return '${date.year}.${twoDigits(date.month)}.${twoDigits(date.day)}';
+  }
+
+  String _formatDateTime(DateTime date) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    return '${date.month}월 ${date.day}일 '
+        '${twoDigits(date.hour)}:${twoDigits(date.minute)}';
   }
 }

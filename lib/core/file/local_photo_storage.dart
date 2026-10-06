@@ -42,6 +42,10 @@ class LocalPhotoStorage {
   /// 상대 경로로 되돌릴 때 기준이 되는 마커이기도 하다.
   static const filmRollsDirName = 'film_rolls';
 
+  /// 현상된 필터 사진을 보관하는 필름롤 하위 디렉터리 이름. 필름롤 디렉터리
+  /// 안에 두므로 [deleteFilmRollDirectory]가 함께 지운다.
+  static const _filteredDirName = 'filtered';
+
   /// 원본 사진을 저장하고, 썸네일을 리사이즈해 함께 저장한 뒤 두 파일의
   /// **문서 디렉터리 기준 상대 경로**를 반환한다.
   Future<({String originalPath, String thumbnailPath})> save({
@@ -92,7 +96,49 @@ class LocalPhotoStorage {
     await _deleteIfExists(await resolve(thumbnailPath));
   }
 
-  /// 필름롤 전체 디렉터리(장소별 원본/썸네일 전부)를 삭제한다.
+  /// 서버에서 내려받은 필터 사진을
+  /// `film_rolls/{filmRollId}/filtered/{serverPhotoId}.jpg`에 보관한다. 현상
+  /// 결과는 서버에 일정 기간만 남으므로, 그 뒤에도 볼 수 있게 기기에 둔다.
+  Future<void> saveFiltered({
+    required String filmRollId,
+    required int serverPhotoId,
+    required List<int> bytes,
+  }) async {
+    final dir = await _filteredDirectory(filmRollId);
+    await dir.create(recursive: true);
+
+    // 쓰는 도중 앱이 종료되면 깨진 파일이 보관본으로 남는다. 임시 파일에
+    // 다 쓴 뒤 이름을 바꿔, 온전한 파일만 보관본으로 보이게 한다.
+    final tempFile = File(p.join(dir.path, '$serverPhotoId.jpg.tmp'));
+    await tempFile.writeAsBytes(bytes, flush: true);
+    await tempFile.rename(p.join(dir.path, '$serverPhotoId.jpg'));
+  }
+
+  /// 기기에 보관된 필터 사진의 절대 경로를 서버 photoId별로 반환한다.
+  /// 보관본이 없으면 빈 맵을 반환한다.
+  Future<Map<int, String>> findFilteredPaths(String filmRollId) async {
+    final dir = await _filteredDirectory(filmRollId);
+    if (!await dir.exists()) return const {};
+
+    final paths = <int, String>{};
+    await for (final entity in dir.list()) {
+      if (entity is! File || p.extension(entity.path) != '.jpg') continue;
+      final serverPhotoId = int.tryParse(
+        p.basenameWithoutExtension(entity.path),
+      );
+      if (serverPhotoId != null) paths[serverPhotoId] = entity.path;
+    }
+    return paths;
+  }
+
+  Future<Directory> _filteredDirectory(String filmRollId) async {
+    final documentsDir = await getApplicationDocumentsDirectory();
+    return Directory(
+      p.join(documentsDir.path, filmRollsDirName, filmRollId, _filteredDirName),
+    );
+  }
+
+  /// 필름롤 전체 디렉터리(장소별 원본/썸네일, 보관한 필터 사진 전부)를 삭제한다.
   Future<void> deleteFilmRollDirectory(String filmRollId) async {
     final documentsDir = await getApplicationDocumentsDirectory();
     final dir = Directory(
