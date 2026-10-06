@@ -5,9 +5,11 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/cache_filtered_photos_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_photos_use_case.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_screen.dart';
 import 'package:chaerok/shared/region/region_code.dart';
+import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -391,5 +393,29 @@ void main() {
     expect(find.text('릴스 보관 기간이 끝났어요. 촬영한 사진은 계속 볼 수 있어요.'), findsNothing);
     expect(find.text('현상된 릴스가 없어요. 촬영한 사진은 계속 볼 수 있어요.'), findsOneWidget);
     expect(find.text('필터 미적용'), findsWidgets);
+  });
+
+  testWidgets('오늘의 사진은 필름 스트립으로 보이고, 칸을 누르면 그 사진부터 전체 화면으로 본다', (tester) async {
+    final repository = _FakePhotoRepository(
+      filteredPaths: {101: '/docs/filtered/101.jpg'},
+      localPhotos: [
+        _localPhoto(1, serverPhotoId: 101),
+        _localPhoto(2, serverPhotoId: 102),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _screen(initialResult: _retentionExpiredResult(), repository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChaerokFilmStripFrame), findsOneWidget);
+    await tester.ensureVisible(find.text('02'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('02'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FilmRollResultPhotoViewerPage), findsOneWidget);
+    expect(find.text('2 / 2'), findsOneWidget);
   });
 }

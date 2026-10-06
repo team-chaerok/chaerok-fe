@@ -15,6 +15,7 @@ class FilmRollResultPhotoImage extends StatelessWidget {
     required this.photo,
     this.placeholderColor = ChaerokColors.sageLight,
     this.showUnfilteredLabel = true,
+    this.fit = BoxFit.cover,
   });
 
   static const unfilteredLabel = '필터 미적용';
@@ -26,6 +27,10 @@ class FilmRollResultPhotoImage extends StatelessWidget {
 
   /// 릴스 썸네일처럼 사진이 배경으로만 쓰이는 곳에서는 라벨을 끈다.
   final bool showUnfilteredLabel;
+
+  /// 그리드·카드는 칸을 채우는 [BoxFit.cover], 확대 보기는 사진 전체가 보이는
+  /// [BoxFit.contain]을 쓴다.
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -64,16 +69,8 @@ class FilmRollResultPhotoImage extends StatelessWidget {
 
     final localPath = photo.localPath;
     if (localPath != null) {
-      return Image.file(
-        File(localPath),
-        fit: BoxFit.cover,
-        errorBuilder: placeholder,
-      );
+      return Image.file(File(localPath), fit: fit, errorBuilder: placeholder);
     }
-    return Image.network(
-      photo.remoteUrl!,
-      fit: BoxFit.cover,
-      errorBuilder: placeholder,
-    );
+    return Image.network(photo.remoteUrl!, fit: fit, errorBuilder: placeholder);
   }
 }

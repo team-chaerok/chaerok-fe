@@ -13,12 +13,15 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.
 import 'package:chaerok/features/film_roll/domain/usecase/cache_filtered_photos_use_case.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_photos_use_case.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
+import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_film_frame.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_image.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/reel_player_page.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
+import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -309,6 +312,20 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
+  void _openPhotoViewer(int index) {
+    final photos = _photos;
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => FilmRollResultPhotoViewerPage(
+            photos: photos,
+            initialIndex: index,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openAllPhotos() {
     // 대표 사진 캐러셀([_buildBody])과 같은 목록([_photos], 촬영 순서)을
     // 넘겨 대표 사진과 "전체 사진" 화면의 순서가 어긋나지 않게 한다.
@@ -356,7 +373,6 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     }
 
     final photos = _photos;
-    final previewPhotos = photos.take(3).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(ChaerokSpacing.md),
@@ -371,7 +387,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
           const SizedBox(height: ChaerokSpacing.xl),
           _buildSectionTitle('오늘의 사진', onSeeAll: _openAllPhotos),
           const SizedBox(height: ChaerokSpacing.sm),
-          _buildPhotoPreviewRow(previewPhotos),
+          _buildPhotoFilmStrip(photos),
           const SizedBox(height: ChaerokSpacing.xl),
           _buildSectionTitle('오늘의 릴스'),
           const SizedBox(height: ChaerokSpacing.sm),
@@ -487,7 +503,9 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
-  Widget _buildPhotoPreviewRow(List<FilmRollResultPhoto> photos) {
+  /// 촬영한 사진 전체를 가로로 넘겨 보는 필름 스트립. 칸을 누르면 그 사진부터
+  /// 전체 화면으로 본다.
+  Widget _buildPhotoFilmStrip(List<FilmRollResultPhoto> photos) {
     if (photos.isEmpty) {
       return Text(
         '표시할 사진이 없어요.',
@@ -497,22 +515,25 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       );
     }
 
-    return Row(
-      children: [
-        for (final photo in photos)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: ChaerokSpacing.xs),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(ChaerokRadius.sm),
-                  child: FilmRollResultPhotoImage(photo: photo),
-                ),
-              ),
+    const frameWidth = 84.0;
+    const frameHeight = frameWidth / FilmRollResultFilmFrame.aspectRatio;
+    return ChaerokFilmStripFrame(
+      child: SizedBox(
+        height: frameHeight,
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
+          scrollDirection: Axis.horizontal,
+          itemCount: photos.length,
+          separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
+          itemBuilder: (context, index) => SizedBox(
+            width: frameWidth,
+            child: FilmRollResultFilmFrame(
+              photo: photos[index],
+              onTap: () => _openPhotoViewer(index),
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 
