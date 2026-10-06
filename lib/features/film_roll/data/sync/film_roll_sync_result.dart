@@ -10,6 +10,7 @@ class FilmRollSyncResult {
     this.serverStatus,
     this.error,
     this.blockedByOtherActiveFilmRoll = false,
+    this.closedOnServer = false,
   });
 
   /// 이번 호출에서 서버 필름롤을 새로 생성(또는 멱등 조회로 연결)했는지 여부.
@@ -38,6 +39,11 @@ class FilmRollSyncResult {
   /// 서버에 이미 있어 생성/연결이 막혔는지 여부. [hasError]와 달리 재시도로
   /// 해결되지 않는 영구적인 상태다(그 필름롤이 서버에서 이탈 처리되기 전까지).
   final bool blockedByOtherActiveFilmRoll;
+
+  /// 서버에서 이미 현상 없이 종료된 필름롤이라 이번 동기화에서 로컬 필름롤도
+  /// 종료([FilmRollStatus.expired]) 상태로 바꿨는지. 호출부는 화면을 다시
+  /// 읽어 더 이상 촬영할 수 없음을 반영해야 한다.
+  final bool closedOnServer;
 
   bool get hasError => error != null;
 }

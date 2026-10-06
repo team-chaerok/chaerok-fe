@@ -23,6 +23,7 @@ import 'package:chaerok/features/film_roll/data/repository/photo_repository_impl
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart';
 import 'package:chaerok/features/film_roll/domain/entity/course_candidate_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
@@ -45,6 +46,7 @@ FilmRollResponse _fakeResponse({
   int id = 900,
   String status = 'CAPTURING',
   String? clientFilmRollId,
+  DateTime? completedAt,
 }) => FilmRollResponse(
   filmRollId: id,
   clientFilmRollId: clientFilmRollId,
@@ -58,6 +60,7 @@ FilmRollResponse _fakeResponse({
   maxPhotoCount: 24,
   exitConfirmed: false,
   developAvailable: false,
+  completedAt: completedAt,
   createdAt: DateTime(2026, 8, 30),
   updatedAt: DateTime(2026, 8, 30),
 );
@@ -534,6 +537,28 @@ void main() {
     });
 
     test(
+      '촬영이 마감된 필름롤이라 거절된 409(FILM_ROLL_CONFLICT)는 방문 완료로 처리하지 않는다',
+      () async {
+        final fr = await seedLinkedWithPlaces();
+        final places = await placeRepository.findByFilmRoll(fr.id);
+        final a = places.firstWhere((p) => p.name == 'A');
+        await seedPhoto(fr.id, a.id, sequence: 1);
+        await placeRepository.markVisited(a.id);
+
+        final result = await service(
+          createVisit: (_, __) async =>
+              throw _dioError(409, code: 'FILM_ROLL_CONFLICT'),
+          getFilmRoll: (id) async => _fakeResponse(id: id, status: 'EXPIRED'),
+        ).syncFilmRoll(fr.id);
+
+        expect(result.visitsPushed, 0);
+        expect(result.closedOnServer, isTrue);
+        final after = await placeRepository.findByFilmRoll(fr.id);
+        expect(after.firstWhere((p) => p.name == 'A').visitSyncedAt, isNull);
+      },
+    );
+
+    test(
       '방문 인증이 photoId 필수(400)로 거부되면 오류가 아니라 skip으로 처리하고 미동기화로 남긴다',
       () async {
         final fr = await seedLinkedWithPlaces();
@@ -759,6 +784,116 @@ void main() {
 
       expect(result.serverStatus, isNull);
       expect(result.hasError, isFalse);
+    });
+  });
+
+  group('서버에서 종료된 필름롤', () {
+    Future<FilmRoll> seedLinkedWithTwoPhotos() async {
+      final fr = await seedFilmRoll();
+      await repository.linkServerFilmRoll(
+        clientFilmRollId: fr.id,
+        serverFilmRollId: 900,
+      );
+      await repository.selectCourse(
+        filmRollId: fr.id,
+        courseId: 'c1',
+        courseTitle: '코스',
+        places: const [
+          CourseCandidatePlace(
+            name: 'A',
+            address: 'a',
+            category: 'cat',
+            latitude: 36,
+            longitude: 126,
+            visitOrder: 0,
+            serverPlaceId: 1,
+          ),
+        ],
+      );
+      final a = (await placeRepository.findByFilmRoll(fr.id)).single;
+      await seedPhoto(fr.id, a.id, sequence: 1);
+      await seedPhoto(fr.id, a.id, sequence: 2);
+      return fr;
+    }
+
+    test('업로드가 FILM_ROLL_CONFLICT로 거절되고 서버가 현상 없이 종료(EXPIRED)했으면 '
+        '남은 업로드를 멈추고 로컬도 종료로 바꾸며 오류로 남기지 않는다', () async {
+      final fr = await seedLinkedWithTwoPhotos();
+
+      var urlCalls = 0;
+      final result = await service(
+        requestPhotoUploadUrl: (_, __) async {
+          urlCalls++;
+          throw _dioError(
+            409,
+            code: 'FILM_ROLL_CONFLICT',
+            message: '촬영 중인 필름 롤에서만 사진을 업로드할 수 있습니다.',
+          );
+        },
+        getFilmRoll: (id) async => _fakeResponse(id: id, status: 'EXPIRED'),
+      ).syncFilmRoll(fr.id);
+
+      expect(urlCalls, 1);
+      expect(result.hasError, isFalse);
+      expect(result.closedOnServer, isTrue);
+      final after = await repository.findById(fr.id);
+      expect(after!.status, FilmRollStatus.expired);
+      expect(after.serverStatus, 'EXPIRED');
+    });
+
+    test('FILM_ROLL_CONFLICT인데 서버가 아직 촬영 중이면 로컬은 그대로 두고 오류로 남긴다', () async {
+      final fr = await seedLinkedWithTwoPhotos();
+
+      final result = await service(
+        requestPhotoUploadUrl: (_, __) async =>
+            throw _dioError(409, code: 'FILM_ROLL_CONFLICT'),
+      ).syncFilmRoll(fr.id);
+
+      expect(result.hasError, isTrue);
+      expect(result.closedOnServer, isFalse);
+      expect(
+        (await repository.findById(fr.id))!.status,
+        FilmRollStatus.inProgress,
+      );
+    });
+
+    test('올릴 사진이 없어도 서버가 현상 없이 종료했으면 로컬을 종료로 바꾼다', () async {
+      final fr = await seedFilmRoll();
+      await repository.linkServerFilmRoll(
+        clientFilmRollId: fr.id,
+        serverFilmRollId: 900,
+      );
+
+      final result = await service(
+        getFilmRoll: (id) async => _fakeResponse(id: id, status: 'EXPIRED'),
+      ).syncFilmRoll(fr.id);
+
+      expect(result.closedOnServer, isTrue);
+      expect(
+        (await repository.findById(fr.id))!.status,
+        FilmRollStatus.expired,
+      );
+    });
+
+    test('현상까지 마친 EXPIRED(completedAt 있음)는 로컬 상태를 바꾸지 않는다', () async {
+      final fr = await seedFilmRoll();
+      await repository.linkServerFilmRoll(
+        clientFilmRollId: fr.id,
+        serverFilmRollId: 900,
+      );
+
+      final result = await service(
+        getFilmRoll: (id) async => _fakeResponse(
+          id: id,
+          status: 'EXPIRED',
+          completedAt: DateTime(2026, 9, 15, 12),
+        ),
+      ).syncFilmRoll(fr.id);
+
+      expect(result.closedOnServer, isFalse);
+      final after = await repository.findById(fr.id);
+      expect(after!.status, FilmRollStatus.inProgress);
+      expect(after.serverStatus, 'EXPIRED');
     });
   });
 

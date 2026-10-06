@@ -17,6 +17,7 @@ import 'package:chaerok/data/remote/visits_api.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
@@ -27,6 +28,9 @@ import 'package:dio/dio.dart';
 
 const _defaultFilterStrength = 1.0;
 const _photoContentType = 'image/jpeg';
+
+/// 서버가 현상 조건 미달 등으로 필름롤을 종료한 상태.
+const _expiredStatus = 'EXPIRED';
 
 /// 서버 사진 상태 중 "업로드까지는 끝난" 것으로 볼 수 있는 값들.
 /// 409(이미 쓰인 sequence) 복구 시 `GET /photos`에서 이 상태의 사진을 찾는다.
@@ -210,13 +214,19 @@ class FilmRollSyncService {
     }
 
     final photoResult = await _pushPhotos(serverId, clientFilmRollId);
-    final visitResult = await _pushVisits(
-      serverId,
-      clientFilmRollId,
-      error: photoResult.error,
-    );
+    // 서버가 이미 촬영을 마감한 필름롤이면 방문 전송도 같은 409로 거절된다.
+    // 그 409를 "이미 방문함"으로 오인해 동기화 완료로 표시하지 않도록 건너뛴다.
+    final visitResult = photoResult.filmRollClosed
+        ? _PushOutcome(pushed: 0, skipped: 0, error: photoResult.error)
+        : await _pushVisits(
+            serverId,
+            clientFilmRollId,
+            error: photoResult.error,
+          );
 
-    final serverStatus = await _mirrorServerStatus(serverId, clientFilmRollId);
+    final mirror = await _mirrorServerStatus(serverId, filmRoll);
+    final filmRollClosed =
+        photoResult.filmRollClosed || visitResult.filmRollClosed;
 
     return FilmRollSyncResult(
       created: created,
@@ -224,8 +234,14 @@ class FilmRollSyncService {
       photosSkipped: photoResult.skipped,
       visitsPushed: visitResult.pushed,
       visitsSkipped: visitResult.skipped,
-      serverStatus: serverStatus,
-      error: visitResult.error,
+      serverStatus: mirror.status,
+      // 마감 거절의 원인(서버 종료)이 확인돼 로컬에 반영했다면 재시도할 일이
+      // 아니므로 오류로 남기지 않는다. 확인하지 못했으면 다음 동기화에서 다시
+      // 판정하도록 오류로 남긴다.
+      error: filmRollClosed && mirror.expiredLocally
+          ? null
+          : visitResult.error ?? photoResult.closedError,
+      closedOnServer: mirror.expiredLocally,
     );
   }
 
@@ -276,6 +292,16 @@ class FilmRollSyncService {
           // 지역 이탈 확정이 막히지 않게 한다.
           skipped++;
           continue;
+        }
+        if (_isFilmRollClosed(e)) {
+          // 서버가 더 이상 촬영 중이 아닌 필름롤 — 남은 사진도 모두 같은 이유로
+          // 거절되므로 멈추고, 상태 미러링에서 서버 상태를 확인하게 한다.
+          return _PushOutcome(
+            pushed: pushed,
+            skipped: skipped,
+            error: error,
+            closedError: e,
+          );
         }
         error ??= e;
       }
@@ -365,6 +391,16 @@ class FilmRollSyncService {
         await _placeRepository.markVisitSynced(place.id, at: DateTime.now());
         pushed++;
       } catch (e) {
+        if (_isFilmRollClosed(e)) {
+          // 409지만 중복 방문이 아니라 서버가 촬영을 마감한 경우. 동기화 완료로
+          // 표시하지 않고 멈춘다.
+          return _PushOutcome(
+            pushed: pushed,
+            skipped: skipped,
+            error: carriedError,
+            closedError: e,
+          );
+        }
         if (_isAlreadyVisited(e)) {
           await _placeRepository.markVisitSynced(place.id, at: DateTime.now());
           pushed++;
@@ -381,21 +417,45 @@ class FilmRollSyncService {
     return _PushOutcome(pushed: pushed, skipped: skipped, error: carriedError);
   }
 
-  Future<String?> _mirrorServerStatus(
+  ///
+  /// 서버가 현상 없이 종료한 필름롤(`EXPIRED`이면서 `completedAt` 없음)인데
+  /// 로컬은 아직 촬영 중이면 로컬도 [FilmRollStatus.expired]로 바꾼다. 이탈
+  /// 확정 응답을 받지 못한 채(네트워크 끊김, 앱 종료, 다른 기기 등) 서버에서만
+  /// 종료되면, 로컬이 계속 촬영을 허용해 업로드가 영구히 거절되기 때문이다.
+  /// `completedAt`이 있는 `EXPIRED`는 현상까지 마친 뒤 결과 보관 기간이 지난
+  /// 것이라 여기서 다루지 않는다.
+  Future<({String? status, bool expiredLocally})> _mirrorServerStatus(
     int serverFilmRollId,
-    String clientFilmRollId,
+    FilmRoll filmRoll,
   ) async {
+    final FilmRollResponse latest;
     try {
-      final latest = await _getFilmRoll(serverFilmRollId);
-      await _filmRollRepository.updateServerStatus(
-        clientFilmRollId: clientFilmRollId,
-        serverStatus: latest.status,
-      );
-      return latest.status;
+      latest = await _getFilmRoll(serverFilmRollId);
     } catch (_) {
       // 상태 미러링 실패는 무시 — 다음 동기화에서 다시 시도된다.
-      return null;
+      return (status: null, expiredLocally: false);
     }
+
+    try {
+      final closedWithoutDevelopment =
+          latest.status.toUpperCase() == _expiredStatus &&
+          latest.completedAt == null;
+      if (closedWithoutDevelopment &&
+          filmRoll.status != FilmRollStatus.expired) {
+        await _filmRollRepository.markExpired(
+          clientFilmRollId: filmRoll.id,
+          serverStatus: latest.status,
+        );
+        return (status: latest.status, expiredLocally: true);
+      }
+      await _filmRollRepository.updateServerStatus(
+        clientFilmRollId: filmRoll.id,
+        serverStatus: latest.status,
+      );
+    } catch (_) {
+      // 로컬 반영 실패도 다음 동기화에서 다시 시도된다.
+    }
+    return (status: latest.status, expiredLocally: false);
   }
 
   /// 서버 필름롤을 생성(또는 멱등 반환)하고 로컬에 연결한다.
@@ -453,6 +513,15 @@ class FilmRollSyncService {
       filterStrength: current.filterStrength,
     );
     return current.filmRollId;
+  }
+
+  /// 서버가 촬영 중(`CAPTURING`)이 아닌 필름롤이라 업로드/방문을 거절한
+  /// 경우(409 `FILM_ROLL_CONFLICT`).
+  bool _isFilmRollClosed(Object e) {
+    if (e is! DioException || e.error is! ApiError) return false;
+    final err = e.error as ApiError;
+    return err.statusCode == 409 &&
+        err.errorCode?.toUpperCase() == 'FILM_ROLL_CONFLICT';
   }
 
   bool _isActiveFilmRollExists(Object e) {
@@ -518,9 +587,16 @@ class _PushOutcome {
     required this.pushed,
     required this.skipped,
     required this.error,
+    this.closedError,
   });
 
   final int pushed;
   final int skipped;
   final Object? error;
+
+  /// 서버가 촬영을 마감한 필름롤이라 거절된 오류. 있으면 남은 항목 전송을
+  /// 멈춘 것이다.
+  final Object? closedError;
+
+  bool get filmRollClosed => closedError != null;
 }
