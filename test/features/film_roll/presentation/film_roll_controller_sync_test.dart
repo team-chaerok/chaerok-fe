@@ -10,6 +10,7 @@ import 'package:chaerok/features/film_roll/data/repository/film_roll_place_repos
 import 'package:chaerok/features/film_roll/data/repository/film_roll_repository_impl.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_result.dart';
 import 'package:chaerok/features/film_roll/data/sync/film_roll_sync_service.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/presentation/controller/film_roll_controller.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:drift/native.dart';
@@ -112,6 +113,21 @@ void main() {
 
     expect(result.hasError, isTrue);
     expect(c.state.lastSyncHadError, isTrue);
+  });
+
+  test('백그라운드 동기화가 서버 종료를 로컬에 반영하면 필름롤을 다시 읽어 종료 상태를 보여준다', () async {
+    final c = controller();
+    // 동기화 서비스가 로컬을 종료로 바꾼 상황을 흉내 낸다.
+    sync.gate = Completer<void>();
+    sync.next = const FilmRollSyncResult(closedOnServer: true);
+    await c.load();
+    await repository.markExpired(clientFilmRollId: seededId);
+    expect(c.state.filmRoll!.status, FilmRollStatus.inProgress);
+
+    sync.gate!.complete();
+    await pumpEventQueue();
+
+    expect(c.state.filmRoll!.status, FilmRollStatus.expired);
   });
 
   test('retrySync 성공 시 lastSyncHadError는 false', () async {

@@ -65,7 +65,15 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
       filmRollId: widget.filmRollId,
       onStateChanged: (state) {
         if (!mounted) return;
+        final wasExpired = _state.filmRoll?.status == FilmRollStatus.expired;
         setState(() => _state = state);
+        // 동기화 중 서버에서 이미 종료된 필름롤로 확인돼 로컬도 종료로 바뀐 경우.
+        // 지역 이탈 확정 흐름([_startExit])은 자체적으로 안내하므로 제외한다.
+        if (!wasExpired &&
+            state.filmRoll?.status == FilmRollStatus.expired &&
+            !_isExiting) {
+          unawaited(_closeAsExpired());
+        }
       },
     );
     unawaited(_controller.load());
@@ -252,6 +260,13 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     }
   }
 
+  /// 이 화면에서 더 촬영할 수 없게 종료 안내 후 화면을 닫는다.
+  Future<void> _closeAsExpired() async {
+    await _showExpiredDialog();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
   Future<void> _showExpiredDialog() {
     return showDialog<void>(
       context: context,
@@ -399,7 +414,8 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
     setState(() => _isSyncing = true);
     try {
       final result = await _controller.retrySync();
-      if (!mounted) return;
+      // 종료된 필름롤로 확인됐으면 종료 안내가 대신 뜬다.
+      if (!mounted || result.closedOnServer) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.hasError ? '아직 동기화하지 못했어요.' : '동기화 완료')),
       );

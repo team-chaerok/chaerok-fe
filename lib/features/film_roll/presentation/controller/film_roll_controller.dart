@@ -158,8 +158,18 @@ class FilmRollController {
   void _triggerSync() {
     unawaited(
       _sync()
-          .then((result) {
-            _emit(_state.copyWith(lastSyncHadError: result.hasError));
+          .then((result) async {
+            // 서버에서 이미 종료된 필름롤이라 로컬도 종료로 바뀌었으면, 화면이
+            // 계속 촬영 가능한 상태로 남지 않게 다시 읽는다.
+            if (result.closedOnServer) await _reload();
+            // copyWith는 errorMessage를 생략하면 지우므로, _reload가 남긴 조회
+            // 오류 문구를 보존한다.
+            _emit(
+              _state.copyWith(
+                lastSyncHadError: result.hasError,
+                errorMessage: _state.errorMessage,
+              ),
+            );
           })
           .catchError((_) {
             // syncFilmRoll은 예외를 던지지 않지만, 방어적으로 무시한다.
@@ -174,7 +184,12 @@ class FilmRollController {
   Future<FilmRollSyncResult> retrySync() async {
     final result = await _sync();
     await _reload();
-    _emit(_state.copyWith(lastSyncHadError: result.hasError));
+    _emit(
+      _state.copyWith(
+        lastSyncHadError: result.hasError,
+        errorMessage: _state.errorMessage,
+      ),
+    );
     return result;
   }
 
