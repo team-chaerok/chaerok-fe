@@ -558,6 +558,23 @@ void main() {
       },
     );
 
+    test('방문만 FILM_ROLL_CONFLICT로 거절되고 서버 종료를 확인하지 못하면 오류로 남긴다', () async {
+      final fr = await seedLinkedWithPlaces();
+      final places = await placeRepository.findByFilmRoll(fr.id);
+      final a = places.firstWhere((p) => p.name == 'A');
+      await seedPhoto(fr.id, a.id, sequence: 1);
+      await placeRepository.markVisited(a.id);
+
+      final result = await service(
+        createVisit: (_, __) async =>
+            throw _dioError(409, code: 'FILM_ROLL_CONFLICT'),
+        getFilmRoll: (_) async => throw _dioError(500),
+      ).syncFilmRoll(fr.id);
+
+      expect(result.closedOnServer, isFalse);
+      expect(result.hasError, isTrue);
+    });
+
     test(
       '방문 인증이 photoId 필수(400)로 거부되면 오류가 아니라 skip으로 처리하고 미동기화로 남긴다',
       () async {

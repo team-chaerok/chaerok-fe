@@ -240,7 +240,9 @@ class FilmRollSyncService {
       // 판정하도록 오류로 남긴다.
       error: filmRollClosed && mirror.expiredLocally
           ? null
-          : visitResult.error ?? photoResult.closedError,
+          : visitResult.error ??
+                photoResult.closedError ??
+                visitResult.closedError,
       closedOnServer: mirror.expiredLocally,
     );
   }
