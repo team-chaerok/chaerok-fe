@@ -158,7 +158,10 @@ class FilmRollController {
   void _triggerSync() {
     unawaited(
       _sync()
-          .then((result) {
+          .then((result) async {
+            // 서버에서 이미 종료된 필름롤이라 로컬도 종료로 바뀌었으면, 화면이
+            // 계속 촬영 가능한 상태로 남지 않게 다시 읽는다.
+            if (result.closedOnServer) await _reload();
             _emit(_state.copyWith(lastSyncHadError: result.hasError));
           })
           .catchError((_) {
