@@ -129,4 +129,43 @@ void main() {
     expect(find.text('필름롤을 삭제하지 못했어요.'), findsOneWidget);
     expect(find.text('공주 필름롤'), findsOneWidget);
   });
+
+  testWidgets('필름롤마다 방문 현황 오른쪽에 촬영한 사진 수를 n/24로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FilmRollCollectionScreen(
+          debugFetchFilmRolls: () async => [
+            _filmRoll(id: 'roll-1', title: '공주 필름롤'),
+            _filmRoll(
+              id: 'roll-2',
+              title: '부여 필름롤',
+              status: FilmRollStatus.completed,
+            ),
+          ],
+          debugCountPhotos: (id) async => id == 'roll-1' ? 5 : 12,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 / 3곳 방문 · 사진 5/24'), findsOneWidget);
+    expect(find.text('완료 · 1곳 방문 · 사진 12/24'), findsOneWidget);
+  });
+
+  testWidgets('사진 수를 세지 못한 필름롤은 사진 수 없이 상태만 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FilmRollCollectionScreen(
+          debugFetchFilmRolls: () async => [
+            _filmRoll(id: 'roll-1', title: '공주 필름롤'),
+          ],
+          debugCountPhotos: (_) async => throw Exception('DB 오류'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('공주 필름롤'), findsOneWidget);
+    expect(find.text('1 / 3곳 방문'), findsOneWidget);
+  });
 }

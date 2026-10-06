@@ -21,6 +21,7 @@ class FilmRollCollectionScreen extends StatefulWidget {
     this.showAppBar = true,
     @visibleForTesting this.debugFetchFilmRolls,
     @visibleForTesting this.debugDeleteFilmRoll,
+    @visibleForTesting this.debugCountPhotos,
   });
 
   /// 홈 폴더 카드처럼 이미 상위 화면이 헤더를 가진 곳에 끼워 넣을 때 false.
@@ -34,6 +35,10 @@ class FilmRollCollectionScreen extends StatefulWidget {
   @visibleForTesting
   final Future<void> Function(String filmRollId)? debugDeleteFilmRoll;
 
+  /// 테스트에서 실제 로컬 DB 대신 필름롤별 사진 수를 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<int> Function(String filmRollId)? debugCountPhotos;
+
   @override
   State<FilmRollCollectionScreen> createState() =>
       _FilmRollCollectionScreenState();
@@ -46,6 +51,10 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   String? _errorMessage;
   List<FilmRoll> _filmRolls = const [];
 
+  /// 필름롤 id별 촬영한 사진 수. 세지 못한 필름롤은 빠져 있고, 그 카드는 사진
+  /// 수 없이 상태만 보여준다.
+  Map<String, int> _photoCounts = const {};
+
   /// 삭제 확인/삭제 API 호출이 진행 중인 필름롤 id. 중복 탭 방지용.
   final Set<String> _deletingIds = {};
 
@@ -53,6 +62,31 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   void initState() {
     super.initState();
     unawaited(_fetch());
+  }
+
+  /// 필름롤마다 기기에 저장된 사진 수를 센다. 일부를 세지 못해도 목록은
+  /// 보여줘야 하므로 실패한 필름롤만 빼고 반환한다.
+  Future<Map<String, int>> _countPhotos(List<FilmRoll> filmRolls) async {
+    // 목록을 주입한 테스트에서는 실제 DB를 열지 않도록, 사진 수 훅이 없으면
+    // 세지 않는다.
+    final countPhotos =
+        widget.debugCountPhotos ??
+        (widget.debugFetchFilmRolls == null
+            ? FilmRollModule.instance.getFilmRollPhotoCount.call
+            : null);
+    if (countPhotos == null) return const {};
+
+    final entries = await Future.wait(
+      filmRolls.map((filmRoll) async {
+        try {
+          return MapEntry(filmRoll.id, await countPhotos(filmRoll.id));
+        } catch (e, st) {
+          log('필름롤 사진 수 조회 실패', name: _tag, error: e, stackTrace: st);
+          return null;
+        }
+      }),
+    );
+    return Map.fromEntries(entries.nonNulls);
   }
 
   Future<void> _fetch() async {
@@ -66,9 +100,11 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
       final filmRolls = override != null
           ? await override()
           : await FilmRollModule.instance.filmRollRepository.findAll();
+      final photoCounts = await _countPhotos(filmRolls);
       if (!mounted) return;
       setState(() {
         _filmRolls = filmRolls;
+        _photoCounts = photoCounts;
         _isLoading = false;
       });
     } catch (e, st) {
@@ -275,13 +311,16 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   }
 
   String _statusLabel(FilmRoll filmRoll) {
-    return switch (filmRoll.status) {
+    final status = switch (filmRoll.status) {
       FilmRollStatus.completed => '완료 · ${filmRoll.visitedPlaceCount}곳 방문',
       FilmRollStatus.developing => '현상 중 · 완료까지 대기 중',
       FilmRollStatus.expired => '만료 · 현상 조건 미충족',
       FilmRollStatus.inProgress =>
         '${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount}곳 방문',
     };
+    final photoCount = _photoCounts[filmRoll.id];
+    if (photoCount == null) return status;
+    return '$status · 사진 $photoCount/${FilmRoll.maxExposureCount}';
   }
 
   IconData _statusIcon(FilmRoll filmRoll) {
