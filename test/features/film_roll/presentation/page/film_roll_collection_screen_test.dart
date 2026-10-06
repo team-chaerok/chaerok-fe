@@ -149,7 +149,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1 / 3곳 방문 · 사진 5/24'), findsOneWidget);
-    expect(find.text('완료 · 1곳 방문 · 사진 12/24'), findsOneWidget);
+    expect(find.text('1곳 방문 · 사진 12/24'), findsOneWidget);
   });
 
   testWidgets('사진 수를 세지 못한 필름롤은 사진 수 없이 상태만 보여준다', (tester) async {
@@ -167,5 +167,46 @@ void main() {
 
     expect(find.text('공주 필름롤'), findsOneWidget);
     expect(find.text('1 / 3곳 방문'), findsOneWidget);
+  });
+
+  testWidgets('필름롤마다 상태 라벨과 대표 사진을 보여주고, 사진이 없으면 빈 필름 칸을 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FilmRollCollectionScreen(
+          debugFetchFilmRolls: () async => [
+            _filmRoll(id: 'roll-1', title: '공주 필름롤'),
+            _filmRoll(
+              id: 'roll-2',
+              title: '부여 필름롤',
+              status: FilmRollStatus.completed,
+            ),
+            _filmRoll(
+              id: 'roll-3',
+              title: '서산 필름롤',
+              status: FilmRollStatus.developing,
+            ),
+            _filmRoll(
+              id: 'roll-4',
+              title: '예산 필름롤',
+              status: FilmRollStatus.expired,
+            ),
+          ],
+          debugFindCoverPhotoPath: (id) async =>
+              id == 'roll-2' ? '/docs/thumbnail/cover.jpg' : null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final label in ['진행 중', '완료', '현상 중', '만료']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    final coverPaths = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((image) => (image.image as ResizeImage).imageProvider)
+        .whereType<FileImage>()
+        .map((provider) => provider.file.path);
+    expect(coverPaths, ['/docs/thumbnail/cover.jpg']);
+    expect(find.byIcon(Icons.camera_roll_outlined), findsNWidgets(3));
   });
 }

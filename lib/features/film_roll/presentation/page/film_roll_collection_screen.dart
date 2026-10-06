@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:chaerok/core/design_system/chaerok_colors.dart';
 import 'package:chaerok/core/design_system/chaerok_radius.dart';
@@ -22,6 +23,7 @@ class FilmRollCollectionScreen extends StatefulWidget {
     @visibleForTesting this.debugFetchFilmRolls,
     @visibleForTesting this.debugDeleteFilmRoll,
     @visibleForTesting this.debugCountPhotos,
+    @visibleForTesting this.debugFindCoverPhotoPath,
   });
 
   /// 홈 폴더 카드처럼 이미 상위 화면이 헤더를 가진 곳에 끼워 넣을 때 false.
@@ -39,6 +41,10 @@ class FilmRollCollectionScreen extends StatefulWidget {
   @visibleForTesting
   final Future<int> Function(String filmRollId)? debugCountPhotos;
 
+  /// 테스트에서 실제 로컬 DB 대신 필름롤 대표 사진 경로를 주입하기 위한 훅.
+  @visibleForTesting
+  final Future<String?> Function(String filmRollId)? debugFindCoverPhotoPath;
+
   @override
   State<FilmRollCollectionScreen> createState() =>
       _FilmRollCollectionScreenState();
@@ -54,6 +60,10 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
   /// 필름롤 id별 촬영한 사진 수. 세지 못한 필름롤은 빠져 있고, 그 카드는 사진
   /// 수 없이 상태만 보여준다.
   Map<String, int> _photoCounts = const {};
+
+  /// 필름롤 id별 대표 사진(가장 최근에 찍은 사진 썸네일) 경로. 사진이 없거나
+  /// 읽지 못한 필름롤은 빠져 있고, 그 카드는 빈 필름 칸을 보여준다.
+  Map<String, String> _coverPhotoPaths = const {};
 
   /// 삭제 확인/삭제 API 호출이 진행 중인 필름롤 id. 중복 탭 방지용.
   final Set<String> _deletingIds = {};
@@ -89,6 +99,38 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
     return Map.fromEntries(entries.nonNulls);
   }
 
+  /// 필름롤마다 가장 최근에 찍은 사진의 썸네일 경로를 찾는다. 실패한 필름롤은
+  /// 빼고 반환한다(목록 표시는 막지 않는다).
+  Future<Map<String, String>> _findCoverPhotoPaths(
+    List<FilmRoll> filmRolls,
+  ) async {
+    final findCoverPhotoPath =
+        widget.debugFindCoverPhotoPath ??
+        (widget.debugFetchFilmRolls == null ? _findLatestThumbnailPath : null);
+    if (findCoverPhotoPath == null) return const {};
+
+    final entries = await Future.wait(
+      filmRolls.map((filmRoll) async {
+        try {
+          final path = await findCoverPhotoPath(filmRoll.id);
+          return path == null ? null : MapEntry(filmRoll.id, path);
+        } catch (e, st) {
+          log('필름롤 대표 사진 조회 실패', name: _tag, error: e, stackTrace: st);
+          return null;
+        }
+      }),
+    );
+    return Map.fromEntries(entries.nonNulls);
+  }
+
+  static Future<String?> _findLatestThumbnailPath(String filmRollId) async {
+    final photos = await FilmRollModule.instance.photoRepository.findByFilmRoll(
+      filmRollId,
+      limit: 1,
+    );
+    return photos.isEmpty ? null : photos.first.thumbnailPath;
+  }
+
   Future<void> _fetch() async {
     setState(() {
       _isLoading = true;
@@ -100,11 +142,15 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
       final filmRolls = override != null
           ? await override()
           : await FilmRollModule.instance.filmRollRepository.findAll();
-      final photoCounts = await _countPhotos(filmRolls);
+      final (photoCounts, coverPhotoPaths) = await (
+        _countPhotos(filmRolls),
+        _findCoverPhotoPaths(filmRolls),
+      ).wait;
       if (!mounted) return;
       setState(() {
         _filmRolls = filmRolls;
         _photoCounts = photoCounts;
+        _coverPhotoPaths = coverPhotoPaths;
         _isLoading = false;
       });
     } catch (e, st) {
@@ -246,7 +292,7 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
       borderRadius: BorderRadius.circular(ChaerokRadius.md),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(ChaerokSpacing.lg),
+        padding: const EdgeInsets.all(ChaerokSpacing.sm),
         decoration: BoxDecoration(
           color: ChaerokColors.surface,
           borderRadius: BorderRadius.circular(ChaerokRadius.md),
@@ -254,14 +300,23 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
         ),
         child: Row(
           children: [
+            _buildCoverPhoto(filmRoll),
+            const SizedBox(width: ChaerokSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(filmRoll.title, style: ChaerokTypography.titleMedium),
+                  _FilmRollStatusChip(status: filmRoll.status),
                   const SizedBox(height: ChaerokSpacing.xxs),
                   Text(
-                    _statusLabel(filmRoll),
+                    filmRoll.title,
+                    style: ChaerokTypography.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _detailLabel(filmRoll),
                     style: ChaerokTypography.bodyMedium.copyWith(
                       color: ChaerokColors.textSecondary,
                     ),
@@ -269,11 +324,36 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
                 ],
               ),
             ),
-            Icon(_statusIcon(filmRoll), color: _statusIconColor(filmRoll)),
-            const SizedBox(width: ChaerokSpacing.xs),
             _buildDeleteButton(filmRoll, isDeleting: isDeleting),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 카드 왼쪽의 대표 사진. 아직 찍은 사진이 없으면 빈 필름 칸을 보여준다.
+  Widget _buildCoverPhoto(FilmRoll filmRoll) {
+    const size = 72.0;
+    final path = _coverPhotoPaths[filmRoll.id];
+    const emptyFrame = ColoredBox(
+      color: ChaerokColors.sageLight,
+      child: Center(
+        child: Icon(Icons.camera_roll_outlined, color: ChaerokColors.sageDark),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(ChaerokRadius.sm),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: path == null
+            ? emptyFrame
+            : Image.file(
+                File(path),
+                fit: BoxFit.cover,
+                cacheWidth: (size * 3).round(),
+                errorBuilder: (context, error, stackTrace) => emptyFrame,
+              ),
       ),
     );
   }
@@ -310,34 +390,68 @@ class _FilmRollCollectionScreenState extends State<FilmRollCollectionScreen> {
     );
   }
 
-  String _statusLabel(FilmRoll filmRoll) {
-    final status = switch (filmRoll.status) {
-      FilmRollStatus.completed => '완료 · ${filmRoll.visitedPlaceCount}곳 방문',
-      FilmRollStatus.developing => '현상 중 · 완료까지 대기 중',
-      FilmRollStatus.expired => '만료 · 현상 조건 미충족',
+  /// 상태 라벨 아래 줄에 보여줄 방문 현황과 사진 수.
+  String _detailLabel(FilmRoll filmRoll) {
+    final detail = switch (filmRoll.status) {
+      FilmRollStatus.completed => '${filmRoll.visitedPlaceCount}곳 방문',
+      FilmRollStatus.developing => '완료까지 대기 중',
+      FilmRollStatus.expired => '현상 조건 미충족',
       FilmRollStatus.inProgress =>
         '${filmRoll.visitedPlaceCount} / ${filmRoll.totalPlaceCount}곳 방문',
     };
     final photoCount = _photoCounts[filmRoll.id];
-    if (photoCount == null) return status;
-    return '$status · 사진 $photoCount/${FilmRoll.maxExposureCount}';
+    if (photoCount == null) return detail;
+    return '$detail · 사진 $photoCount/${FilmRoll.maxExposureCount}';
   }
+}
 
-  IconData _statusIcon(FilmRoll filmRoll) {
-    return switch (filmRoll.status) {
-      FilmRollStatus.completed => Icons.check_circle,
-      FilmRollStatus.developing => Icons.hourglass_bottom,
-      FilmRollStatus.expired => Icons.cancel_outlined,
-      FilmRollStatus.inProgress => Icons.chevron_right,
-    };
-  }
+/// 필름롤 상태를 색으로 구분하는 작은 라벨. 새 색을 만들지 않고 디자인
+/// 시스템 색에 투명도만 달리해 쓴다.
+class _FilmRollStatusChip extends StatelessWidget {
+  const _FilmRollStatusChip({required this.status});
 
-  Color _statusIconColor(FilmRoll filmRoll) {
-    return switch (filmRoll.status) {
-      FilmRollStatus.completed ||
-      FilmRollStatus.developing => ChaerokColors.primary,
-      FilmRollStatus.expired ||
-      FilmRollStatus.inProgress => ChaerokColors.textSecondary,
+  final FilmRollStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, foreground, background) = switch (status) {
+      FilmRollStatus.inProgress => (
+        '진행 중',
+        ChaerokColors.skyBlue,
+        ChaerokColors.skyBlue.withValues(alpha: 0.14),
+      ),
+      FilmRollStatus.developing => (
+        '현상 중',
+        ChaerokColors.sageDark,
+        ChaerokColors.primary.withValues(alpha: 0.28),
+      ),
+      FilmRollStatus.completed => (
+        '완료',
+        ChaerokColors.primaryDark,
+        ChaerokColors.sageLight,
+      ),
+      FilmRollStatus.expired => (
+        '만료',
+        ChaerokColors.textSecondary,
+        ChaerokColors.border,
+      ),
     };
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ChaerokSpacing.xs,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(ChaerokRadius.full),
+      ),
+      child: Text(
+        label,
+        style: ChaerokTypography.caption.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }
