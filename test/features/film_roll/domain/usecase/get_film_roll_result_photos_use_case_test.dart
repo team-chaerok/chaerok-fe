@@ -11,10 +11,12 @@ class _FakePhotoRepository implements PhotoRepository {
   _FakePhotoRepository({
     this.filteredPaths = const {},
     this.localPhotos = const [],
+    this.failLocalPhotos = false,
   });
 
   final Map<int, String> filteredPaths;
   final List<FilmRollPhoto> localPhotos;
+  final bool failLocalPhotos;
 
   @override
   Future<Map<int, String>> findFilteredPhotoPaths(String filmRollId) async =>
@@ -24,7 +26,10 @@ class _FakePhotoRepository implements PhotoRepository {
   Future<List<FilmRollPhoto>> findByFilmRoll(
     String filmRollId, {
     int? limit,
-  }) async => localPhotos;
+  }) async {
+    if (failLocalPhotos) throw StateError('db error');
+    return localPhotos;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -219,5 +224,26 @@ void main() {
       photo(4, null),
     ]);
     expect(unknown.map((p) => p.sequence), [1, 2, 3]);
+  });
+
+  test('보관 기간 안이면 기기 촬영 기록 조회가 실패해도 서버 사진과 기기 보관본 경로를 준다', () async {
+    final useCase = GetFilmRollResultPhotosUseCase(
+      _FakePhotoRepository(
+        filteredPaths: {101: '/docs/filtered/101.jpg'},
+        failLocalPhotos: true,
+      ),
+    );
+
+    final photos = await useCase(
+      filmRollId: 'fr-1',
+      result: _result(
+        'COMPLETED',
+        filteredPhotos: [_filteredPhoto(101, 1), _filteredPhoto(102, 2)],
+      ),
+    );
+
+    expect(photos.map((p) => p.sequence), [1, 2]);
+    expect(photos[0].localPath, '/docs/filtered/101.jpg');
+    expect(photos.every((p) => p.filmRollPlaceId == null), isTrue);
   });
 }

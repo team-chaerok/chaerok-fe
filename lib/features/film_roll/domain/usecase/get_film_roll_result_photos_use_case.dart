@@ -1,4 +1,5 @@
 import 'package:chaerok/data/models/film_roll_result_response.dart';
+import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.dart';
 import 'package:chaerok/features/film_roll/domain/repository/film_roll_place_repository.dart';
 import 'package:chaerok/features/film_roll/domain/repository/photo_repository.dart';
@@ -26,10 +27,12 @@ class GetFilmRollResultPhotosUseCase {
     final filteredPaths = await _photoRepository.findFilteredPhotoPaths(
       filmRollId,
     );
-    final localPhotos = await _photoRepository.findByFilmRoll(filmRollId);
     final placeNames = await _findPlaceNames(filmRollId);
 
     if (result.isCompleted) {
+      // 보관 기간 안에는 기기 촬영 기록이 장소를 붙이는 데만 쓰인다. 조회에
+      // 실패해도 서버 사진과 기기 보관본 경로는 그대로 보여줄 수 있어야 한다.
+      final localPhotos = await _findLocalPhotosOrEmpty(filmRollId);
       final localByServerId = {
         for (final photo in localPhotos)
           if (photo.serverPhotoId case final serverPhotoId?)
@@ -48,6 +51,7 @@ class GetFilmRollResultPhotosUseCase {
       ]);
     }
 
+    final localPhotos = await _photoRepository.findByFilmRoll(filmRollId);
     return _sorted([
       for (final photo in localPhotos)
         if (filteredPaths[photo.serverPhotoId] case final filteredPath?)
@@ -66,6 +70,14 @@ class GetFilmRollResultPhotosUseCase {
             placeName: placeNames[photo.filmRollPlaceId],
           ),
     ]);
+  }
+
+  Future<List<FilmRollPhoto>> _findLocalPhotosOrEmpty(String filmRollId) async {
+    try {
+      return await _photoRepository.findByFilmRoll(filmRollId);
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// 장소 id → 장소 이름. 이름은 부가 정보라 조회에 실패해도 사진 목록은
