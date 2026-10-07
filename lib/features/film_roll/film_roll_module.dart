@@ -81,7 +81,10 @@ class FilmRollModule {
     developFilmRoll = DevelopFilmRollUseCase();
     watchFilmRollResult = WatchFilmRollResultUseCase();
     cacheFilteredPhotos = CacheFilteredPhotosUseCase(photoRepository);
-    getFilmRollResultPhotos = GetFilmRollResultPhotosUseCase(photoRepository);
+    getFilmRollResultPhotos = GetFilmRollResultPhotosUseCase(
+      photoRepository,
+      placeRepository: filmRollPlaceRepository,
+    );
     saveResultPhotoToGallery = SaveResultPhotoToGalleryUseCase();
   }
 

@@ -15,13 +15,12 @@ import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_p
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
-import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_film_frame.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_featured_frame.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_image.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_strip.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/reel_player_page.dart';
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
-import 'package:chaerok/shared/widgets/chaerok_button.dart';
-import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -90,8 +89,8 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   /// 버튼의 화면 좌표를 여기서 얻는다.
   final GlobalKey _shareButtonKey = GlobalKey();
 
-  final PageController _representativePageController = PageController();
-  int _representativePageIndex = 0;
+  final PageController _coverPageController = PageController();
+  int _coverPageIndex = 0;
 
   @override
   void initState() {
@@ -110,7 +109,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
 
   @override
   void dispose() {
-    _representativePageController.dispose();
+    _coverPageController.dispose();
     super.dispose();
   }
 
@@ -327,8 +326,8 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   }
 
   void _openAllPhotos() {
-    // 대표 사진 캐러셀([_buildBody])과 같은 목록([_photos], 촬영 순서)을
-    // 넘겨 대표 사진과 "전체 사진" 화면의 순서가 어긋나지 않게 한다.
+    // 오늘의 사진 스트립과 같은 목록([_photos], 촬영 순서)을 넘겨 두 화면의
+    // 순서가 어긋나지 않게 한다.
     final photos = _photos;
     unawaited(
       Navigator.of(context).push(
@@ -375,165 +374,249 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     final photos = _photos;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(ChaerokSpacing.md),
+      padding: const EdgeInsets.only(
+        top: ChaerokSpacing.xl,
+        bottom: ChaerokSpacing.xxl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(),
-          const SizedBox(height: ChaerokSpacing.md),
-          _buildRepresentativeImage(photos),
-          const SizedBox(height: ChaerokSpacing.sm),
-          _buildStatsRow(result),
+          _padded(_buildHeader(result)),
           const SizedBox(height: ChaerokSpacing.xl),
-          _buildSectionTitle('오늘의 사진', onSeeAll: _openAllPhotos),
+          _padded(_buildRepresentativeImage(photos)),
+          _buildSectionDivider(),
+          _padded(
+            _buildSectionTitle(
+              '오늘의 사진',
+              count: photos.isEmpty ? null : '${photos.length}장',
+              onSeeAll: photos.isEmpty ? null : _openAllPhotos,
+            ),
+          ),
           const SizedBox(height: ChaerokSpacing.sm),
           _buildPhotoFilmStrip(photos),
+          _buildSectionDivider(),
+          _padded(_buildReelTitle(result)),
+          const SizedBox(height: ChaerokSpacing.md),
+          _padded(
+            _buildReelSection(result, photos.isEmpty ? null : photos.first),
+          ),
           const SizedBox(height: ChaerokSpacing.xl),
-          _buildSectionTitle('오늘의 릴스'),
-          const SizedBox(height: ChaerokSpacing.sm),
-          _buildReelSection(result, photos.isEmpty ? null : photos.first),
-          const SizedBox(height: ChaerokSpacing.xl),
-          _buildActionButtons(result),
+          _padded(_buildActionButtons(result)),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _padded(Widget child) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.lg),
+      child: child,
+    );
+  }
+
+  Widget _buildSectionDivider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: ChaerokSpacing.lg,
+        vertical: ChaerokSpacing.xl,
+      ),
+      child: Divider(height: 1, thickness: 1, color: ChaerokColors.border),
+    );
+  }
+
+  /// 현상 완료 제목과 이 필름롤의 지역·날짜·방문/촬영 수.
+  Widget _buildHeader(FilmRollResultResponse result) {
     final regionCode = widget.filmRoll.regionCode;
     final completedAt = widget.filmRoll.completedAt;
+    final secondaryStyle = ChaerokTypography.bodyMedium.copyWith(
+      color: ChaerokColors.textSecondary,
+    );
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${regionCode.name.toUpperCase()} · ${regionCode.displayName}',
+          'DEVELOPED FILM',
           style: ChaerokTypography.caption.copyWith(
             color: ChaerokColors.textSecondary,
+            fontSize: 10,
+            letterSpacing: 3,
           ),
         ),
-        if (completedAt != null) ...[
-          const SizedBox(height: ChaerokSpacing.xxs),
-          Text(_formatDate(completedAt), style: ChaerokTypography.caption),
-        ],
+        const SizedBox(height: ChaerokSpacing.xs),
+        Text(
+          '현상 완료',
+          style: ChaerokTypography.displayMedium.copyWith(
+            color: ChaerokColors.primaryDark,
+            fontSize: 40,
+            height: 1.2,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: ChaerokSpacing.xs),
+        Text(
+          '${regionCode.displayName}에서 담은 순간들이 도착했어요.',
+          style: ChaerokTypography.bodyLarge.copyWith(
+            color: ChaerokColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: ChaerokSpacing.md),
+        Text(
+          '${regionCode.name.toUpperCase()} · ${regionCode.cityCountyName}',
+          style: secondaryStyle.copyWith(letterSpacing: 1),
+        ),
+        const SizedBox(height: ChaerokSpacing.xxs),
+        Text(
+          [
+            if (completedAt != null) _formatDate(completedAt),
+            '방문 ${widget.filmRoll.visitedPlaceCount}곳',
+            '촬영 ${result.totalPhotoCount}장',
+          ].join(' · '),
+          style: secondaryStyle,
+        ),
       ],
     );
   }
 
-  /// 코스 순서([FilmRollResultPhoto.sequence] 오름차순)대로 좌우 스와이프되는
-  /// 대표 사진. 관광지 → 식당 → 카페 순으로 방문·촬영되므로 정렬된 목록을
-  /// 그대로 넘기면 스와이프 순서가 코스 순서와 일치한다.
+  /// 이 필름롤의 표지. 방문한 장소마다 처음 찍은 사진을 한 장씩, 최대 3장을
+  /// 대표 컷으로 골라 좌우로 넘겨 본다. 누르면 그 사진부터 확대해 보고, 전체
+  /// 사진은 아래 "오늘의 사진" 스트립이 맡는다. 필름 띠에는 지역과 현상 날짜,
+  /// 지금 보는 컷의 칸 번호를, 틀 아래에는 촬영 장소와 위치를 둔다.
   Widget _buildRepresentativeImage(List<FilmRollResultPhoto> photos) {
-    final pageCount = photos.isEmpty ? 1 : photos.length;
-    final safeIndex = _representativePageIndex >= pageCount
-        ? pageCount - 1
-        : _representativePageIndex;
+    final covers = GetFilmRollResultPhotosUseCase.pickPlaceRepresentatives(
+      photos,
+    );
+    final index = covers.isEmpty
+        ? 0
+        : _coverPageIndex.clamp(0, covers.length - 1);
+    final current = covers.isEmpty ? null : covers[index];
+    final completedAt = widget.filmRoll.completedAt;
+    final secondaryStyle = ChaerokTypography.bodyMedium.copyWith(
+      color: ChaerokColors.textSecondary,
+    );
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
 
-    return AspectRatio(
-      aspectRatio: 1,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(ChaerokRadius.lg),
-        child: Stack(
-          fit: StackFit.expand,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilmRollResultFeaturedFrame(
+          topLabel:
+              'CHAEROK · ${widget.filmRoll.regionCode.name.toUpperCase()}',
+          dateLabel: completedAt == null ? null : _formatDate(completedAt),
+          frameLabel: current == null ? null : twoDigits(current.sequence),
+          child: covers.isEmpty
+              ? const ColoredBox(color: ChaerokColors.sageLight)
+              : PageView.builder(
+                  controller: _coverPageController,
+                  itemCount: covers.length,
+                  onPageChanged: (i) => setState(() => _coverPageIndex = i),
+                  itemBuilder: (context, i) => GestureDetector(
+                    onTap: () => _openPhotoViewer(photos.indexOf(covers[i])),
+                    child: FilmRollResultPhotoImage(photo: covers[i]),
+                  ),
+                ),
+        ),
+        const SizedBox(height: ChaerokSpacing.sm),
+        Row(
           children: [
-            PageView.builder(
-              controller: _representativePageController,
-              itemCount: pageCount,
-              onPageChanged: (i) =>
-                  setState(() => _representativePageIndex = i),
-              itemBuilder: (context, i) {
-                if (photos.isEmpty) {
-                  return const ColoredBox(color: ChaerokColors.sageLight);
-                }
-                return FilmRollResultPhotoImage(photo: photos[i]);
-              },
+            Expanded(
+              child: Text(
+                current?.placeName ?? widget.filmRoll.title,
+                overflow: TextOverflow.ellipsis,
+                style: secondaryStyle,
+              ),
             ),
-            if (photos.length > 1)
-              Positioned(
-                right: ChaerokSpacing.sm,
-                bottom: ChaerokSpacing.sm,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ChaerokSpacing.xs,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(ChaerokRadius.sm),
-                  ),
-                  child: Text(
-                    '${safeIndex + 1}/$pageCount',
-                    style: ChaerokTypography.caption.copyWith(
-                      color: Colors.white,
-                    ),
-                  ),
+            if (covers.length > 1)
+              Text(
+                '${twoDigits(index + 1)} / ${twoDigits(covers.length)}',
+                style: secondaryStyle.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
           ],
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildStatsRow(FilmRollResultResponse result) {
-    return Text(
-      '방문 ${widget.filmRoll.visitedPlaceCount}곳 · 촬영 ${result.totalPhotoCount}장',
-      textAlign: TextAlign.center,
-      style: ChaerokTypography.bodyMedium.copyWith(
-        color: ChaerokColors.textSecondary,
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title, {VoidCallback? onSeeAll}) {
+  Widget _buildSectionTitle(
+    String title, {
+    String? count,
+    VoidCallback? onSeeAll,
+  }) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(title, style: ChaerokTypography.titleMedium),
+        if (count != null) ...[
+          const SizedBox(width: ChaerokSpacing.xs),
+          Text(
+            count,
+            style: ChaerokTypography.caption.copyWith(
+              color: ChaerokColors.textSecondary,
+            ),
+          ),
+        ],
+        const Spacer(),
         if (onSeeAll != null)
           TextButton(
             onPressed: onSeeAll,
-            child: Text(
-              '전체 >',
-              style: ChaerokTypography.bodyMedium.copyWith(
-                color: ChaerokColors.textSecondary,
+            style: TextButton.styleFrom(
+              foregroundColor: ChaerokColors.textSecondary,
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChaerokSpacing.xs,
               ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('전체 보기', style: ChaerokTypography.bodyMedium),
+                Icon(Icons.chevron_right, size: 18),
+              ],
             ),
           ),
       ],
     );
   }
 
-  /// 촬영한 사진 전체를 가로로 넘겨 보는 필름 스트립. 칸을 누르면 그 사진부터
-  /// 전체 화면으로 본다.
+  /// 촬영한 사진 전체를 가로로 넘겨 보는 필름 스트립. 화면 오른쪽 끝까지
+  /// 필름이 이어지고, 칸을 누르면 그 사진부터 전체 화면으로 본다.
   Widget _buildPhotoFilmStrip(List<FilmRollResultPhoto> photos) {
     if (photos.isEmpty) {
-      return Text(
-        '표시할 사진이 없어요.',
-        style: ChaerokTypography.bodyMedium.copyWith(
-          color: ChaerokColors.textSecondary,
+      return _padded(
+        Text(
+          '표시할 사진이 없어요.',
+          style: ChaerokTypography.bodyMedium.copyWith(
+            color: ChaerokColors.textSecondary,
+          ),
         ),
       );
     }
 
-    const frameWidth = 84.0;
-    const frameHeight = frameWidth / FilmRollResultFilmFrame.aspectRatio;
-    return ChaerokFilmStripFrame(
-      child: SizedBox(
-        height: frameHeight,
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
-          scrollDirection: Axis.horizontal,
-          itemCount: photos.length,
-          separatorBuilder: (_, _) => const SizedBox(width: ChaerokSpacing.xs),
-          itemBuilder: (context, index) => SizedBox(
-            width: frameWidth,
-            child: FilmRollResultFilmFrame(
-              photo: photos[index],
-              onTap: () => _openPhotoViewer(index),
-            ),
-          ),
+    return FilmRollResultPhotoStrip(
+      photos: photos,
+      onPhotoTap: _openPhotoViewer,
+      padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.lg),
+    );
+  }
+
+  Widget _buildReelTitle(FilmRollResultResponse result) {
+    final secondaryStyle = ChaerokTypography.bodyMedium.copyWith(
+      color: ChaerokColors.textSecondary,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Text('오늘의 릴스', style: ChaerokTypography.titleMedium),
+            const Spacer(),
+            if (!result.isExpired && result.reel != null)
+              Text('9:16', style: secondaryStyle),
+          ],
         ),
-      ),
+        const SizedBox(height: ChaerokSpacing.xxs),
+        Text('한 롤의 순간을 하나의 영상으로', style: secondaryStyle),
+      ],
     );
   }
 
@@ -557,9 +640,29 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
       children: [
         _buildReelCard(result.reel, thumbnail),
         if (result.reel != null && expiresAt != null) ...[
-          const SizedBox(height: ChaerokSpacing.sm),
+          const SizedBox(height: ChaerokSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.schedule,
+                size: 18,
+                color: ChaerokColors.textSecondary,
+              ),
+              const SizedBox(width: ChaerokSpacing.xxs),
+              Flexible(
+                child: Text(
+                  '${_formatDateTime(expiresAt.toLocal())}까지 볼 수 있어요',
+                  style: ChaerokTypography.bodyMedium.copyWith(
+                    color: ChaerokColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ChaerokSpacing.xxs),
           Text(
-            '${_formatDateTime(expiresAt.toLocal())}까지 볼 수 있어요',
+            '기간이 지나기 전에 저장해 주세요.',
             textAlign: TextAlign.center,
             style: ChaerokTypography.caption.copyWith(
               color: ChaerokColors.textSecondary,
@@ -610,7 +713,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
           child: AspectRatio(
             aspectRatio: 9 / 16,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(ChaerokRadius.lg),
+              borderRadius: BorderRadius.circular(ChaerokRadius.sm),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -621,12 +724,21 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
                           placeholderColor: ChaerokColors.cameraBlack,
                           showUnfilteredLabel: false,
                         ),
-                  ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
-                  const Center(
-                    child: Icon(
-                      Icons.play_circle_fill,
-                      size: 56,
-                      color: Colors.white,
+                  ColoredBox(color: Colors.black.withValues(alpha: 0.12)),
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.25),
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 36,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
@@ -639,55 +751,81 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   }
 
   Widget _buildActionButtons(FilmRollResultResponse result) {
-    final hasReel = result.reel != null;
-    // 테마 primary가 연한 세이지색이라 기본 스타일에서는 글자가 배경에 묻힌다.
-    // 강조색(primaryDark)을 글자/배경에 명시해 대비를 확보한다.
+    final isEnabled = result.reel != null && !_isBusyWithReel;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(ChaerokRadius.md),
+    );
+    final textStyle = ChaerokTypography.bodyMedium.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    // 저장이 주된 동작이라 채운 버튼으로, 공유는 보조 동작이라 외곽선 버튼으로 둔다.
     return Row(
       children: [
         Expanded(
+          flex: 2,
           child: SizedBox(
-            height: 56,
+            key: _shareButtonKey,
+            height: 48,
             child: OutlinedButton(
-              onPressed: hasReel && !_isBusyWithReel ? _onSaveTap : null,
+              onPressed: isEnabled ? _onShareTap : null,
               style: OutlinedButton.styleFrom(
-                foregroundColor: ChaerokColors.primaryDark,
+                foregroundColor: ChaerokColors.textPrimary,
                 disabledForegroundColor: ChaerokColors.textDisabled,
-                side: BorderSide(
-                  color: hasReel && !_isBusyWithReel
-                      ? ChaerokColors.primaryDark
-                      : ChaerokColors.border,
-                  width: 1.5,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ChaerokRadius.md),
-                ),
-                textStyle: ChaerokTypography.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                side: const BorderSide(color: ChaerokColors.border, width: 1.5),
+                shape: shape,
+                textStyle: textStyle,
               ),
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: ChaerokLoadingIndicator(
-                        color: ChaerokColors.primaryDark,
-                        strokeWidth: 2,
-                      ),
+              child: _isSharing
+                  ? const ChaerokLoadingIndicator(
+                      color: ChaerokColors.primaryDark,
+                      size: 20,
+                      strokeWidth: 2,
                     )
-                  : const Text('저장하기'),
+                  : const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.ios_share, size: 18),
+                        SizedBox(width: ChaerokSpacing.xxs),
+                        Flexible(
+                          child: Text('공유하기', overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),
         const SizedBox(width: ChaerokSpacing.sm),
         Expanded(
-          child: KeyedSubtree(
-            key: _shareButtonKey,
-            child: ChaerokButton(
-              text: '공유하기',
-              backgroundColor: ChaerokColors.primaryDark,
-              isEnabled: hasReel && !_isBusyWithReel,
-              isLoading: _isSharing,
-              onPressed: _onShareTap,
+          flex: 3,
+          child: SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: isEnabled ? _onSaveTap : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ChaerokColors.primaryDark,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _isSaving
+                    ? ChaerokColors.primaryDark
+                    : ChaerokColors.border,
+                disabledForegroundColor: ChaerokColors.textDisabled,
+                elevation: 0,
+                shape: shape,
+                textStyle: textStyle,
+              ),
+              child: _isSaving
+                  ? const ChaerokLoadingIndicator(
+                      color: ChaerokColors.background,
+                      size: 20,
+                      strokeWidth: 2,
+                    )
+                  : const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.file_download_outlined, size: 20),
+                        SizedBox(width: ChaerokSpacing.xs),
+                        Text('저장하기'),
+                      ],
+                    ),
             ),
           ),
         ),

@@ -8,8 +8,8 @@ import 'package:chaerok/features/film_roll/domain/usecase/get_film_roll_result_p
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_strip.dart';
 import 'package:chaerok/shared/region/region_code.dart';
-import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -143,18 +143,27 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('공주 필름롤'), findsOneWidget);
-    expect(find.text('GONGJU · 공주'), findsOneWidget);
+    // 앱바 제목과 대표 사진 필름 틀 아래 필름롤 이름.
+    expect(find.text('공주 필름롤'), findsNWidgets(2));
+    expect(find.text('CHAEROK · GONGJU'), findsOneWidget);
     expect(find.text('2026.09.15'), findsOneWidget);
-    expect(find.text('방문 3곳 · 촬영 12장'), findsOneWidget);
+    expect(find.text('현상 완료'), findsOneWidget);
+    expect(find.text('2026.09.15 · 방문 3곳 · 촬영 12장'), findsOneWidget);
+    expect(find.text('12장'), findsOneWidget);
     expect(find.text('오늘의 사진'), findsOneWidget);
     expect(find.text('오늘의 릴스'), findsOneWidget);
     expect(find.text('저장하기'), findsOneWidget);
     expect(find.text('공유하기'), findsOneWidget);
-    expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
   });
 
-  testWidgets('대표 사진을 좌우로 스와이프하면 sequence 오름차순(코스 순서)으로 전환된다', (tester) async {
+  testWidgets('대표 컷을 sequence 순서대로 넘겨 보고, 누르면 그 사진부터 확대해 본다', (tester) async {
+    // 기기 촬영 기록이 없어 장소를 모르면 앞에서부터 3장이 대표 컷이 된다.
+    // 대표 컷이 화면 안에 보여야 넘기고 누를 수 있으므로 휴대폰 크기로 그린다.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     final result = FilmRollResultResponse(
       filmRollId: 900,
       status: 'COMPLETED',
@@ -194,9 +203,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('1/3'), findsOneWidget);
-
-    String currentPageImageUrl() {
+    String currentCoverUrl() {
       final image = tester.widget<Image>(
         find.descendant(
           of: find.byType(PageView),
@@ -206,19 +213,20 @@ void main() {
       return (image.image as NetworkImage).url;
     }
 
-    expect(currentPageImageUrl(), 'https://example.com/tourism.jpg');
+    expect(find.text('01 / 03'), findsOneWidget);
+    expect(currentCoverUrl(), 'https://example.com/tourism.jpg');
 
-    await tester.fling(find.byType(PageView), const Offset(-600, 0), 1000);
+    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
     await tester.pumpAndSettle();
 
-    expect(find.text('2/3'), findsOneWidget);
-    expect(currentPageImageUrl(), 'https://example.com/food.jpg');
+    expect(find.text('02 / 03'), findsOneWidget);
+    expect(currentCoverUrl(), 'https://example.com/food.jpg');
 
-    await tester.fling(find.byType(PageView), const Offset(-600, 0), 1000);
+    await tester.tap(find.byType(PageView));
     await tester.pumpAndSettle();
 
-    expect(find.text('3/3'), findsOneWidget);
-    expect(currentPageImageUrl(), 'https://example.com/cafe.jpg');
+    expect(find.byType(FilmRollResultPhotoViewerPage), findsOneWidget);
+    expect(find.text('2 / 3'), findsOneWidget);
   });
 
   testWidgets('릴스가 없으면 저장/공유 버튼이 비활성화된다', (tester) async {
@@ -240,11 +248,11 @@ void main() {
     );
     await tester.pump();
 
-    final saveButton = tester.widget<OutlinedButton>(
-      find.widgetWithText(OutlinedButton, '저장하기'),
+    final saveButton = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, '저장하기'),
     );
-    final shareButton = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, '공유하기'),
+    final shareButton = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, '공유하기'),
     );
     expect(saveButton.onPressed, isNull);
     expect(shareButton.onPressed, isNull);
@@ -309,20 +317,21 @@ void main() {
 
     expect(find.text('필름롤 결과를 불러오지 못했어요.'), findsNothing);
     expect(find.text('릴스 보관 기간이 끝났어요. 촬영한 사진은 계속 볼 수 있어요.'), findsOneWidget);
-    expect(find.byIcon(Icons.play_circle_fill), findsNothing);
-    expect(find.text('방문 3곳 · 촬영 2장'), findsOneWidget);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
+    expect(find.textContaining('방문 3곳 · 촬영 2장'), findsOneWidget);
 
-    final saveButton = tester.widget<OutlinedButton>(
-      find.widgetWithText(OutlinedButton, '저장하기'),
+    final saveButton = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, '저장하기'),
     );
-    final shareButton = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, '공유하기'),
+    final shareButton = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, '공유하기'),
     );
     expect(saveButton.onPressed, isNull);
     expect(shareButton.onPressed, isNull);
 
-    // 대표 사진(1/2)은 보관한 필터 사진, 미리보기 둘째 칸은 촬영 원본이다.
-    expect(find.text('1/2'), findsOneWidget);
+    // 두 장 모두 같은 장소라 대표 컷은 첫 장(보관한 필터 사진) 하나뿐이고,
+    // 스트립 둘째 칸은 촬영 원본이다.
+    expect(find.text('01 / 02'), findsNothing);
     final imagePaths = tester
         .widgetList<Image>(find.byType(Image))
         .map((image) => (image.image as FileImage).file.path);
@@ -349,9 +358,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('전체 >'));
+    await tester.ensureVisible(find.text('전체 보기'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('전체 >'));
+    await tester.tap(find.text('전체 보기'));
     await tester.pumpAndSettle();
 
     expect(find.byType(FilmRollResultPhotosScreen), findsOneWidget);
@@ -409,7 +418,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(ChaerokFilmStripFrame), findsOneWidget);
+    expect(find.byType(FilmRollResultPhotoStrip), findsOneWidget);
     await tester.ensureVisible(find.text('02'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('02'));

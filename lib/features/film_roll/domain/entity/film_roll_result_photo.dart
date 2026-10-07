@@ -6,6 +6,8 @@ class FilmRollResultPhoto {
     this.localPath,
     this.remoteUrl,
     this.isFiltered = true,
+    this.filmRollPlaceId,
+    this.placeName,
   }) : assert(localPath != null || remoteUrl != null);
 
   /// 필름롤 안에서의 촬영 순서. 화면은 이 값의 오름차순으로 보여준다.
@@ -20,4 +22,11 @@ class FilmRollResultPhoto {
   /// 필터가 적용된 사진인지. false면 보관한 필터 사진이 없어 촬영 원본으로
   /// 대체한 것이다.
   final bool isFiltered;
+
+  /// 촬영한 장소의 로컬 id. 기기에 촬영 기록이 없으면(다른 기기에서 찍은 롤 등)
+  /// 알 수 없어 null이다.
+  final String? filmRollPlaceId;
+
+  /// 촬영한 장소 이름. 장소를 알 수 없으면 null이다.
+  final String? placeName;
 }
