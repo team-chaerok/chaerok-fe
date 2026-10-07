@@ -20,7 +20,10 @@ import 'package:chaerok/features/location/data/location_permission_service.dart'
 import 'package:chaerok/shared/region/region_code.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
 import 'package:chaerok/shared/widgets/chaerok_loading_indicator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
 
 /// 카메라 브랜드 표기. 실제 데이터 모델과 연동되는 값이 아니라 촬영 화면의
@@ -346,6 +349,36 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     final controller = _cameraController;
     if (controller == null || _isSaving) return;
 
+    await _captureAndSave(() async {
+      // 촬영 직전 플래시 모드를 한 번 더 확정한다(이전 촬영 후 모드가 초기화되는
+      // 기기 대비).
+      await _applyFlashModeSafely(controller);
+      final file = await controller.takePicture();
+      // 카메라는 앱 방향(세로) 기준으로 저장하지만 이 화면은 UI를 돌려 그리므로,
+      // 뷰파인더에서 본 방향과 같아지도록 사진도 그만큼 돌려 저장한다.
+      return orientCapturedPhotoInBackground(
+        await file.readAsBytes(),
+        uiQuarterTurns: _photoQuarterTurns,
+      );
+    });
+  }
+
+  /// 디버그 빌드 전용. 카메라가 없는 시뮬레이터에서도 방문 인증 흐름을 확인할
+  /// 수 있도록, 필름롤 지역의 샘플 이미지를 촬영한 사진처럼 저장한다.
+  Future<void> _onDebugSamplePhotoTap() async {
+    if (!kDebugMode || _isSaving || _isExposureLimitReached) return;
+
+    final regionCode = _regionCode ?? RegionCode.gongju;
+    await _captureAndSave(() async {
+      final data = await rootBundle.load(
+        'assets/images/regions/${regionCode.name}.webp',
+      );
+      return compute(_encodeAsJpeg, data.buffer.asUint8List());
+    });
+  }
+
+  /// [takeBytes]로 얻은 사진을 현재 장소의 사진으로 저장하고 화면을 닫는다.
+  Future<void> _captureAndSave(Future<Uint8List> Function() takeBytes) async {
     setState(() => _isSaving = true);
     try {
       // 화면이 열려 있는 동안(예: 동기화)으로 필름이 가득 찼을 수 있으므로,
@@ -363,16 +396,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
         return;
       }
 
-      // 촬영 직전 플래시 모드를 한 번 더 확정한다(이전 촬영 후 모드가 초기화되는
-      // 기기 대비).
-      await _applyFlashModeSafely(controller);
-      final file = await controller.takePicture();
-      // 카메라는 앱 방향(세로) 기준으로 저장하지만 이 화면은 UI를 돌려 그리므로,
-      // 뷰파인더에서 본 방향과 같아지도록 사진도 그만큼 돌려 저장한다.
-      final bytes = await orientCapturedPhotoInBackground(
-        await file.readAsBytes(),
-        uiQuarterTurns: _photoQuarterTurns,
-      );
+      final bytes = await takeBytes();
       final position = await LocationPermissionService.getCurrentPosition();
 
       await FilmRollModule.instance.savePhoto(
@@ -450,6 +474,14 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                 ChaerokButton(
                   text: '설정에서 권한 허용하기',
                   onPressed: _onOpenSettingsTap,
+                ),
+              ],
+              if (kDebugMode && !_isExposureLimitReached) ...[
+                const SizedBox(height: ChaerokSpacing.lg),
+                ChaerokButton(
+                  text: '테스트 사진으로 촬영 (디버그)',
+                  isLoading: _isSaving,
+                  onPressed: _onDebugSamplePhotoTap,
                 ),
               ],
             ],
@@ -586,4 +618,11 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
       ),
     );
   }
+}
+
+/// 디버그 샘플 이미지(webp)를 서버 업로드 형식(JPEG)으로 바꾼다.
+Uint8List _encodeAsJpeg(Uint8List bytes) {
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return bytes;
+  return Uint8List.fromList(img.encodeJpg(decoded, quality: 90));
 }
