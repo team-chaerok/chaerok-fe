@@ -89,8 +89,8 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   /// 버튼의 화면 좌표를 여기서 얻는다.
   final GlobalKey _shareButtonKey = GlobalKey();
 
-  final PageController _representativePageController = PageController();
-  int _representativePageIndex = 0;
+  final PageController _coverPageController = PageController();
+  int _coverPageIndex = 0;
 
   @override
   void initState() {
@@ -109,7 +109,7 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
 
   @override
   void dispose() {
-    _representativePageController.dispose();
+    _coverPageController.dispose();
     super.dispose();
   }
 
@@ -326,8 +326,8 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   }
 
   void _openAllPhotos() {
-    // 대표 사진 캐러셀([_buildBody])과 같은 목록([_photos], 촬영 순서)을
-    // 넘겨 대표 사진과 "전체 사진" 화면의 순서가 어긋나지 않게 한다.
+    // 오늘의 사진 스트립과 같은 목록([_photos], 촬영 순서)을 넘겨 두 화면의
+    // 순서가 어긋나지 않게 한다.
     final photos = _photos;
     unawaited(
       Navigator.of(context).push(
@@ -477,16 +477,22 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
     );
   }
 
-  /// 코스 순서([FilmRollResultPhoto.sequence] 오름차순)대로 좌우 스와이프되는
-  /// 대표 사진. 관광지 → 식당 → 카페 순으로 방문·촬영되므로 정렬된 목록을
-  /// 그대로 넘기면 스와이프 순서가 코스 순서와 일치한다. 필름 띠에는 지역과
-  /// 현상 날짜, 지금 보는 칸 번호를 새기고, 틀 아래에 필름롤 이름과 위치를 둔다.
+  /// 이 필름롤의 표지. 방문한 장소마다 처음 찍은 사진을 한 장씩, 최대 3장을
+  /// 대표 컷으로 골라 좌우로 넘겨 본다. 누르면 그 사진부터 확대해 보고, 전체
+  /// 사진은 아래 "오늘의 사진" 스트립이 맡는다. 필름 띠에는 지역과 현상 날짜,
+  /// 지금 보는 컷의 칸 번호를, 틀 아래에는 촬영 장소와 위치를 둔다.
   Widget _buildRepresentativeImage(List<FilmRollResultPhoto> photos) {
-    final pageCount = photos.isEmpty ? 1 : photos.length;
-    final safeIndex = _representativePageIndex >= pageCount
-        ? pageCount - 1
-        : _representativePageIndex;
+    final covers = GetFilmRollResultPhotosUseCase.pickPlaceRepresentatives(
+      photos,
+    );
+    final index = covers.isEmpty
+        ? 0
+        : _coverPageIndex.clamp(0, covers.length - 1);
+    final current = covers.isEmpty ? null : covers[index];
     final completedAt = widget.filmRoll.completedAt;
+    final secondaryStyle = ChaerokTypography.bodyMedium.copyWith(
+      color: ChaerokColors.textSecondary,
+    );
     String twoDigits(int n) => n.toString().padLeft(2, '0');
 
     return Column(
@@ -496,41 +502,33 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
           topLabel:
               'CHAEROK · ${widget.filmRoll.regionCode.name.toUpperCase()}',
           dateLabel: completedAt == null ? null : _formatDate(completedAt),
-          frameLabel: photos.isEmpty
-              ? null
-              : twoDigits(photos[safeIndex].sequence),
-          child: PageView.builder(
-            controller: _representativePageController,
-            itemCount: pageCount,
-            onPageChanged: (i) => setState(() => _representativePageIndex = i),
-            itemBuilder: (context, i) {
-              if (photos.isEmpty) {
-                return const ColoredBox(color: ChaerokColors.sageLight);
-              }
-              return GestureDetector(
-                onTap: () => _openPhotoViewer(i),
-                child: FilmRollResultPhotoImage(photo: photos[i]),
-              );
-            },
-          ),
+          frameLabel: current == null ? null : twoDigits(current.sequence),
+          child: covers.isEmpty
+              ? const ColoredBox(color: ChaerokColors.sageLight)
+              : PageView.builder(
+                  controller: _coverPageController,
+                  itemCount: covers.length,
+                  onPageChanged: (i) => setState(() => _coverPageIndex = i),
+                  itemBuilder: (context, i) => GestureDetector(
+                    onTap: () => _openPhotoViewer(photos.indexOf(covers[i])),
+                    child: FilmRollResultPhotoImage(photo: covers[i]),
+                  ),
+                ),
         ),
         const SizedBox(height: ChaerokSpacing.sm),
         Row(
           children: [
             Expanded(
               child: Text(
-                widget.filmRoll.title,
+                current?.placeName ?? widget.filmRoll.title,
                 overflow: TextOverflow.ellipsis,
-                style: ChaerokTypography.bodyMedium.copyWith(
-                  color: ChaerokColors.textSecondary,
-                ),
+                style: secondaryStyle,
               ),
             ),
-            if (photos.isNotEmpty)
+            if (covers.length > 1)
               Text(
-                '${twoDigits(safeIndex + 1)} / ${twoDigits(pageCount)}',
-                style: ChaerokTypography.bodyMedium.copyWith(
-                  color: ChaerokColors.textSecondary,
+                '${twoDigits(index + 1)} / ${twoDigits(covers.length)}',
+                style: secondaryStyle.copyWith(
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),

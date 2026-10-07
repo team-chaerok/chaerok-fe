@@ -157,8 +157,9 @@ void main() {
     expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
   });
 
-  testWidgets('대표 사진을 좌우로 스와이프하면 sequence 오름차순(코스 순서)으로 전환된다', (tester) async {
-    // 대표 사진이 화면 안에 보여야 스와이프할 수 있으므로 휴대폰 크기로 그린다.
+  testWidgets('대표 컷을 sequence 순서대로 넘겨 보고, 누르면 그 사진부터 확대해 본다', (tester) async {
+    // 기기 촬영 기록이 없어 장소를 모르면 앞에서부터 3장이 대표 컷이 된다.
+    // 대표 컷이 화면 안에 보여야 넘기고 누를 수 있으므로 휴대폰 크기로 그린다.
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -202,9 +203,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('01 / 03'), findsOneWidget);
-
-    String currentPageImageUrl() {
+    String currentCoverUrl() {
       final image = tester.widget<Image>(
         find.descendant(
           of: find.byType(PageView),
@@ -214,19 +213,20 @@ void main() {
       return (image.image as NetworkImage).url;
     }
 
-    expect(currentPageImageUrl(), 'https://example.com/tourism.jpg');
+    expect(find.text('01 / 03'), findsOneWidget);
+    expect(currentCoverUrl(), 'https://example.com/tourism.jpg');
 
     await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
     await tester.pumpAndSettle();
 
     expect(find.text('02 / 03'), findsOneWidget);
-    expect(currentPageImageUrl(), 'https://example.com/food.jpg');
+    expect(currentCoverUrl(), 'https://example.com/food.jpg');
 
-    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+    await tester.tap(find.byType(PageView));
     await tester.pumpAndSettle();
 
-    expect(find.text('03 / 03'), findsOneWidget);
-    expect(currentPageImageUrl(), 'https://example.com/cafe.jpg');
+    expect(find.byType(FilmRollResultPhotoViewerPage), findsOneWidget);
+    expect(find.text('2 / 3'), findsOneWidget);
   });
 
   testWidgets('릴스가 없으면 저장/공유 버튼이 비활성화된다', (tester) async {
@@ -329,8 +329,9 @@ void main() {
     expect(saveButton.onPressed, isNull);
     expect(shareButton.onPressed, isNull);
 
-    // 대표 사진(1/2)은 보관한 필터 사진, 미리보기 둘째 칸은 촬영 원본이다.
-    expect(find.text('01 / 02'), findsOneWidget);
+    // 두 장 모두 같은 장소라 대표 컷은 첫 장(보관한 필터 사진) 하나뿐이고,
+    // 스트립 둘째 칸은 촬영 원본이다.
+    expect(find.text('01 / 02'), findsNothing);
     final imagePaths = tester
         .widgetList<Image>(find.byType(Image))
         .map((image) => (image.image as FileImage).file.path);
