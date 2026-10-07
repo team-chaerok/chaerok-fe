@@ -6,9 +6,8 @@ import 'package:chaerok/core/design_system/chaerok_spacing.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.dart';
 import 'package:chaerok/features/film_roll/domain/usecase/save_result_photo_to_gallery_use_case.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
-import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_film_frame.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_strip.dart';
 import 'package:chaerok/shared/widgets/chaerok_appbar.dart';
-import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
 import 'package:flutter/material.dart';
 
 /// 현상 결과의 촬영 사진 전체를 밀착 인화(contact sheet)처럼 보여주는 화면.
@@ -48,7 +47,10 @@ class FilmRollResultPhotosScreen extends StatelessWidget {
       backgroundColor: ChaerokColors.background,
       appBar: const ChaerokAppbar(title: '오늘의 사진'),
       body: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: ChaerokSpacing.md),
+        padding: const EdgeInsets.symmetric(
+          horizontal: ChaerokSpacing.lg,
+          vertical: ChaerokSpacing.md,
+        ),
         itemCount: stripCount,
         separatorBuilder: (_, _) => const SizedBox(height: ChaerokSpacing.md),
         itemBuilder: (context, stripIndex) =>
@@ -57,27 +59,22 @@ class FilmRollResultPhotosScreen extends StatelessWidget {
     );
   }
 
-  /// [start]번째 사진부터 [framesPerStrip]칸짜리 필름 스트립 한 줄. 마지막
-  /// 줄이 덜 차면 남은 칸은 빈 필름으로 둬 칸 크기를 맞춘다.
+  /// [start]번째 사진부터 [framesPerStrip]칸짜리 필름 스트립 한 줄. 결과
+  /// 화면의 "오늘의 사진" 스트립과 같은 칸을 이어 붙인다. 마지막 줄이 덜 차면
+  /// 남은 칸은 빈 필름으로 둬 칸 크기를 맞춘다.
   Widget _buildStrip(BuildContext context, int start) {
     final end = math.min(start + framesPerStrip, photos.length);
-    return ChaerokFilmStripFrame(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: ChaerokSpacing.xs),
-        child: Row(
-          children: [
-            for (var i = start; i < start + framesPerStrip; i++) ...[
-              if (i > start) const SizedBox(width: ChaerokSpacing.xs),
-              Expanded(
-                child: FilmRollResultFilmFrame(
-                  photo: i < end ? photos[i] : null,
-                  onTap: i < end ? () => _openViewer(context, i) : null,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = start; i < start + framesPerStrip; i++)
+          Expanded(
+            child: FilmRollResultStripFrame(
+              photo: i < end ? photos[i] : null,
+              onTap: i < end ? () => _openViewer(context, i) : null,
+            ),
+          ),
+      ],
     );
   }
 }

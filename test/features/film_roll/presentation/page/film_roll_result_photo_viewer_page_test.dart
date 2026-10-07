@@ -2,7 +2,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.
 import 'package:chaerok/features/film_roll/domain/usecase/save_result_photo_to_gallery_use_case.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
-import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_film_frame.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_strip.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -46,7 +46,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(FilmRollResultFilmFrame).at(index));
+    await tester.tap(find.byType(FilmRollResultStripFrame).at(index));
     await tester.pumpAndSettle();
   }
 

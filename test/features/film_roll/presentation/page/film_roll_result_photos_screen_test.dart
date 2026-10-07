@@ -1,8 +1,7 @@
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_result_photo.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photo_viewer_page.dart';
 import 'package:chaerok/features/film_roll/presentation/page/film_roll_result_photos_screen.dart';
-import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_film_frame.dart';
-import 'package:chaerok/shared/widgets/chaerok_film_strip_frame.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_result_photo_strip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,8 +30,7 @@ void main() {
   ) async {
     await pumpScreen(tester, 5);
 
-    expect(find.byType(ChaerokFilmStripFrame), findsNWidgets(2));
-    expect(find.byType(FilmRollResultFilmFrame), findsNWidgets(6));
+    expect(find.byType(FilmRollResultStripFrame), findsNWidgets(6));
     for (final number in ['01', '02', '03', '04', '05']) {
       expect(find.text(number), findsOneWidget);
     }
@@ -53,7 +51,7 @@ void main() {
   testWidgets('빈 필름 칸은 눌러도 아무 화면도 열지 않는다', (tester) async {
     await pumpScreen(tester, 5);
 
-    await tester.tap(find.byType(FilmRollResultFilmFrame).last);
+    await tester.tap(find.byType(FilmRollResultStripFrame).last);
     await tester.pumpAndSettle();
 
     expect(find.byType(FilmRollResultPhotoViewerPage), findsNothing);
