@@ -366,9 +366,14 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   /// 디버그 빌드 전용. 카메라가 없는 시뮬레이터에서도 방문 인증 흐름을 확인할
   /// 수 있도록, 필름롤 지역의 샘플 이미지를 촬영한 사진처럼 저장한다.
   Future<void> _onDebugSamplePhotoTap() async {
-    if (!kDebugMode || _isSaving || _isExposureLimitReached) return;
-
-    final regionCode = _regionCode ?? RegionCode.gongju;
+    // 지역 조회가 끝나기 전에는 다른 지역 샘플이 저장되지 않도록 고르지 않는다.
+    final regionCode = _regionCode;
+    if (!kDebugMode ||
+        regionCode == null ||
+        _isSaving ||
+        _isExposureLimitReached) {
+      return;
+    }
     await _captureAndSave(() async {
       final data = await rootBundle.load(
         'assets/images/regions/${regionCode.name}.webp',
@@ -480,6 +485,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                 const SizedBox(height: ChaerokSpacing.lg),
                 ChaerokButton(
                   text: '테스트 사진으로 촬영 (디버그)',
+                  isEnabled: _regionCode != null,
                   isLoading: _isSaving,
                   onPressed: _onDebugSamplePhotoTap,
                 ),
