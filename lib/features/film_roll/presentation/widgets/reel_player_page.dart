@@ -84,23 +84,24 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: IconButton(
-                    icon: Icon(
-                      _controller.value.isPlaying
-                          ? Icons.pause_circle_filled
-                          : Icons.play_circle_fill,
-                      color: Colors.white,
-                      size: 48,
+                  // 재생 상태가 비동기로 바뀌므로 컨트롤러 값을 구독해 아이콘을
+                  // 실제 재생 여부와 맞춘다.
+                  child: ValueListenableBuilder<VideoPlayerValue>(
+                    valueListenable: _controller,
+                    builder: (context, value, _) => IconButton(
+                      icon: Icon(
+                        value.isPlaying
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_fill,
+                        color: Colors.white,
+                        size: 48,
+                      ),
+                      onPressed: () => unawaited(
+                        value.isPlaying
+                            ? _controller.pause()
+                            : _controller.play(),
+                      ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        unawaited(
-                          _controller.value.isPlaying
-                              ? _controller.pause()
-                              : _controller.play(),
-                        );
-                      });
-                    },
                   ),
                 ),
               ),

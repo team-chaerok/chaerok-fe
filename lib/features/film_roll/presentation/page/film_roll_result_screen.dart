@@ -77,6 +77,9 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isSharing = false;
+
+  /// 릴스 재생 직전 URL 갱신 중 — 중복 탭을 막고 로딩 상태를 보여준다.
+  bool _isOpeningReel = false;
   bool _isCachingPhotos = false;
   String? _errorMessage;
   FilmRollResultResponse? _result;
@@ -302,7 +305,15 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
   /// 결과 화면을 오래 열어 둔 뒤 재생하면 presigned URL이 만료돼 있을 수
   /// 있으므로, 재생 직전에 [_freshReel]로 유효기간을 확인·갱신한다.
   Future<void> _openReelPlayer() async {
-    final reel = await _freshReel();
+    if (_isOpeningReel) return;
+    setState(() => _isOpeningReel = true);
+    DownloadResponse? fresh;
+    try {
+      fresh = await _freshReel();
+    } finally {
+      if (mounted) setState(() => _isOpeningReel = false);
+    }
+    final reel = fresh;
     if (reel == null || !mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -734,11 +745,18 @@ class _FilmRollResultScreenState extends State<FilmRollResultScreen> {
                         color: Colors.black.withValues(alpha: 0.25),
                         border: Border.all(color: Colors.white, width: 2),
                       ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        size: 36,
-                        color: Colors.white,
-                      ),
+                      child: _isOpeningReel
+                          ? const Padding(
+                              padding: EdgeInsets.all(ChaerokSpacing.md),
+                              child: ChaerokLoadingIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 36,
+                              color: Colors.white,
+                            ),
                     ),
                   ),
                 ],

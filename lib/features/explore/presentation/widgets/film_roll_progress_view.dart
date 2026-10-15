@@ -25,6 +25,7 @@ import 'package:chaerok/features/film_roll/presentation/state/film_roll_state.da
 import 'package:chaerok/features/film_roll/presentation/widgets/guidance_card.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/select_course_button.dart';
 import 'package:chaerok/features/film_roll/presentation/widgets/visit_gate_message.dart';
+import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.dart';
 import 'package:chaerok/features/location/data/kakao_local_api_service.dart';
 import 'package:chaerok/features/location/data/location_permission_service.dart';
 import 'package:chaerok/shared/widgets/chaerok_button.dart';
@@ -474,6 +475,20 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
     );
   }
 
+  void _onMarkerTap(String id) {
+    for (final place in _state.places) {
+      if (place.id == id) {
+        unawaited(
+          showPlaceDetailSheet(
+            context,
+            place: PlaceDetailSheetPlace.fromFilmRollPlace(place),
+          ),
+        );
+        return;
+      }
+    }
+  }
+
   List<ExploreMapMarker> _buildMarkers() {
     final nextId = _nextPlace?.id;
     return [
@@ -543,6 +558,7 @@ class _FilmRollProgressViewState extends State<FilmRollProgressView> {
             markers: _buildMarkers(),
             focus: _focusMarker,
             enabled: widget.mapEnabled,
+            onMarkerTap: _onMarkerTap,
           ),
         ),
         Expanded(

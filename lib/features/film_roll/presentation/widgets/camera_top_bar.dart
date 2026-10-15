@@ -64,22 +64,35 @@ class CameraTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: ChaerokSpacing.sm),
-        GestureDetector(
-          onTap: onClose,
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: _kCloseBackground,
-              shape: BoxShape.circle,
-              border: Border.fromBorderSide(BorderSide(color: _kCloseBorder)),
-            ),
-            child: SvgPicture.asset(
-              'assets/images/chaerok-camera-icon-cancel.svg',
-              width: 16,
-              height: 16,
+        // 보이는 원은 32dp지만 터치 영역은 44dp로 넓혀 빗나간 탭도 받는다.
+        Semantics(
+          button: true,
+          label: '닫기',
+          child: GestureDetector(
+            onTap: onClose,
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: _kCloseBackground,
+                    shape: BoxShape.circle,
+                    border: Border.fromBorderSide(
+                      BorderSide(color: _kCloseBorder),
+                    ),
+                  ),
+                  child: SvgPicture.asset(
+                    'assets/images/chaerok-camera-icon-cancel.svg',
+                    width: 16,
+                    height: 16,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
