@@ -9,6 +9,7 @@ import 'package:chaerok/data/models/place_category.dart';
 import 'package:chaerok/data/models/place_list_response.dart';
 import 'package:chaerok/data/models/user_response.dart';
 import 'package:chaerok/data/remote/users_api.dart';
+import 'package:chaerok/features/explore/domain/explore_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_photo.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
@@ -27,6 +28,7 @@ import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_ca
 import 'package:chaerok/features/home/presentation/widgets/folder_deck/folder_card_deck.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/out_of_service_home_view.dart';
 import 'package:chaerok/features/home/presentation/widgets/out_of_service/region_film_palette.dart';
+import 'package:chaerok/features/home/presentation/widgets/place_detail_sheet.dart';
 import 'package:chaerok/features/home/presentation/widgets/recommended_place_card.dart';
 import 'package:chaerok/features/home/presentation/widgets/region_photo_gallery.dart';
 import 'package:chaerok/features/home/presentation/widgets/weather_card.dart';
@@ -73,6 +75,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   FilmRoll? _recoveredFilmRoll;
   bool _isEnteringFilmRoll = false;
 
+  /// 위치 인증 실패 후 "위치 인증하기"로 다시 시도하는 중인지 여부.
+  bool _isRetryingLocation = false;
+
   // 위치 인증 성공 직후 자동으로 지역 진입 → 코스 선택까지 이어주는 동안,
   // 같은 화면의 수동 "필름롤 시작하기" 버튼이 동시에 눌려 내비게이션이
   // 중복 push되는 것을 막기 위한 플래그.
@@ -94,6 +99,9 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
   List<FilmRollPhoto> _filmRollPhotos = const [];
   List<FilmRollPlace> _filmRollPlaces = const [];
   List<RecommendedPlaceSummaryData> _nearbyPlaces = const [];
+
+  /// [_nearbyPlaces]와 같은 순서의 원본 장소 — 카드 탭 시 상세 시트를 띄운다.
+  List<PlaceListResponse> _nearbyPlaceSources = const [];
 
   // 재개/시작 버튼이 연타되는 등 _loadNearbyPlaces/_loadFilmRollPhotos가 겹쳐
   // 호출될 때, 먼저 시작한 요청이 나중에 끝나며 최신 상태를 stale 데이터로
@@ -246,6 +254,17 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     _applyLocationOutcome(fallback);
   }
 
+  /// 위치 인증이 실패한 채 홈에 남았을 때 필름롤 카드에서 다시 시도한다.
+  Future<void> _onRetryLocationTap() async {
+    if (_isRetryingLocation) return;
+    setState(() => _isRetryingLocation = true);
+    try {
+      await _ensureLocationVerified();
+    } finally {
+      if (mounted) setState(() => _isRetryingLocation = false);
+    }
+  }
+
   Future<LocationVerificationOutcome> _runLocationVerification() {
     final override = widget.debugRunLocationVerification;
     return override != null ? override() : LocationVerificationRunner.run();
@@ -375,11 +394,24 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     if (!mounted || requestToken != _nearbyPlacesRequestToken) return;
     setState(() {
       _filmRollPlaces = filmRollPlaces;
+      _nearbyPlaceSources = result.places;
       _nearbyPlaces = [
         for (final (index, place) in result.places.indexed)
           _toNearbySummary(place, index, result.position, filmRollPlaces),
       ];
     });
+  }
+
+  void _onNearbyPlaceTap(int index) {
+    if (index >= _nearbyPlaceSources.length) return;
+    unawaited(
+      showPlaceDetailSheet(
+        context,
+        place: PlaceDetailSheetPlace.fromExplorePlace(
+          ExplorePlace.fromListResponse(_nearbyPlaceSources[index]),
+        ),
+      ),
+    );
   }
 
   RecommendedPlaceSummaryData _toNearbySummary(
@@ -540,7 +572,12 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
     final filmRoll = _recoveredFilmRoll;
     if (filmRoll == null || _isSelectingCourseFromGallery) return;
     final regionId = filmRoll.regionId ?? _locationResult?.region.regionId;
-    if (regionId == null) return;
+    if (regionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('지역 정보를 확인하지 못했어요. 위치 인증 후 다시 시도해 주세요.')),
+      );
+      return;
+    }
 
     setState(() => _isSelectingCourseFromGallery = true);
     try {
@@ -602,10 +639,13 @@ class HomeDashboardScreenState extends State<HomeDashboardScreen>
                   filmRollPhotos: _filmRollPhotos,
                   filmRollPlaces: _filmRollPlaces,
                   nearbyPlaces: _nearbyPlaces,
+                  onNearbyPlaceTap: _onNearbyPlaceTap,
                   isAutoConnectingFilmRoll: _isAutoConnectingFilmRoll,
                   isEnteringFilmRoll: _isEnteringFilmRoll,
                   isSelectingCourse: _isSelectingCourseFromGallery,
+                  isRetryingLocation: _isRetryingLocation,
                   onStartFilmRollTap: _onStartFilmRollTap,
+                  onRetryLocationTap: _onRetryLocationTap,
                   onSelectCourseTap: _onSelectCourseForRecoveredFilmRollTap,
                   onVisitCompleted: refresh,
                 ),
@@ -687,10 +727,13 @@ class _RegionHomeBody extends StatelessWidget {
     required this.filmRollPhotos,
     required this.filmRollPlaces,
     required this.nearbyPlaces,
+    required this.onNearbyPlaceTap,
     required this.isAutoConnectingFilmRoll,
     required this.isEnteringFilmRoll,
     required this.isSelectingCourse,
+    required this.isRetryingLocation,
     required this.onStartFilmRollTap,
+    required this.onRetryLocationTap,
     required this.onSelectCourseTap,
     required this.onVisitCompleted,
   });
@@ -702,12 +745,19 @@ class _RegionHomeBody extends StatelessWidget {
   final List<FilmRollPhoto> filmRollPhotos;
   final List<FilmRollPlace> filmRollPlaces;
   final List<RecommendedPlaceSummaryData> nearbyPlaces;
+
+  /// "가까운 채록 장소" 카드 탭 콜백 — [nearbyPlaces]의 인덱스를 넘긴다.
+  final ValueChanged<int> onNearbyPlaceTap;
   final bool isAutoConnectingFilmRoll;
   final bool isEnteringFilmRoll;
 
   /// 진행중 필름롤은 있지만 코스 미선택일 때 뜨는 안내 카드의 버튼 로딩 상태.
   final bool isSelectingCourse;
+  final bool isRetryingLocation;
   final VoidCallback onStartFilmRollTap;
+
+  /// 위치 인증 전([locationResult]가 null)일 때 버튼이 다시 인증을 시도한다.
+  final VoidCallback onRetryLocationTap;
 
   /// 코스 미선택 안내 카드의 "추천 코스 선택하기" 버튼 콜백.
   final VoidCallback onSelectCourseTap;
@@ -799,8 +849,11 @@ class _RegionHomeBody extends StatelessWidget {
       children: [
         const Text('가까운 채록 장소', style: ChaerokTypography.titleMedium),
         const SizedBox(height: ChaerokSpacing.sm),
-        for (final place in nearbyPlaces) ...[
-          RecommendedPlaceCard(data: place, onTap: () {}),
+        for (final (index, place) in nearbyPlaces.indexed) ...[
+          RecommendedPlaceCard(
+            data: place,
+            onTap: () => onNearbyPlaceTap(index),
+          ),
           const SizedBox(height: ChaerokSpacing.sm),
         ],
       ],
@@ -830,12 +883,19 @@ class _RegionHomeBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: ChaerokSpacing.sm),
-          ChaerokButton(
-            text: '필름롤 시작하기',
-            isEnabled: locationResult != null && !isAutoConnectingFilmRoll,
-            isLoading: isEnteringFilmRoll || isAutoConnectingFilmRoll,
-            onPressed: onStartFilmRollTap,
-          ),
+          if (locationResult != null)
+            ChaerokButton(
+              text: '필름롤 시작하기',
+              isEnabled: !isAutoConnectingFilmRoll,
+              isLoading: isEnteringFilmRoll || isAutoConnectingFilmRoll,
+              onPressed: onStartFilmRollTap,
+            )
+          else
+            ChaerokButton(
+              text: '위치 인증하기',
+              isLoading: isRetryingLocation,
+              onPressed: onRetryLocationTap,
+            ),
         ],
       ),
     );

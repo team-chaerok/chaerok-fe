@@ -419,6 +419,12 @@ class _FilmRollScreenState extends State<FilmRollScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.hasError ? '아직 동기화하지 못했어요.' : '동기화 완료')),
       );
+    } catch (e, st) {
+      log('동기화 재시도 실패', name: _tag, error: e, stackTrace: st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('아직 동기화하지 못했어요.')));
     } finally {
       if (mounted) setState(() => _isSyncing = false);
     }

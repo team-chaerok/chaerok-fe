@@ -71,6 +71,10 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
   bool _isSaving = false;
   bool _isInitializingCamera = false;
   bool _isSwitchingCamera = false;
+
+  /// 전면/후면 카메라가 모두 있을 때만 전환 버튼을 노출한다. 렌즈가 하나뿐인
+  /// 기기에서 전환을 누르면 같은 카메라가 다시 열려 버튼이 반응하지 않는 것처럼 보인다.
+  bool _canSwitchCamera = false;
   bool _isPermissionPermanentlyDenied = false;
 
   CameraLensDirection _lensDirection = CameraLensDirection.back;
@@ -238,6 +242,9 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
         setState(() => _errorMessage = '사용 가능한 카메라가 없어요.');
         return;
       }
+      _canSwitchCamera =
+          cameras.any((c) => c.lensDirection == CameraLensDirection.back) &&
+          cameras.any((c) => c.lensDirection == CameraLensDirection.front);
       final selectedCamera = cameras.firstWhere(
         (camera) => camera.lensDirection == _lensDirection,
         orElse: () => cameras.first,
@@ -322,7 +329,12 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     setState(() => _flashMode = nextFlashMode);
   }
 
+  void _onCloseTap() {
+    unawaited(Navigator.of(context).maybePop());
+  }
+
   Future<void> _onCameraSwitch() async {
+    if (!_canSwitchCamera) return;
     if (_isInitializingCamera || _isSaving || _isSwitchingCamera) return;
     _isSwitchingCamera = true;
 
@@ -424,10 +436,11 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
     } catch (e, st) {
       log('사진 저장 실패', name: _tag, error: e, stackTrace: st);
       if (!mounted) return;
-      setState(() {
-        _errorMessage = '사진 저장에 실패했어요.';
-        _isSaving = false;
-      });
+      // 카메라는 살아 있으므로 오류 화면으로 막지 않고 바로 다시 촬영할 수 있게 둔다.
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사진 저장에 실패했어요. 다시 촬영해 주세요.')),
+      );
     }
   }
 
@@ -481,6 +494,8 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                   onPressed: _onOpenSettingsTap,
                 ),
               ],
+              const SizedBox(height: ChaerokSpacing.lg),
+              ChaerokButton(text: '닫기', onPressed: _onCloseTap),
               if (kDebugMode && !_isExposureLimitReached) ...[
                 const SizedBox(height: ChaerokSpacing.lg),
                 ChaerokButton(
@@ -498,8 +513,20 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
 
     final controller = _cameraController;
     if (controller == null || !controller.value.isInitialized) {
-      return const Center(
-        child: ChaerokLoadingIndicator(color: ChaerokColors.primary),
+      return Stack(
+        children: [
+          const Center(
+            child: ChaerokLoadingIndicator(color: ChaerokColors.primary),
+          ),
+          Align(
+            alignment: Alignment.topLeft,
+            child: IconButton(
+              tooltip: '닫기',
+              icon: const Icon(Icons.close, color: ChaerokColors.textPrimary),
+              onPressed: _onCloseTap,
+            ),
+          ),
+        ],
       );
     }
 
@@ -514,7 +541,7 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
             photoCount: _photoCount,
             maxPhotoCount: FilmRoll.maxExposureCount,
             onFlashToggle: _onFlashToggle,
-            onClose: () => Navigator.of(context).maybePop(),
+            onClose: _onCloseTap,
           ),
           if (_place != null) ...[
             const SizedBox(height: ChaerokSpacing.xs),
@@ -611,7 +638,15 @@ class _VisitCaptureScreenState extends State<VisitCaptureScreen>
                             ],
                           ),
                           const SizedBox(height: ChaerokSpacing.lg),
-                          CameraSwitchButton(onPressed: _onCameraSwitch),
+                          Visibility(
+                            visible: _canSwitchCamera,
+                            maintainSize: true,
+                            maintainAnimation: true,
+                            maintainState: true,
+                            child: CameraSwitchButton(
+                              onPressed: _onCameraSwitch,
+                            ),
+                          ),
                         ],
                       ),
                     ],

@@ -214,17 +214,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
                     _onExploreRequested();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt_outlined),
-                  title: const Text('자유 촬영하기'),
-                  subtitle: const Text('곧 만나볼 수 있어요'),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('자유 촬영하기는 준비 중이에요.')),
-                    );
-                  },
-                ),
               ],
             ),
           ),
