@@ -263,10 +263,19 @@ class _PlaceDetailSheetState extends State<PlaceDetailSheet> {
       );
       if (!launched) {
         log('외부 링크 열기 실패(launchUrl=false)', name: _tag);
+        _showOpenFailure();
       }
     } catch (e, st) {
       log('외부 링크 열기 실패', name: _tag, error: e, stackTrace: st);
+      _showOpenFailure();
     }
+  }
+
+  void _showOpenFailure() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('연결할 수 있는 앱을 찾지 못했어요.')));
   }
 
   void _openMapView() {
@@ -435,7 +444,7 @@ class _PlaceDetailSheetState extends State<PlaceDetailSheet> {
                                 style: ChaerokTypography.bodyMedium,
                               ),
                             ),
-                            GestureDetector(
+                            _InlineLinkButton(
                               onTap: _openMapView,
                               child: Text(
                                 '지도에서 보기 >',
@@ -461,7 +470,7 @@ class _PlaceDetailSheetState extends State<PlaceDetailSheet> {
                         const SizedBox(height: ChaerokSpacing.xs),
                         _buildInfoRow(
                           icon: Icons.call_outlined,
-                          child: GestureDetector(
+                          child: _InlineLinkButton(
                             onTap: () => _callPhone(phone),
                             child: Text(
                               phone,
@@ -729,6 +738,31 @@ class _PlacePhotoGalleryScreenState extends State<_PlacePhotoGalleryScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 본문 텍스트 사이의 작은 링크("지도에서 보기", 전화번호)가 글자 크기만큼의
+/// 좁은 영역만 반응하지 않도록 최소 터치 높이와 눌림 피드백을 준다.
+class _InlineLinkButton extends StatelessWidget {
+  const _InlineLinkButton({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(ChaerokRadius.sm),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          widthFactor: 1,
+          child: child,
         ),
       ),
     );

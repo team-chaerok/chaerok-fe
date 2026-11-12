@@ -449,6 +449,14 @@ class ExploreScreenState extends State<ExploreScreen>
           child: ExploreMapView(
             markers: _buildExploringMarkers(places),
             enabled: _mapEnabled,
+            onMarkerTap: (id) {
+              for (final place in places) {
+                if (place.identityKey == id) {
+                  _onShowPlaceDetail(place);
+                  return;
+                }
+              }
+            },
           ),
         ),
         Padding(

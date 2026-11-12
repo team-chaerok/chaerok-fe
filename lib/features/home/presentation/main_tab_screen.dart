@@ -11,6 +11,7 @@ import 'package:chaerok/features/film_roll/domain/entity/film_roll_place.dart';
 import 'package:chaerok/features/film_roll/domain/entity/film_roll_status.dart';
 import 'package:chaerok/features/film_roll/film_roll_module.dart';
 import 'package:chaerok/features/film_roll/presentation/page/visit_capture_screen.dart';
+import 'package:chaerok/features/film_roll/presentation/widgets/film_roll_entry_flow.dart';
 import 'package:chaerok/features/home/presentation/home_dashboard_screen.dart';
 import 'package:chaerok/features/home/presentation/widgets/home_bottom_navigation.dart';
 import 'package:flutter/material.dart';
@@ -99,9 +100,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
       // 이 경우 가장 최근에 인증한 장소에 사진을 귀속시킨다.
       final targetPlace = nextPlace ?? _mostRecentlyVisitedPlace(places);
       if (targetPlace == null) {
-        // 코스 미선택 등으로 촬영할 장소 자체가 없는 경우 - 코스 선택 등
-        // 다음 행동은 채록길 탭(FilmRollProgressView)이 이미 보여주므로 그리로 이동한다.
-        _onExploreRequested();
+        // 코스 미선택 등으로 촬영할 장소 자체가 없는 경우. 조용히 탭만 옮기면
+        // (이미 채록길 탭이면 화면 변화가 없어) 버튼이 반응하지 않는 것처럼
+        // 보이므로, 이유를 알리고 코스 선택으로 바로 이어준다.
+        await _showNeedsCourseSelectionDialog(recovered);
         return;
       }
 
@@ -165,6 +167,44 @@ class _MainTabScreenState extends State<MainTabScreen> {
     }
   }
 
+  /// 코스를 고르기 전에는 촬영할 장소가 없어 카메라를 열 수 없음을 알리고,
+  /// "코스 선택하기"로 코스 선택 화면을 바로 연다. 필름롤에 지역 정보가 없으면
+  /// 코스 선택 버튼이 있는 채록길 탭으로 이동한다.
+  Future<void> _showNeedsCourseSelectionDialog(FilmRoll filmRoll) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('코스를 먼저 선택해 주세요'),
+        content: const Text(
+          '촬영할 장소가 정해져야 사진을 찍을 수 있어요.\n'
+          '추천 코스를 고르거나 직접 코스를 만들어 보세요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('코스 선택하기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final regionId = filmRoll.regionId;
+    if (regionId == null) {
+      _onExploreRequested();
+      return;
+    }
+    await pushCourseSelectionAndConfirm(
+      context,
+      filmRollId: filmRoll.id,
+      regionId: regionId,
+    );
+  }
+
   /// 자유 촬영 사진을 귀속시킬 대상. 방문 인증된 장소 중 가장 최근에
   /// 인증된 곳을 고른다(없으면 null, [visitedAt]이 없는 방문 기록은 없음).
   FilmRollPlace? _mostRecentlyVisitedPlace(List<FilmRollPlace> places) {
@@ -212,17 +252,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _onExploreRequested();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt_outlined),
-                  title: const Text('자유 촬영하기'),
-                  subtitle: const Text('곧 만나볼 수 있어요'),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('자유 촬영하기는 준비 중이에요.')),
-                    );
                   },
                 ),
               ],

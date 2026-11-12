@@ -66,6 +66,7 @@ class ExploreMapView extends StatefulWidget {
     required this.markers,
     this.focus,
     this.enabled = true,
+    this.onMarkerTap,
   });
 
   final List<ExploreMapMarker> markers;
@@ -73,6 +74,9 @@ class ExploreMapView extends StatefulWidget {
   /// 카메라를 이동시킬 좌표(다음 장소 보기 등). null이면 이동하지 않는다.
   final ExploreMapMarker? focus;
   final bool enabled;
+
+  /// 마커 탭 콜백 — 탭한 마커의 [ExploreMapMarker.id]를 넘긴다.
+  final ValueChanged<String>? onMarkerTap;
 
   @override
   State<ExploreMapView> createState() => _ExploreMapViewState();
@@ -145,6 +149,7 @@ class _ExploreMapViewState extends State<ExploreMapView> {
             ],
           ),
           text: marker.label,
+          onClick: () => widget.onMarkerTap?.call(marker.id),
         );
         // 비동기 대기 중 새 동기화가 시작됐다면 방금 추가한 POI는 최신 동기화의
         // "기존 제거" 대상에 포함되지 않으므로 즉시 직접 제거한다.

@@ -54,6 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await _handleLoginResponse(context, response);
     } catch (e, st) {
       log('카카오 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+      _showLoginFailure();
     } finally {
       if (mounted) setState(() => _loadingProvider = null);
     }
@@ -78,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await _handleLoginResponse(context, response);
     } catch (e, st) {
       log('구글 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+      _showLoginFailure();
     } finally {
       if (mounted) setState(() => _loadingProvider = null);
     }
@@ -106,6 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await _handleLoginResponse(context, response);
     } catch (e, st) {
       log('애플 로그인 실패 - ${_errorMessage(e)}', name: _tag, stackTrace: st);
+      _showLoginFailure();
     } finally {
       if (mounted) setState(() => _loadingProvider = null);
     }
@@ -134,13 +137,18 @@ class _LoginScreenState extends State<LoginScreen> {
       final tokens = response.tokens!;
       if (tokens.accessToken.isEmpty || tokens.refreshToken.isEmpty) {
         log('로그인 실패 - 토큰 발급 실패(빈 응답)', name: _tag);
+        _showLoginFailure();
         return;
       }
       final saved = await TokenStorage.instance.saveTokens(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
-      if (!saved || !context.mounted) return;
+      if (!context.mounted) return;
+      if (!saved) {
+        _showLoginFailure();
+        return;
+      }
       await CurrentAccountSync.sync();
       try {
         await LocationPermissionService.requestPermission();
@@ -152,7 +160,20 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         MaterialPageRoute(builder: (_) => const MainTabScreen()),
       );
+    } else {
+      log('로그인 실패 - 토큰/회원가입 토큰 모두 없음', name: _tag);
+      _showLoginFailure();
     }
+  }
+
+  /// 로그인 실패 시 버튼이 반응하지 않는 것처럼 보이지 않도록 결과를 알린다.
+  void _showLoginFailure() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('로그인하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      );
   }
 
   @override

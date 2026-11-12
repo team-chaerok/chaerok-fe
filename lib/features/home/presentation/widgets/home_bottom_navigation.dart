@@ -41,19 +41,25 @@ class HomeBottomNavigation extends StatelessWidget {
               onTap: () => onItemSelected(0),
             ),
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  HomeCameraAction(onPressed: onCameraTap),
-                  const SizedBox(height: 2),
-                  Text(
-                    '카메라',
-                    style: ChaerokTypography.caption.copyWith(
-                      color: ChaerokColors.primaryDark,
-                      fontSize: 10,
+              // 원형 버튼뿐 아니라 "카메라" 라벨과 칸 전체도 탭되게 한다
+              // (홈/채록길 칸과 동일한 터치 영역).
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onCameraTap,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    HomeCameraAction(onPressed: onCameraTap),
+                    const SizedBox(height: 2),
+                    Text(
+                      '카메라',
+                      style: ChaerokTypography.caption.copyWith(
+                        color: ChaerokColors.primaryDark,
+                        fontSize: 10,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             _NavigationItem(

@@ -89,7 +89,9 @@ class _LocationVerificationScreenState
 
   /// 인증 전 지도 미리보기에 쓸 현재 좌표를 조회한다. 권한 다이얼로그를 띄우지
   /// 않고, 실패해도 오류 화면 없이 지도만 비워둔다(인증은 CTA에서 시작).
-  Future<void> _loadPreviewPosition() async {
+  /// [userInitiated]면(새로고침/현재 위치 버튼) 실패 시 안내를 띄워 버튼이
+  /// 반응하지 않는 것처럼 보이지 않게 한다.
+  Future<void> _loadPreviewPosition({bool userInitiated = false}) async {
     if (_isReloadingPreview) return;
     setState(() => _isReloadingPreview = true);
     try {
@@ -107,12 +109,24 @@ class _LocationVerificationScreenState
             state: ExploreMarkerState.currentLocation,
           );
         });
+      } else if (userInitiated) {
+        _showPreviewFailure();
       }
     } catch (e, st) {
       log('위치 미리보기 좌표 조회 실패', name: _tag, error: e, stackTrace: st);
+      if (userInitiated) _showPreviewFailure();
     } finally {
       if (mounted) setState(() => _isReloadingPreview = false);
     }
+  }
+
+  void _showPreviewFailure() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('현재 위치를 불러오지 못했어요. 아래 위치 인증하기로 위치 권한을 허용해 주세요.'),
+      ),
+    );
   }
 
   Future<void> _run() async {
@@ -165,7 +179,8 @@ class _LocationVerificationScreenState
               mapPreview: _buildMapPreview(),
               isReloading: _isReloadingPreview,
               onVerifyTap: () => unawaited(_run()),
-              onReloadTap: () => unawaited(_loadPreviewPosition()),
+              onReloadTap: () =>
+                  unawaited(_loadPreviewPosition(userInitiated: true)),
             )
           : Padding(
               padding: const EdgeInsets.all(ChaerokSpacing.xxl),
@@ -202,7 +217,7 @@ class _LocationVerificationScreenState
           right: ChaerokSpacing.md,
           bottom: ChaerokSpacing.md,
           child: _RecenterButton(
-            onTap: () => unawaited(_loadPreviewPosition()),
+            onTap: () => unawaited(_loadPreviewPosition(userInitiated: true)),
           ),
         ),
       ],
